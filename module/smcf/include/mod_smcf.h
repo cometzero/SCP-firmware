@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -110,7 +110,15 @@ struct smcf_data_api {
      * \retval ::FWK_E_PARAM The identifier is invalid.
      */
     int (*start_data_sampling)(fwk_id_t elmenent_id);
-
+    /*!
+     * \brief Stop data sampling
+     *
+     * \param element_id Identifier of the element
+     *
+     * \retval ::FWK_SUCCESS Operation successful.
+     * \retval ::FWK_E_PARAM The identifier is invalid.
+     */
+    int (*stop_data_sampling)(fwk_id_t elmenent_id);
     /*!
      * \brief Get the last data value available
      *

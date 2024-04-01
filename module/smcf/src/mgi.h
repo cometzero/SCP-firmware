@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -478,6 +478,9 @@ int mgi_set_sample_type(struct smcf_mgi_reg *smcf_mgi, uint32_t type);
 
 /* Enable sample */
 void mgi_enable_sample(struct smcf_mgi_reg *smcf_mgi);
+
+/* Disable sample */
+void mgi_disable_sample(struct smcf_mgi_reg *smcf_mgi);
 
 /* Is sampling ongoing */
 bool mgi_is_sample_ongoing(struct smcf_mgi_reg *smcf_mgi);

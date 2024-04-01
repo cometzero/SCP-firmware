@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2024-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -94,6 +94,19 @@ static int smcf_start_data_sample(fwk_id_t element_id)
 
     mgi_enable_sample(element_ctx->mgi);
 
+    return FWK_SUCCESS;
+}
+
+static int smcf_stop_data_sample(fwk_id_t element_id)
+{
+    struct smcf_element_ctx *element_ctx;
+
+    element_ctx = get_domain_ctx(element_id);
+    if (element_ctx == NULL) {
+        return FWK_E_PARAM;
+    }
+
+    mgi_disable_sample(element_ctx->mgi);
     return FWK_SUCCESS;
 }
 
@@ -358,6 +371,7 @@ static int smcf_mli_disable(fwk_id_t mli_id)
 
 static const struct smcf_data_api data_api = {
     .start_data_sampling = smcf_start_data_sample,
+    .stop_data_sampling = smcf_stop_data_sample,
     .get_data = smcf_get_element_data,
 };
 
