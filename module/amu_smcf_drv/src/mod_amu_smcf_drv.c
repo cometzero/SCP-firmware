@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -51,7 +51,7 @@ static int amu_smcf_drv_get_counter_value(
     unsigned int i, core_idx, amu_counter_idx;
     struct amu_smcf_drv_element_config *core_counters_cfg;
     struct mod_smcf_buffer smcf_tag_buf;
-    static uint32_t tag_buf[AMU_TAG_BUFFER_SIZE];
+    static uint32_t tag_buf[AMU_TAG_BUFFER_SIZE_MAX];
 
     /* arguments check */
     if (!fwk_module_is_valid_sub_element_id(start_counter_id) ||
@@ -68,13 +68,14 @@ static int amu_smcf_drv_get_counter_value(
     }
 
     /* Prepare smcf get_data arguments */
-    memset(tag_buf, 0, sizeof(uint32_t) * AMU_TAG_BUFFER_SIZE);
+    memset(
+        tag_buf, 0, sizeof(uint32_t) * core_counters_cfg->amu_tag_buffer_size);
     memset(
         amu_smcf_drv_ctx.amu_smcf_data_buf.ptr,
         0,
         amu_smcf_drv_ctx.amu_smcf_data_buf.size);
     smcf_tag_buf.ptr = tag_buf;
-    smcf_tag_buf.size = AMU_TAG_BUFFER_SIZE;
+    smcf_tag_buf.size = core_counters_cfg->amu_tag_buffer_size;
     amu_smcf_data = amu_smcf_drv_ctx.amu_smcf_data_buf.ptr;
 
     status = amu_smcf_drv_ctx.data_api->get_data(

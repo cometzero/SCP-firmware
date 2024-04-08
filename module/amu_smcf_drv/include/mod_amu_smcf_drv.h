@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,7 +10,7 @@
 
 #include <fwk_id.h>
 
-#define AMU_TAG_BUFFER_SIZE 16
+#define AMU_TAG_BUFFER_SIZE_MAX 128
 
 /*!
  * \brief amu_smcf_drv element config.
@@ -28,6 +28,9 @@ struct amu_smcf_drv_element_config {
 
     /*! Table of counter offsets per core. */
     uint32_t *counter_offsets;
+
+    /*! SMCF Tag buffer size */
+    uint32_t amu_tag_buffer_size;
 };
 
 /*!
