@@ -22,6 +22,16 @@ set(SCP_ENABLE_AE_EXTENSION TRUE)
 
 set(SCP_ENABLE_SCMI_NOTIFICATIONS TRUE)
 
+set(SCP_ENABLE_SCMI_PFDI_MONITOR_INIT FALSE)
+
+if (NOT DEFINED SCP_PC_CONFIGURED_CORES_COUNT)
+    set(SCP_PC_CONFIGURED_CORES_COUNT 4)
+endif()
+
+if (NOT DEFINED SCP_PFDI_ONLINE_TIMEOUT_US)
+    set(SCP_PFDI_ONLINE_TIMEOUT_US 100000UL)
+endif()
+
 list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../module/si0_platform"
      "${CMAKE_CURRENT_LIST_DIR}/../module/ros_clock"
@@ -32,7 +42,9 @@ list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../../module/ssu"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/test_ssu"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/sbistc"
-     "${CMAKE_CURRENT_LIST_DIR}/../../module/test_sbistc")
+     "${CMAKE_CURRENT_LIST_DIR}/../../module/test_sbistc"
+     "${CMAKE_CURRENT_LIST_DIR}/../module/pfdi_monitor"
+     "${CMAKE_CURRENT_LIST_DIR}/../module/scmi_pfdi_monitor")
 
 list(APPEND SCP_MODULES
     "armv8r-mpu"
@@ -72,4 +84,10 @@ if(SCP_ENABLE_DEBUGGER)
         "test-fmu"
         "test-ssu"
         "test-sbistc")
+endif()
+
+if(SCP_ENABLE_SCMI_PFDI_MONITOR)
+    list(APPEND SCP_MODULES
+        "pfdi-monitor"
+        "scmi-pfdi-monitor")
 endif()

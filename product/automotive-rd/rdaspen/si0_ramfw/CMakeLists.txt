@@ -47,3 +47,15 @@ if(SCP_ENABLE_DEBUGGER)
     target_sources(rdaspen-si0-bl2 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/config_debugger_cli.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/config_integration_test.c")
 endif()
+
+target_compile_definitions(rdaspen-si0-bl2 PUBLIC
+        -DPC_CONFIGURED_CORES_COUNT=${SCP_PC_CONFIGURED_CORES_COUNT})
+
+if(SCP_ENABLE_SCMI_PFDI_MONITOR)
+    target_compile_definitions(rdaspen-si0-bl2 PUBLIC
+        -DPFDI_ONLINE_TIMEOUT_US=${SCP_PFDI_ONLINE_TIMEOUT_US})
+    target_sources(rdaspen-si0-bl2 PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/config_scmi_pfdi_monitor.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/config_pfdi_monitor.c"
+        )
+endif()

@@ -24,10 +24,9 @@ static const struct fwk_element timer_dev_table[] = {
         .name = "REFCLK",
         .data = &((struct mod_timer_dev_config) {
             .id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_GTIMER, 0),
-            .timer_irq = CL0_SYSTEM_TIMER_IRQ,
         }),
         .sub_element_count =
-            SI0_CFGD_MOD_TIMER_ALARM_IDX_COUNT, /* Number of alarms */
+            SI0_CFGD_MOD_TIMER_REFCLK_ALARM_IDX_COUNT, /* Number of alarms */
     },
     [1] = {
         .name = "SI0_TIMER",

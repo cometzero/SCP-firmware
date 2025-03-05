@@ -20,6 +20,24 @@
 #include <fwk_module.h>
 #include <fwk_module_idx.h>
 
+#define SCMI_PFDI_MONITOR_AP(cluster, core) \
+    { \
+        .name = "SCMI_PFDI_MONITOR_AP_CLUSTER_" #cluster "_CORE_" #core, \
+        .data = &((struct mod_scmi_service_config){ \
+            .transport_id = FWK_ID_ELEMENT_INIT( \
+                FWK_MODULE_IDX_TRANSPORT, \
+                SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_##cluster##_CORE_##core), \
+            .transport_api_id = FWK_ID_API_INIT( \
+                FWK_MODULE_IDX_TRANSPORT, \
+                MOD_TRANSPORT_API_IDX_SCMI_TO_TRANSPORT), \
+            .transport_notification_init_id = FWK_ID_NOTIFICATION_INIT( \
+                FWK_MODULE_IDX_TRANSPORT, \
+                MOD_TRANSPORT_NOTIFICATION_IDX_INITIALIZED), \
+            .scmi_agent_id = SI0_SCMI_AGENT_IDX_PFDI_MONITOR, \
+            .scmi_p2a_id = FWK_ID_NONE_INIT, \
+        }), \
+    }
+
 static const struct fwk_element service_table[SI0_CFGD_MOD_SCMI_EIDX_COUNT + 1] = {
     [SI0_CFGD_MOD_SCMI_EIDX_RSE] = {
         .name = "SCMI_SERVICE_TO_RSE",
@@ -76,6 +94,22 @@ static const struct fwk_element service_table[SI0_CFGD_MOD_SCMI_EIDX_COUNT + 1] 
         }),
     },
 #endif
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_0] = SCMI_PFDI_MONITOR_AP(0, 0),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_1] = SCMI_PFDI_MONITOR_AP(0, 1),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_2] = SCMI_PFDI_MONITOR_AP(0, 2),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_3] = SCMI_PFDI_MONITOR_AP(0, 3),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_0] = SCMI_PFDI_MONITOR_AP(1, 0),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_1] = SCMI_PFDI_MONITOR_AP(1, 1),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_2] = SCMI_PFDI_MONITOR_AP(1, 2),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_3] = SCMI_PFDI_MONITOR_AP(1, 3),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_0] = SCMI_PFDI_MONITOR_AP(2, 0),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_1] = SCMI_PFDI_MONITOR_AP(2, 1),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_2] = SCMI_PFDI_MONITOR_AP(2, 2),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_3] = SCMI_PFDI_MONITOR_AP(2, 3),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_0] = SCMI_PFDI_MONITOR_AP(3, 0),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_1] = SCMI_PFDI_MONITOR_AP(3, 1),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_2] = SCMI_PFDI_MONITOR_AP(3, 2),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_3] = SCMI_PFDI_MONITOR_AP(3, 3),
     [SI0_CFGD_MOD_SCMI_EIDX_COUNT] = { 0 }
 };
 
@@ -93,13 +127,17 @@ static struct mod_scmi_agent agent_table[SI0_SCMI_AGENT_IDX_COUNT] = {
         .type = SCMI_AGENT_TYPE_PSCI,
         .name = "PSCI",
     },
+    [SI0_SCMI_AGENT_IDX_PFDI_MONITOR] = {
+        .type = SCMI_AGENT_TYPE_OTHER,
+        .name = "SI0_SCMI_AGENT_PFDI_MONITOR",
+    },
 };
 
 const struct fwk_module_config config_scmi = {
     .data =
         &(struct mod_scmi_config){
-            .protocol_count_max = 4,
-            .protocol_requester_count_max = 1,
+            .protocol_count_max = 5,
+            .protocol_requester_count_max = 2,
             .agent_count = FWK_ARRAY_SIZE(agent_table) - 1,
             .agent_table = agent_table,
             .vendor_identifier = "arm",

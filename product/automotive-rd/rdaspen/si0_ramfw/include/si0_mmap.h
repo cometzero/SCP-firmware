@@ -166,7 +166,18 @@ static_assert(
 
 /* SCMI Secure Payload Area */
 #define SI0_SCMI_PAYLOAD_S_A2P_BASE (SI0_SDS_SECURE_BASE + SI0_SDS_SECURE_SIZE)
-#define SI0_SCMI_PAYLOAD_SIZE       (128)
+#define SI0_SCMI_PAYLOAD_SIZE       (0x100)
+
+/* SCMI PFDI Monitor Secure Payload Area */
+#define SI0_SCMI_PFDI_MONITOR_S_A2P_BASE \
+    (SI0_SCMI_PAYLOAD_S_A2P_BASE + SI0_SCMI_PAYLOAD_SIZE)
+/*
+ * The size of reserved shared memory for each core =
+ * sizeof(struct mod_transport_buffer) + SCMI PFDI Monitor payload size =
+ * 32 + 4 = 36 bytes
+ */
+#define SI0_SCMI_PFDI_MONITOR_SIZE_CORE (36)
+#define SI0_SCMI_PFDI_MONITOR_SIZE      (SI0_SCMI_PFDI_MONITOR_SIZE_CORE * 16U)
 
 /* Shared RSE<->SI shared SRAM ie. SI Local SRAM Banks group0 */
 #define SI0_RSE_SHARED_SRAM_BASE (0x40000000UL)

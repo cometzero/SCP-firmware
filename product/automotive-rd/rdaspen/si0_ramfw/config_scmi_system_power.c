@@ -25,7 +25,7 @@ const struct fwk_module_config config_scmi_system_power = {
 #ifdef BUILD_HAS_SCMI_NOTIFICATIONS
         .alarm_id = FWK_ID_SUB_ELEMENT_INIT(
             FWK_MODULE_IDX_TIMER,
-            SI0_ALARM_ELEMENT_IDX,
+            SI0_REFCLK_ALARM_ELEMENT_IDX,
             SI0_CFGD_SCMI_NOTIFICATION_ALARM_IDX),
         .graceful_timeout = 1000000, /* us */
 #endif

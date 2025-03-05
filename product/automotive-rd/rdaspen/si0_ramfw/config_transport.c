@@ -8,15 +8,16 @@
  *     Configuration data for module 'transport'.
  */
 
+#include "platform_core.h"
 #include "si0_cfgd_mhu3.h"
 #include "si0_cfgd_power_domain.h"
 #include "si0_cfgd_transport.h"
 #include "si0_mmap.h"
 
 #include <mod_mhu3.h>
+#include <mod_ras_handlers.h>
 #include <mod_si0_platform.h>
 #include <mod_transport.h>
-#include <mod_ras_handlers.h>
 
 #include <fwk_element.h>
 #include <fwk_id.h>
@@ -32,6 +33,27 @@
     FWK_ID_NOTIFICATION_INIT( \
         FWK_MODULE_IDX_SI0_PLATFORM, \
         MOD_SI0_PLATFORM_NOTIFICATION_IDX_SUBSYS_INITIALIZED)
+
+#define TRANSPORT_PFDI_MONITOR_AP(cluster, core) \
+    { \
+        .name = "TRANSPORT_PFDI_MONITOR_AP_CLUSTER_" #cluster "_CORE_" #core, \
+        .data = &((struct mod_transport_channel_config){ \
+            .transport_type = MOD_TRANSPORT_CHANNEL_TRANSPORT_TYPE_OUT_BAND, \
+            .policies = TRANSPORT_CH_SEC_MBX_INIT, \
+            .channel_type = MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER, \
+            .out_band_mailbox_address = \
+                (uintptr_t)SI0_SCMI_PFDI_MONITOR_S_A2P_BASE + \
+                (((cluster * CORES_PER_CLUSTER) + core) * \
+                 SI0_SCMI_PFDI_MONITOR_SIZE_CORE), \
+            .out_band_mailbox_size = SI0_SCMI_PFDI_MONITOR_SIZE_CORE, \
+            .driver_id = FWK_ID_SUB_ELEMENT_INIT( \
+                FWK_MODULE_IDX_MHU3, \
+                SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_S, \
+                SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_##cluster##_CORE_##core), \
+            .driver_api_id = FWK_ID_API_INIT( \
+                FWK_MODULE_IDX_MHU3, MOD_MHU3_API_IDX_TRANSPORT_DRIVER), \
+        }), \
+    }
 
 /* Module 'transport' element configuration table */
 static const struct fwk_element element_table[]  = {
@@ -134,6 +156,22 @@ static const struct fwk_element element_table[]  = {
                         MOD_RAS_API_IDX_SIGNALS),
         }),
     },
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_0] = TRANSPORT_PFDI_MONITOR_AP(0, 0),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_1] = TRANSPORT_PFDI_MONITOR_AP(0, 1),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_2] = TRANSPORT_PFDI_MONITOR_AP(0, 2),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_3] = TRANSPORT_PFDI_MONITOR_AP(0, 3),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_0] = TRANSPORT_PFDI_MONITOR_AP(1, 0),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_1] = TRANSPORT_PFDI_MONITOR_AP(1, 1),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_2] = TRANSPORT_PFDI_MONITOR_AP(1, 2),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_1_CORE_3] = TRANSPORT_PFDI_MONITOR_AP(1, 3),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_0] = TRANSPORT_PFDI_MONITOR_AP(2, 0),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_1] = TRANSPORT_PFDI_MONITOR_AP(2, 1),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_2] = TRANSPORT_PFDI_MONITOR_AP(2, 2),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_2_CORE_3] = TRANSPORT_PFDI_MONITOR_AP(2, 3),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_0] = TRANSPORT_PFDI_MONITOR_AP(3, 0),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_1] = TRANSPORT_PFDI_MONITOR_AP(3, 1),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_2] = TRANSPORT_PFDI_MONITOR_AP(3, 2),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_3] = TRANSPORT_PFDI_MONITOR_AP(3, 3),
     [SI0_CFGD_MOD_TRANSPORT_EIDX_COUNT] = { 0 },
 };
 
