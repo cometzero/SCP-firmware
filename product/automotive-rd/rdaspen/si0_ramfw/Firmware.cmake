@@ -26,6 +26,7 @@ list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../module/si0_platform"
      "${CMAKE_CURRENT_LIST_DIR}/../module/ros_clock"
      "${CMAKE_CURRENT_LIST_DIR}/../module/cluster_control"
+     "${CMAKE_CURRENT_LIST_DIR}/../module/ras_handlers"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/fmu"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/test_fmu"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/ssu"
@@ -62,6 +63,7 @@ list(APPEND SCP_MODULES
     "ssu"
     "cluster-control"
     "si0-platform"
+    "ras-handlers"
 )
 
 if(SCP_ENABLE_DEBUGGER)

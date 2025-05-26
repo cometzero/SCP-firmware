@@ -127,6 +127,7 @@ static_assert(
  * Size of SCP's view of per-cluster utility memory region.
  */
 #define SI0_CLUSTER_UTILITY_SIZE (0x4000000UL)
+#define SI0_CORE_REG_UTILITY_SIZE (0x100000UL)
 
 /*
  * Offsets of various blocks within cluster utility that is
@@ -136,6 +137,7 @@ static_assert(
 #define SI0_CLUSTER_UTILITY_CLUSTER_PPU_OFFSET     (0x1030000UL)
 #define SI0_CLUSTER_UTILITY_CLUSTER_AE_OFFSET      (0x1050000UL)
 #define SI0_CLUSTER_UTILITY_CORE_PPU0_OFFSET       (0x1080000UL)
+#define SI0_CLUSTER_UTILITY_CORE0_RAS_REG_OFFSET   (0x10A0000UL)
 #define SI0_CLUSTER_UTILITY_CORE_PPU_OFFSET        (0x100000UL)
 #define SI0_CLUSTER_UTILITY_CLUSTER_CONTROL_OFFSET (0x2000000UL)
 
