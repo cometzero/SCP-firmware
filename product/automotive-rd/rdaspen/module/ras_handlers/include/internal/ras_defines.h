@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #define MOD_NAME            "[RAS_FFH_SERVICE]"
+#define CPU_HANDLE_MOD_NAME "[AP_RAS_CPU_INT]"
 
 // clang-format off
 struct ext_cpu_ras_cluster_regs {

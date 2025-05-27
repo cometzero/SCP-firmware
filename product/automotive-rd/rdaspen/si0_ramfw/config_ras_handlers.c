@@ -153,4 +153,3 @@ static const struct fwk_element ras_config_table[] = {
 const struct fwk_module_config config_ras_handlers = {
     .elements = FWK_MODULE_STATIC_ELEMENTS_PTR(ras_config_table),
 };
-
