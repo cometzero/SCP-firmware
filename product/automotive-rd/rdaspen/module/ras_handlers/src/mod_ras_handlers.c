@@ -7,9 +7,6 @@
 
 #include "internal/ras_defines.h"
 
-#include "si0_mmap.h"
-#include "platform_core.h"
-
 #include <fwk_id.h>
 #include <fwk_log.h>
 #include <fwk_module.h>
@@ -201,7 +198,6 @@ static int mod_ras_handler_init(
     ras_ctx.descriptors = fwk_mm_calloc(element_count,
                                         sizeof(struct mod_ras_isr_desc));
     ras_ctx.desc_count = element_count;
-
     return FWK_SUCCESS;
 }
 
