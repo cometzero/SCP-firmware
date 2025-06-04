@@ -18,25 +18,25 @@
  * These are Core Fault SPIs on SI0 that trigger
  * with Core Fault PPI from AP
  */
-#define CLUSTER0_FAULT_INT   324
-#define CLUSTER1_FAULT_INT   326
-#define CLUSTER2_FAULT_INT   328
-#define CLUSTER3_FAULT_INT   330
+#define CLUSTER0_FAULT_INT 324
+#define CLUSTER1_FAULT_INT 326
+#define CLUSTER2_FAULT_INT 328
+#define CLUSTER3_FAULT_INT 330
 
 /* RAS MHU Sync based constants */
 #define RAS_SYNC_FLAG                  0x2u
 #define RAS_SYNC_CHANNEL               0x0u
 #define RAS_MAX_RETRIES                100000
 
-#define CPU_RAS_ERR_RECORD_REG_ADDR(core_idx) (SI0_ATW1_CLUSTER_UTILITY_BASE + \
-                                              (core_idx * SI0_CORE_REG_UTILITY_SIZE) + \
-                                               SI0_CLUSTER_UTILITY_CORE0_RAS_REG_OFFSET)
+#define CPU_RAS_ERR_RECORD_REG_ADDR(core_idx) \
+    (SI0_ATW1_CLUSTER_UTILITY_BASE + (core_idx * SI0_CORE_REG_UTILITY_SIZE) + \
+     SI0_CLUSTER_UTILITY_CORE0_RAS_REG_OFFSET)
 
 /*
  * RAS Components
  */
 enum ras_ip_idx {
-    CPU_CL0 =0,
+    CPU_CL0 = 0,
     CPU_CL1,
     CPU_CL2,
     CPU_CL3,

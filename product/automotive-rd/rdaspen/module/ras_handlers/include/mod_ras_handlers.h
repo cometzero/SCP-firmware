@@ -15,6 +15,8 @@
 #include <stdint.h>
 #include <fwk_interrupt.h>
 
+#include <mod_ssu.h>
+
 /*!
  * \addtogroup GroupPLATFORMModule PLATFORM Product Modules
  * \{
@@ -51,7 +53,7 @@ struct mod_ras_isr_desc {
     /*! Number of PEs */
     unsigned int pe_count;
     /*! Error Record Base Address */
-    const uintptr_t * err_records_base;
+    const uintptr_t *err_records_base;
     /*! Number of Error Records */
     unsigned int err_record_count;
     /*! MHU in and out base */
@@ -69,6 +71,9 @@ struct mod_ras_isr_desc {
 struct ras_context {
     struct mod_ras_isr_desc *descriptors;
     unsigned int desc_count;
+    struct mod_ssu_sys_register_api *ssu_sys_reg_api_ctx;
+    fwk_id_t ssu_sys_reg_id;
+    fwk_id_t element_id_ssu;
 };
 
 /*!

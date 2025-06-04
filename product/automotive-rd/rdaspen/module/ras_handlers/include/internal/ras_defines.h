@@ -15,6 +15,12 @@
 #define MOD_NAME            "[RAS_FFH_SERVICE]"
 #define CPU_HANDLE_MOD_NAME "[AP_RAS_CPU_INT]"
 
+#define ERX_STATUS_V  (1UL << 30)
+#define ERX_STATUS_UC (1UL << 29)
+#define ERX_STATUS_CE (1UL << 25)
+#define ERX_STATUS_DE (1UL << 23)
+
+
 // clang-format off
 struct ext_cpu_ras_cluster_regs {
     FWK_R   uint64_t  ERRXFR;

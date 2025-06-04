@@ -14,11 +14,11 @@
 #include <mod_ras_handlers.h>
 #include <fwk_macros.h>
 
-#define CLUSTER_X_BASE 0xDCDCDCD0
+#define CLUSTER_X_BASE                 0xDCDCDCD0
 #define CLUSTER_ERR_REG_MOCK(core_idx) (CLUSTER_X_BASE + (0x8 * core_idx))
 
-#define GIC_LEVEL  0x0
-#define GIC_EDGE   0x2
+#define GIC_LEVEL 0x0
+#define GIC_EDGE  0x2
 
 /*!
  * \brief RAS IP indexes.
@@ -54,7 +54,7 @@ static const unsigned int cpu_clx_pe_ids[] = { 0, 1, 2, 3 };
 static const struct mod_ras_isr_desc valid_intr_desc[] = {
     {
         .interrupt_no = TEST_RAS_CLUSTERX_INTR_IDX,
-        .ip_type  = TYPE_CPU_IP,
+        .ip_type = TYPE_CPU_IP,
         .interrupt_trigger_type = GIC_LEVEL,
         .pe_ids = cpu_clx_pe_ids,
         .pe_count = FWK_ARRAY_SIZE(cpu_clx_pe_ids),

@@ -12,6 +12,9 @@ set(UNIT_TEST_TARGET mod_ras_handlers_unit_test)
 set(MODULE_SRC ${PRODUCT_ROOT}/${TEST_MODULE}/src)
 set(MODULE_INC ${PRODUCT_ROOT}/${TEST_MODULE}/include)
 
+list(APPEND OTHER_MODULE_INC
+        ${PRODUCT_ROOT}/automotive-rd/module/ssu/include)
+
 set(MODULE_UT_SRC ${CMAKE_CURRENT_LIST_DIR})
 set(MODULE_UT_INC ${CMAKE_CURRENT_LIST_DIR})
 

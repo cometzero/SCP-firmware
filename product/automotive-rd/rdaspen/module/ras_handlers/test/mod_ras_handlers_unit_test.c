@@ -30,8 +30,7 @@ void test_ras_handlers_init(void)
     int status;
 
     /* Tests the IP count sanity */
-    status = mod_ras_handler_init(
-        fwk_module_id_ras_handlers, IPCOUNT, NULL);
+    status = mod_ras_handler_init(fwk_module_id_ras_handlers, IPCOUNT, NULL);
     TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
 }
 
@@ -40,16 +39,14 @@ void test_ras_handlers_failed_init(void)
     int status;
 
     /* Tests the IP count sanity */
-    status = mod_ras_handler_init(
-        fwk_module_id_ras_handlers,0,NULL);
+    status = mod_ras_handler_init(fwk_module_id_ras_handlers, 0, NULL);
     TEST_ASSERT_EQUAL(FWK_E_PARAM, status);
 }
 
 void test_ras_handlers_search_by_intr_id(void)
 {
     int status;
-    status = mod_ras_handler_init(
-        fwk_module_id_ras_handlers, IPCOUNT, NULL);
+    status = mod_ras_handler_init(fwk_module_id_ras_handlers , IPCOUNT , NULL);
 
     TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
 
@@ -58,13 +55,14 @@ void test_ras_handlers_search_by_intr_id(void)
         fwk_id_t element_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_TEST_MODULE, idx);
         fwk_id_get_element_idx_ExpectAndReturn(element_id, idx);
 
-        status = mod_ras_handler_elements_init(element_id, IPCOUNT,
-            &valid_intr_desc[idx]);
-        TEST_ASSERT_EQUAL(FWK_SUCCESS,status);
+        status = mod_ras_handler_elements_init(
+            element_id, IPCOUNT, &valid_intr_desc[idx]);
+        TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
 
         unsigned fidx = find_descriptor_idx(TEST_RAS_CLUSTERX_INTR_IDX + idx);
-        /* The result should be the same index since we are searching the same list*/
-        TEST_ASSERT_EQUAL(idx,fidx);
+        /* The result should be the same index since we are searching the same
+         * list*/
+        TEST_ASSERT_EQUAL(idx, fidx);
     }
 
 }

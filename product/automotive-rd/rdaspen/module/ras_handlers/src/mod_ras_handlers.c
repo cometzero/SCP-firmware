@@ -6,6 +6,7 @@
  */
 
 #include "internal/ras_defines.h"
+#include "si0_cfgd_ssu.h"
 
 #include <fwk_id.h>
 #include <fwk_log.h>
@@ -18,6 +19,9 @@
 #include <fwk_mmio.h>
 
 static struct ras_context ras_ctx;
+
+static fwk_id_t element_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_SSU,
+    CONFIG_SSU_ELEMENT_IDX);
 
 static void ring_ras_sync_door_bell_si2ap(
     uintptr_t mhu_send_base,
@@ -64,6 +68,7 @@ static unsigned int find_descriptor_idx(unsigned int intr)
 static void cpu_ras_intr_handler()
 {
     uint32_t intr, mhu_reply;
+    uint32_t ssu_state;
     uint32_t retries = 0;
     unsigned int cpu_idx = 0;
     uint64_t erx_status;
@@ -75,9 +80,10 @@ static void cpu_ras_intr_handler()
     /* Find the descriptor from the Interrupt number */
     desc_idx = find_descriptor_idx(intr);
 
-    for (;cpu_idx < ras_ctx.descriptors[desc_idx].err_record_count; cpu_idx++) {
-        reg = (struct ext_cpu_ras_cluster_regs *)
-                      ras_ctx.descriptors[desc_idx].err_records_base[cpu_idx];
+    for (; cpu_idx < ras_ctx.descriptors[desc_idx].err_record_count;
+         cpu_idx++) {
+        reg = (struct ext_cpu_ras_cluster_regs *)ras_ctx.descriptors[desc_idx]
+                  .err_records_base[cpu_idx];
 
         /* The Faulty CPU has been found in the Cluster */
         if (reg->ERRXSTATUS != 0x0) {
@@ -91,6 +97,8 @@ static void cpu_ras_intr_handler()
         return;
     }
 
+    erx_status = reg->ERRXSTATUS;
+
     ring_ras_sync_door_bell_si2ap(
         ras_ctx.descriptors[desc_idx].mhu_out_base,
         ras_ctx.descriptors[desc_idx].mhu_channel,
@@ -98,7 +106,6 @@ static void cpu_ras_intr_handler()
     );
 
     do {
-
         /* Read if Reply has been recieved */
         mhu_reply = poll_ras_sync_doorbell_ap2si(
             ras_ctx.descriptors[desc_idx].mhu_in_base,
@@ -128,6 +135,30 @@ static void cpu_ras_intr_handler()
     FWK_LOG_INFO("%s fwk_int number = %d",CPU_HANDLE_MOD_NAME ,intr);
     FWK_LOG_INFO("%s ERXSTATUS = 0x%lx",CPU_HANDLE_MOD_NAME, reg->ERRXSTATUS);
     FWK_LOG_INFO("%s ERXMISC0 = 0x%lx", CPU_HANDLE_MOD_NAME,reg->ERRXMISC0);
+
+    if (erx_status & ERX_STATUS_CE) {
+        FWK_LOG_INFO("%s Fault Type = Correctable Error", CPU_HANDLE_MOD_NAME);
+    }
+
+    else if (erx_status & ERX_STATUS_DE) {
+        FWK_LOG_INFO("%s Fault Type = Deferred Error", CPU_HANDLE_MOD_NAME);
+        ras_ctx.ssu_sys_reg_api_ctx->set_sys_ctrl(
+            ras_ctx.element_id_ssu, MOD_SSU_FSM_NCE_STATE);
+        ras_ctx.ssu_sys_reg_api_ctx->get_sys_status(
+            ras_ctx.element_id_ssu, &ssu_state);
+        FWK_LOG_INFO("%s SSU State Changed to 0x%x", CPU_HANDLE_MOD_NAME,
+            ssu_state);
+    }
+
+    else {
+        FWK_LOG_INFO("%s Fault Type = Uncontainable Error", CPU_HANDLE_MOD_NAME);
+        ras_ctx.ssu_sys_reg_api_ctx->set_sys_ctrl(
+            ras_ctx.element_id_ssu, MOD_SSU_FSM_CE_STATE);
+        ras_ctx.ssu_sys_reg_api_ctx->get_sys_status(
+            ras_ctx.element_id_ssu, &ssu_state);
+        FWK_LOG_INFO("%s SSU State Changed to 0x%x", CPU_HANDLE_MOD_NAME,
+            ssu_state);
+    }
 
     /* All Retries fail clear the respective error record */
     if (retries==ras_ctx.descriptors[desc_idx].mhu_poll_retries) {
@@ -195,9 +226,10 @@ static int mod_ras_handler_init(
     }
 
     /* Initialise space for descriptors */
-    ras_ctx.descriptors = fwk_mm_calloc(element_count,
-                                        sizeof(struct mod_ras_isr_desc));
-    ras_ctx.desc_count = element_count;
+    ras_ctx.descriptors =
+        fwk_mm_calloc(element_count, sizeof(struct mod_ras_isr_desc));
+     ras_ctx.desc_count = element_count;
+
     return FWK_SUCCESS;
 }
 
@@ -240,9 +272,28 @@ static int mod_ras_handler_elements_init(
     return FWK_SUCCESS;
 }
 
+static int ras_handler_bind(fwk_id_t id, unsigned int round)
+{
+    int status;
+    ras_ctx.ssu_sys_reg_id = FWK_ID_MODULE(FWK_MODULE_IDX_SSU);
+    ras_ctx.element_id_ssu = element_id;
+
+    status = fwk_module_bind(
+        ras_ctx.ssu_sys_reg_id,
+        FWK_ID_API(FWK_MODULE_IDX_SSU, MOD_SSU_SYS_API_IDX),
+        &ras_ctx.ssu_sys_reg_api_ctx);
+
+    if (status != FWK_SUCCESS) {
+        return status;
+    }
+
+    return status;
+}
+
 const struct fwk_module module_ras_handlers = {
     .type = FWK_MODULE_TYPE_SERVICE,
     .init = mod_ras_handler_init,
     .start = mod_ras_handler_start,
     .element_init = mod_ras_handler_elements_init,
+    .bind = ras_handler_bind,
 };
