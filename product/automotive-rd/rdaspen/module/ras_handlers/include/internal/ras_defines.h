@@ -10,6 +10,7 @@
 #define RAS_DEFINES_H
 
 #include <fwk_macros.h>
+
 #include <stdint.h>
 
 #define MOD_NAME            "[RAS_FFH_SERVICE]"
@@ -19,7 +20,6 @@
 #define ERX_STATUS_UC (1UL << 29)
 #define ERX_STATUS_CE (1UL << 25)
 #define ERX_STATUS_DE (1UL << 23)
-
 
 // clang-format off
 struct ext_cpu_ras_cluster_regs {

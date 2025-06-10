@@ -6,7 +6,8 @@
  */
 
  #include "si0_mmap.h"
- #include "platform_core.h"
+ #include "si0_cfgd_transport.h"
+ #include "si0_cfgd_ssu.h"
 
 #include <mod_ras_handlers.h>
 
@@ -27,6 +28,8 @@
 #define RAS_SYNC_FLAG                  0x2u
 #define RAS_SYNC_CHANNEL               0x0u
 #define RAS_MAX_RETRIES                100000
+#define RAS_SYNC_WAIT_TIMEOUT_US       (800 * 1000)
+#define RAS_INTR_PRIORITY              (0x10)
 
 #define CPU_RAS_ERR_RECORD_REG_ADDR(core_idx) \
     (SI0_ATW1_CLUSTER_UTILITY_BASE + (core_idx * SI0_CORE_REG_UTILITY_SIZE) + \
@@ -41,6 +44,17 @@ enum ras_ip_idx {
     CPU_CL2,
     CPU_CL3,
     COMPONENT_END,
+};
+
+static const struct mod_ras_config ras_config_data = {
+    .ssu_sys_elem_id =
+        FWK_ID_ELEMENT(FWK_MODULE_IDX_SSU, CONFIG_SSU_ELEMENT_IDX),
+    .transport_elem_id = FWK_ID_ELEMENT_INIT(
+        FWK_MODULE_IDX_TRANSPORT,
+        SI0_CFGD_MOD_TRANSPORT_EIDX_RAS),
+    /* Use the REFCLK as the source */
+    .timer_elem_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
+    .ras_sync_wait_us = RAS_SYNC_WAIT_TIMEOUT_US,
 };
 
 //Make this a formal struct with core number and the respective Err Record
@@ -85,15 +99,11 @@ static const struct fwk_element ras_config_table[] = {
             .interrupt_no = CLUSTER0_FAULT_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
+            .interrupt_priority = RAS_INTR_PRIORITY,
             .pe_ids = cpu_cl0_pe_ids,
             .pe_count = FWK_ARRAY_SIZE(cpu_cl3_pe_ids),
             .err_records_base = error_records_cl0,
             .err_record_count = FWK_ARRAY_SIZE(error_records_cl0),
-            .mhu_in_base = SI0_AP2SI0_S_MHUV3_RCV_BASE,
-            .mhu_out_base = SI0_SI02AP_S_MHUV3_SEND_BASE,
-            .mhu_channel = RAS_SYNC_CHANNEL,
-            .mhu_flag = RAS_SYNC_FLAG,
-            .mhu_poll_retries = RAS_MAX_RETRIES,
         }),
     },
     [CPU_CL1] = {
@@ -102,15 +112,11 @@ static const struct fwk_element ras_config_table[] = {
             .interrupt_no = CLUSTER1_FAULT_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
+            .interrupt_priority = RAS_INTR_PRIORITY,
             .pe_ids = cpu_cl1_pe_ids,
             .pe_count = FWK_ARRAY_SIZE(cpu_cl3_pe_ids),
             .err_records_base = error_records_cl1,
             .err_record_count = FWK_ARRAY_SIZE(error_records_cl1),
-            .mhu_in_base = SI0_AP2SI0_S_MHUV3_RCV_BASE,
-            .mhu_out_base = SI0_SI02AP_S_MHUV3_SEND_BASE,
-            .mhu_channel = RAS_SYNC_CHANNEL,
-            .mhu_flag = RAS_SYNC_FLAG,
-            .mhu_poll_retries = RAS_MAX_RETRIES,
         }),
     },
     [CPU_CL2] = {
@@ -119,15 +125,11 @@ static const struct fwk_element ras_config_table[] = {
             .interrupt_no = CLUSTER2_FAULT_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
+            .interrupt_priority = RAS_INTR_PRIORITY,
             .pe_ids = cpu_cl2_pe_ids,
             .pe_count = FWK_ARRAY_SIZE(cpu_cl3_pe_ids),
             .err_records_base = error_records_cl2,
             .err_record_count = FWK_ARRAY_SIZE(error_records_cl2),
-            .mhu_in_base = SI0_AP2SI0_S_MHUV3_RCV_BASE,
-            .mhu_out_base = SI0_SI02AP_S_MHUV3_SEND_BASE,
-            .mhu_channel = RAS_SYNC_CHANNEL,
-            .mhu_flag = RAS_SYNC_FLAG,
-            .mhu_poll_retries = RAS_MAX_RETRIES,
         }),
     },
     [CPU_CL3] = {
@@ -136,20 +138,17 @@ static const struct fwk_element ras_config_table[] = {
             .interrupt_no = CLUSTER3_FAULT_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
+            .interrupt_priority = RAS_INTR_PRIORITY,
             .pe_ids = cpu_cl3_pe_ids,
             .pe_count = FWK_ARRAY_SIZE(cpu_cl3_pe_ids),
             .err_records_base = error_records_cl3,
             .err_record_count = FWK_ARRAY_SIZE(error_records_cl3),
-            .mhu_in_base = SI0_AP2SI0_S_MHUV3_RCV_BASE,
-            .mhu_out_base = SI0_SI02AP_S_MHUV3_SEND_BASE,
-            .mhu_channel = RAS_SYNC_CHANNEL,
-            .mhu_flag = RAS_SYNC_FLAG,
-            .mhu_poll_retries = RAS_MAX_RETRIES,
         }),
     },
     [COMPONENT_END]={0},
 };
 
 const struct fwk_module_config config_ras_handlers = {
+    .data = &ras_config_data,
     .elements = FWK_MODULE_STATIC_ELEMENTS_PTR(ras_config_table),
 };

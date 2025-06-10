@@ -16,6 +16,7 @@
 #include <mod_mhu3.h>
 #include <mod_si0_platform.h>
 #include <mod_transport.h>
+#include <mod_ras_handlers.h>
 
 #include <fwk_element.h>
 #include <fwk_id.h>
@@ -108,6 +109,31 @@ static const struct fwk_element element_table[]  = {
         }),
     },
 #endif
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_RAS] = {
+        .name = "RAS Sync",
+        .data = &((
+            struct mod_transport_channel_config) {
+                .transport_type = MOD_TRANSPORT_CHANNEL_TRANSPORT_TYPE_NONE,
+                .policies = MOD_TRANSPORT_POLICY_NONE,
+                .channel_type = MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER,
+                .out_band_mailbox_address =
+                    (uintptr_t) SI0_SCMI_PAYLOAD_S_A2P_BASE,
+                .out_band_mailbox_size = SI0_SCMI_PAYLOAD_SIZE,
+                .driver_id =
+                    FWK_ID_SUB_ELEMENT_INIT(
+                        FWK_MODULE_IDX_MHU3,
+                        SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_S_RAS,
+                        0),
+                .driver_api_id =
+                    FWK_ID_API_INIT(
+                        FWK_MODULE_IDX_MHU3,
+                        MOD_MHU3_API_IDX_TRANSPORT_DRIVER),
+                .signal_api_id =
+                    FWK_ID_API_INIT(
+                        FWK_MODULE_IDX_RAS_HANDLERS,
+                        MOD_RAS_API_IDX_SIGNALS),
+        }),
+    },
     [SI0_CFGD_MOD_TRANSPORT_EIDX_COUNT] = { 0 },
 };
 

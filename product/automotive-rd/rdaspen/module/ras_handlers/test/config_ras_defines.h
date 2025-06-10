@@ -12,6 +12,7 @@
 #define CONFIG_RAS_DEFINES_H
 
 #include <mod_ras_handlers.h>
+
 #include <fwk_macros.h>
 
 #define CLUSTER_X_BASE                 0xDCDCDCD0
