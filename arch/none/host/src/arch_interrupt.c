@@ -54,6 +54,11 @@ int arch_interrupt_set_pending(unsigned int interrupt)
     return FWK_E_SUPPORT;
 }
 
+int arch_interrupt_set_intr_priority(unsigned int interrupt, unsigned int val)
+{
+    return FWK_E_SUPPORT;
+}
+
 int arch_interrupt_clear_pending(unsigned int interrupt)
 {
     return FWK_E_SUPPORT;

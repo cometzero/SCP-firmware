@@ -26,6 +26,7 @@ int is_pending_return_val;
 int configure_return_val;
 int set_pending_return_val;
 int clear_pending_return_val;
+int set_intr_priority;
 int set_isr_return_val;
 int set_isr_param_return_val;
 int set_isr_nmi_return_val;
@@ -92,6 +93,11 @@ int arch_interrupt_set_pending(unsigned int interrupt)
 int arch_interrupt_clear_pending(unsigned int interrupt)
 {
     return clear_pending_return_val;
+}
+
+int arch_interrupt_set_intr_priority(unsigned int interrupt, unsigned int val)
+{
+    return set_intr_priority;
 }
 
 int arch_interrupt_set_isr(unsigned int interrupt, void (*isr)(void))

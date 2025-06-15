@@ -136,6 +136,7 @@
 #define GICR_ICENABLER0 0x0180u
 #define GICR_ISPENDR0   0x0200u
 #define GICR_ICPENDR0   0x0280u
+#define GICD_IPRIORITY  0x0400u
 
 #define GICD_ISENABLER(N) (0x0100u + (4 * (N)))
 #define GICD_ICENABLER(N) (0x0180u + (4 * (N)))

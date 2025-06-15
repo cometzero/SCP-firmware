@@ -170,6 +170,17 @@ int fwk_interrupt_set_pending(unsigned int interrupt);
 int fwk_interrupt_clear_pending(unsigned int interrupt);
 
 /*!
+ * \brief Set interrupt priority interrupt.
+ *
+ * \param interrupt Interrupt number.
+ * \param val Interrupt priority value, dependant on the interrupt controller
+ *
+ * \retval ::FWK_SUCCESS Operation succeeded.
+ * \retval ::FWK_E_PARAM One or more parameters were invalid.
+ */
+int fwk_interrupt_set_intr_priority(unsigned int interrupt, unsigned int val);
+
+/*!
  * \brief Assign an interrupt service routine to an interrupt.
  *
  * \param interrupt Interrupt number. This function accepts FWK_INTERRUPT_NMI as

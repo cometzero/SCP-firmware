@@ -123,6 +123,17 @@ int arch_interrupt_set_pending(unsigned int interrupt);
 int arch_interrupt_clear_pending(unsigned int interrupt);
 
 /*!
+ * \brief Set interrupt priority.
+ *
+ * \param interrupt Interrupt number.
+ * \param val Interrupt priority.
+ *
+ * \retval ::FWK_SUCCESS Operation succeeded.
+ * \retval ::FWK_E_PARAM One or more parameters were invalid.
+ */
+int arch_interrupt_set_intr_priority(unsigned int interrupt, unsigned int val);
+
+/*!
  * \brief Set an IRQ interrupt service routine.
  *
  * \param interrupt Interrupt number.

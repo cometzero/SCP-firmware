@@ -251,6 +251,20 @@ int arch_interrupt_set_pending(unsigned int interrupt)
     return FWK_SUCCESS;
 }
 
+int arch_interrupt_set_intr_priority(unsigned int interrupt, unsigned int val)
+{
+    switch (interrupt_type_from_id(interrupt)) {
+    case INTERRUPT_TYPE_SPI:
+        unsigned int n = interrupt >> 2;
+        fwk_mmio_write_32(FMW_GICD_BASE + GICD_IPRIORITY + (n << 2), val);
+        break;
+    default:
+        return FWK_E_SUPPORT;
+    }
+
+    return FWK_SUCCESS;
+}
+
 int arch_interrupt_clear_pending(unsigned int interrupt)
 {
     switch (interrupt_type_from_id(interrupt)) {

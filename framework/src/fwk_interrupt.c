@@ -64,6 +64,11 @@ int fwk_interrupt_clear_pending(unsigned int interrupt)
     return arch_interrupt_clear_pending(interrupt);
 }
 
+int fwk_interrupt_set_intr_priority(unsigned int interrupt, unsigned int val)
+{
+    return arch_interrupt_set_intr_priority(interrupt, val);
+}
+
 int fwk_interrupt_set_isr(unsigned int interrupt, void (*isr)(void))
 {
     if (isr == NULL) {
