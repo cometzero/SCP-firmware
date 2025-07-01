@@ -15,6 +15,9 @@ set(MODULE_INC ${PRODUCT_ROOT}/${TEST_MODULE}/include)
 list(APPEND OTHER_MODULE_INC
         ${PRODUCT_ROOT}/automotive-rd/module/ssu/include)
 
+list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/transport/include)
+list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/timer/include)
+
 set(MODULE_UT_SRC ${CMAKE_CURRENT_LIST_DIR})
 set(MODULE_UT_INC ${CMAKE_CURRENT_LIST_DIR})
 
@@ -22,3 +25,6 @@ list(APPEND MOCK_REPLACEMENTS fwk_id)
 list(APPEND MOCK_REPLACEMENTS fwk_module)
 
 include(${SCP_ROOT}/unit_test/module_common.cmake)
+
+target_compile_definitions(${UNIT_TEST_TARGET} PUBLIC
+                           "BUILD_HAS_MOD_TRANSPORT")

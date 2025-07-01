@@ -61,11 +61,6 @@ static const struct mod_ras_isr_desc valid_intr_desc[] = {
         .pe_count = FWK_ARRAY_SIZE(cpu_clx_pe_ids),
         .err_records_base = error_records_clx,
         .err_record_count = FWK_ARRAY_SIZE(error_records_clx),
-        .mhu_in_base = 0xFDFDFDFEULL,
-        .mhu_out_base = 0xFDFDFDFDULL,
-        .mhu_channel = 0,
-        .mhu_flag = 0x2,
-        .mhu_poll_retries = 1000,
     },
 };
 

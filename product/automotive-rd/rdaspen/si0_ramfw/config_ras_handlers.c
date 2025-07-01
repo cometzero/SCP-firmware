@@ -5,9 +5,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
- #include "si0_mmap.h"
- #include "si0_cfgd_transport.h"
- #include "si0_cfgd_ssu.h"
+#include "si0_mmap.h"
+#include "si0_cfgd_transport.h"
+#include "si0_cfgd_ssu.h"
 
 #include <mod_ras_handlers.h>
 
@@ -25,11 +25,11 @@
 #define CLUSTER3_FAULT_INT 330
 
 /* RAS MHU Sync based constants */
-#define RAS_SYNC_FLAG                  0x2u
-#define RAS_SYNC_CHANNEL               0x0u
-#define RAS_MAX_RETRIES                100000
-#define RAS_SYNC_WAIT_TIMEOUT_US       (800 * 1000)
-#define RAS_INTR_PRIORITY              (0x10)
+#define RAS_SYNC_FLAG            0x2u
+#define RAS_SYNC_CHANNEL         0x0u
+#define RAS_MAX_RETRIES          100000
+#define RAS_SYNC_WAIT_TIMEOUT_US (800 * 1000)
+#define RAS_INTR_PRIORITY        (0x10)
 
 #define CPU_RAS_ERR_RECORD_REG_ADDR(core_idx) \
     (SI0_ATW1_CLUSTER_UTILITY_BASE + (core_idx * SI0_CORE_REG_UTILITY_SIZE) + \
@@ -57,7 +57,7 @@ static const struct mod_ras_config ras_config_data = {
     .ras_sync_wait_us = RAS_SYNC_WAIT_TIMEOUT_US,
 };
 
-//Make this a formal struct with core number and the respective Err Record
+// Make this a formal struct with core number and the respective Err Record
 /* Cluster to Core Mapings for Interrupt configuration */
 static const unsigned int cpu_cl0_pe_ids[] = { 0, 1, 2, 3 };
 static const unsigned int cpu_cl1_pe_ids[] = { 4, 5, 6, 7 };
