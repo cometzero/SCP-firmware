@@ -115,6 +115,7 @@ list(APPEND SCP_UNITY_SRC ${SCP_ROOT}/unit_test/unity_mocks/scp_unity.c)
 
 #Append common unit tests under product/ below here (alphabetical order)
 list(APPEND UNIT_PRODUCT automotive-rd/module/fmu)
+list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/pfdi_monitor)
 list(APPEND UNIT_PRODUCT automotive-rd/module/sbistc)
 list(APPEND UNIT_PRODUCT automotive-rd/module/ssu)
 list(APPEND UNIT_PRODUCT automotive-rd/rd1ae/module/safety_island_platform)
