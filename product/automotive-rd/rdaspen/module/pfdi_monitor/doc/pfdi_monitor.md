@@ -79,6 +79,13 @@ Failure to receive valid status within configured intervals leads to logging err
 
 ---
 
+## Notification Handling
+
+The module handles power domain transition notifications to stop PFDI monitoring
+when a core enters the OFF state.
+
+---
+
 ## Function Summary
 
 - `pfdi_monitor_init()`: Initialize core contexts.
@@ -87,6 +94,7 @@ Failure to receive valid status within configured intervals leads to logging err
 - `pfdi_monitor_bind()`: Bind to timer alarms.
 - `pfdi_monitor_process_bind_request()`: Expose the PFDI Monitor API.
 - `pfdi_monitor_process_event()`: Handle status or timeout events.
+- `pfdi_monitor_process_notification()`: Handle power domain state transitions notifications.
 
 ---
 

@@ -6,6 +6,7 @@
  */
 
 #include <mod_pfdi_monitor.h>
+#include <mod_power_domain.h>
 #include <mod_timer.h>
 
 #include <fwk_assert.h>
@@ -14,6 +15,7 @@
 #include <fwk_log.h>
 #include <fwk_mm.h>
 #include <fwk_module.h>
+#include <fwk_notification.h>
 
 #define MOD_NAME "[PFDI_MONITOR] "
 
@@ -49,6 +51,10 @@ struct pfdi_monitor_ctx {
 };
 
 static struct pfdi_monitor_ctx ctx;
+
+static fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
+    FWK_MODULE_IDX_POWER_DOMAIN,
+    MOD_PD_NOTIFICATION_IDX_POWER_STATE_TRANSITION);
 
 static int pfdi_monitor_oor_status(fwk_id_t id, uint32_t status)
 {
@@ -199,12 +205,28 @@ static int pfdi_monitor_start(fwk_id_t id)
     struct pfdi_monitor_core_context *core_ctx;
     const struct mod_pfdi_monitor_core_config *core_cfg;
     unsigned int element_idx;
+    fwk_id_t pd_transition_source_id;
 
     if (fwk_id_is_type(id, FWK_ID_TYPE_MODULE)) {
         return FWK_SUCCESS;
     }
 
     element_idx = fwk_id_get_element_idx(id);
+
+    pd_transition_source_id =
+        fwk_id_build_element_id(fwk_module_id_power_domain, element_idx);
+
+    status = fwk_notification_subscribe(
+        pd_transition_notification_id, pd_transition_source_id, id);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR(
+            MOD_NAME "Failed to subscribe to Power Domain notification for %s",
+            fwk_module_get_element_name(id));
+    } else {
+        FWK_LOG_DEBUG(
+            MOD_NAME "Subscribed to Power Domain notifications for %s",
+            fwk_module_get_element_name(id));
+    }
 
     if (element_idx >= ctx.core_count) {
         return FWK_E_PARAM;
@@ -439,6 +461,84 @@ static int pfdi_monitor_process_event(
     }
 }
 
+int pfdi_monitor_process_notificiation(
+    const struct fwk_event *event,
+    struct fwk_event *resp_event)
+{
+    struct mod_pd_power_state_transition_notification_params *params;
+    struct pfdi_monitor_core_context *core_ctx;
+    const struct mod_pfdi_monitor_core_config *core_cfg;
+    unsigned int element_idx;
+    int status;
+
+    if (fwk_id_is_type(event->target_id, FWK_ID_TYPE_MODULE)) {
+        return FWK_E_PARAM;
+    }
+
+    if (fwk_id_is_equal(event->id, pd_transition_notification_id)) {
+        element_idx = fwk_id_get_element_idx(event->target_id);
+
+        if (element_idx >= ctx.core_count) {
+            return FWK_E_PARAM;
+        }
+
+        core_ctx = &ctx.core_ctx_table[element_idx];
+        core_cfg = core_ctx->core_cfg;
+
+        params = (struct mod_pd_power_state_transition_notification_params *)
+                     event->params;
+
+        switch (params->state) {
+        case (unsigned int)MOD_PD_STATE_OFF:
+        case (unsigned int)MOD_PD_STATE_OFF_0:
+        case (unsigned int)MOD_PD_STATE_OFF_1:
+        case (unsigned int)MOD_PD_STATE_OFF_2:
+        case (unsigned int)MOD_PD_STATE_SLEEP:
+            FWK_LOG_INFO(
+                MOD_NAME
+                "%s has been turned off, switching off PFDI monitoring",
+                fwk_module_get_element_name(event->target_id));
+            /* Stop the alarm */
+            status = core_ctx->alarm_api->stop(core_cfg->alarm_id);
+            if ((status != FWK_SUCCESS) && (status != FWK_E_STATE)) {
+                FWK_LOG_ERR(
+                    MOD_NAME
+                    "Error! Failed to stop PFDI monitoring alarm for %s",
+                    fwk_module_get_element_name(event->target_id));
+
+                return status;
+            }
+            break;
+        case (unsigned int)MOD_PD_STATE_ON:
+            FWK_LOG_INFO(
+                MOD_NAME "%s has been turned on, switching on PFDI monitoring",
+                fwk_module_get_element_name(event->target_id));
+            status = core_ctx->alarm_api->start(
+                core_cfg->alarm_id,
+                core_cfg->boot_timeout_us,
+                MOD_TIMER_ALARM_TYPE_ONCE,
+                pfdi_monitor_timeout,
+                (uintptr_t)element_idx);
+            if (status != FWK_SUCCESS) {
+                FWK_LOG_ERR(
+                    MOD_NAME
+                    "Error! Failed to start PFDI monitoring alarm for %s",
+                    fwk_module_get_element_name(event->target_id));
+
+                return status;
+            }
+            break;
+        default:
+            /* Unsupported Power Domain notification, do nothing */
+            break;
+        }
+    } else {
+        return FWK_E_PARAM;
+    }
+
+    return FWK_SUCCESS;
+}
+
 /* Module description */
 const struct fwk_module module_pfdi_monitor = {
     .type = FWK_MODULE_TYPE_SERVICE,
@@ -449,5 +549,6 @@ const struct fwk_module module_pfdi_monitor = {
     .bind = pfdi_monitor_bind,
     .process_bind_request = pfdi_monitor_process_bind_request,
     .process_event = pfdi_monitor_process_event,
+    .process_notification = pfdi_monitor_process_notificiation,
     .event_count = PFDI_MONITOR_EVENT_IDX_COUNT,
 };

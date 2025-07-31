@@ -9,6 +9,7 @@
 
 #include <Mockfwk_id.h>
 #include <Mockfwk_module.h>
+#include <Mockfwk_notification.h>
 
 #include <mod_pfdi_monitor.h>
 #include <mod_timer.h>
@@ -123,6 +124,20 @@ void pfdi_monitor_state_machine(void)
         fwk_id_is_type_ExpectAndReturn(element_id, FWK_ID_TYPE_MODULE, false);
         fwk_id_get_element_idx_IgnoreAndReturn(idx);
         fwk_module_get_element_name_IgnoreAndReturn("Test");
+
+        fwk_id_t pd_transition_source_id =
+            FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, idx);
+        fwk_id_build_element_id_ExpectAndReturn(
+            fwk_module_id_power_domain, idx, pd_transition_source_id);
+
+        fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
+            FWK_MODULE_IDX_POWER_DOMAIN,
+            MOD_PD_NOTIFICATION_IDX_POWER_STATE_TRANSITION);
+        fwk_notification_subscribe_ExpectAndReturn(
+            pd_transition_notification_id,
+            pd_transition_source_id,
+            element_id,
+            FWK_SUCCESS);
 
         ctx.core_ctx_table[idx].alarm_api = &alarm_api;
 

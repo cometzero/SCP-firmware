@@ -13,6 +13,7 @@
 enum fwk_module_idx {
     FWK_MODULE_IDX_TIMER,
     FWK_MODULE_IDX_PFDI_MONITOR,
+    FWK_MODULE_IDX_POWER_DOMAIN,
     FWK_MODULE_IDX_TEST_MODULE,
     FWK_MODULE_IDX_COUNT,
 };
@@ -22,6 +23,9 @@ static const fwk_id_t fwk_module_id_timer =
 
 static const fwk_id_t fwk_module_id_pfdi_monitor =
     FWK_ID_MODULE_INIT(FWK_MODULE_IDX_PFDI_MONITOR);
+
+static const fwk_id_t fwk_module_id_power_domain =
+    FWK_ID_MODULE_INIT(FWK_MODULE_IDX_POWER_DOMAIN);
 
 static const fwk_id_t fwk_module_id_test_module =
     FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_MODULE);
