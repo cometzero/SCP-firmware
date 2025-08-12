@@ -174,9 +174,9 @@ static_assert(
 /*
  * The size of reserved shared memory for each core =
  * sizeof(struct mod_transport_buffer) + SCMI PFDI Monitor payload size =
- * 32 + 4 = 36 bytes
+ * 32 + 8 = 40 bytes
  */
-#define SI0_SCMI_PFDI_MONITOR_SIZE_CORE (36)
+#define SI0_SCMI_PFDI_MONITOR_SIZE_CORE (40)
 #define SI0_SCMI_PFDI_MONITOR_SIZE      (SI0_SCMI_PFDI_MONITOR_SIZE_CORE * 16U)
 
 /* Shared RSE<->SI shared SRAM ie. SI Local SRAM Banks group0 */
