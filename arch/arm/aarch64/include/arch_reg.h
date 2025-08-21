@@ -73,6 +73,7 @@
  */
 #define MAIR_DEVICE_NGNRNE 0x0
 #define MAIR_NORMAL_WB_NT  0xFF
+#define MAIR_NORMAL_NC     0x44
 
 /*
  * SCTLR_EL3 values

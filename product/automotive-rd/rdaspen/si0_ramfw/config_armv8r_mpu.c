@@ -18,6 +18,7 @@
 static uint8_t mem_attributes[] = {
     MAIR_NORMAL_WB_NT,
     MAIR_DEVICE_NGNRNE,
+    MAIR_NORMAL_NC,
 };
 
 static struct mod_armv8r_mpu_region mem_regions[] = {
@@ -109,7 +110,7 @@ static struct mod_armv8r_mpu_region mem_regions[] = {
       .prlar = PRLAR_VALUE(
           SI0_RSE_SHARED_SRAM_BASE + SI0_RSE_SHARED_SRAM_SIZE - 1,
           PRLAR_NS_SECURE,
-          MPU_ATTR_0,
+          MPU_ATTR_2,
           PRLAR_EN_ENABLED) },
     { .prbar = PRBAR_VALUE(
           SI1_CLUSTER_UTILITY_BUS_BASE,
