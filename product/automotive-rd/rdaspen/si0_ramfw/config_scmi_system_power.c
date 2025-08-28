@@ -10,6 +10,8 @@
 
 #include "si0_cfgd_timer.h"
 
+#include <internal/scmi_system_power.h>
+
 #include <mod_scmi_system_power.h>
 #include <mod_system_power.h>
 
@@ -38,7 +40,7 @@ int scmi_sys_power_state_set_policy(
     fwk_id_t service_id,
     bool graceful)
 {
-    if (graceful) {
+    if (graceful && (*state != SCMI_SYSTEM_STATE_WARM_RESET)) {
         *policy_status = MOD_SCMI_SYS_POWER_SKIP_MESSAGE_HANDLER;
     } else {
         *policy_status = MOD_SCMI_SYS_POWER_EXECUTE_MESSAGE_HANDLER;

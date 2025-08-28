@@ -16,6 +16,8 @@
 
 #include <stdint.h>
 
+#define WARM_RESET_MAX_RETRIES 10
+
 /*!
  * \addtogroup GroupPLATFORMModule PLATFORM Product Modules
  * @{
@@ -39,6 +41,23 @@ enum mod_si0_platform_api_idx {
 };
 
 /*!
+ * \brief Events used by platform system module.
+ */
+enum mod_si0_platform_event_idx {
+    /*! Event requesting check for power domain OFF */
+    MOD_SI0_PLATFORM_CHECK_PD_OFF,
+
+    /*! Number of defined events */
+    MOD_SI0_PLATFORM_EVENT_COUNT
+};
+
+/*!
+ * \brief Event to check all CPUs are powered off.
+ */
+static const fwk_id_t mod_si0_platform_event_check_ppu_off =
+    FWK_ID_EVENT(FWK_MODULE_IDX_SI0_PLATFORM, MOD_SI0_PLATFORM_CHECK_PD_OFF);
+
+/*!
  * \brief Notification indices.
  */
 enum mod_si0_platform_notification_idx {
@@ -57,6 +76,43 @@ static const fwk_id_t mod_si0_platform_notification_subsys_init =
     FWK_ID_NOTIFICATION_INIT(
         FWK_MODULE_IDX_SI0_PLATFORM,
         MOD_SI0_PLATFORM_NOTIFICATION_IDX_SUBSYS_INITIALIZED);
+
+/*!
+ * \brief List of isolated CPU MPIDs.
+ */
+struct mod_si0_platform_isolated_cpu_info {
+    /*! Number of isolated CPUs */
+    uint64_t isolated_cpu_count;
+
+    /*!
+     * MPID of Isolated CPUs represented as a list. Value of each MPID
+     * specifies the affinity values as per by the MPIDR register format
+     *    Bits 63:40 - should be zero
+     *    Bits 39:32 - Affinity level 3
+     *    Bits 31:24 - should be zero
+     *    Bits 23:16 - Affinity level 2
+     *    Bits 15:8  - Affinity level 1
+     *    Bits 7:0   - Affinity level 0
+     */
+    uint64_t *isolated_cpu_mpid_list;
+};
+
+/*!
+ * \brief Module configuration.
+ */
+struct mod_si0_platform_config {
+    /*! MPID number of the CPU to be used as primary CPU */
+    uint64_t primary_cpu_mpid;
+
+    /*! List of isolated CPUs MPID. */
+    struct mod_si0_platform_isolated_cpu_info isolated_cpu_info;
+};
+
+/*!
+ * \brief Event to check all CPUs are powered off.
+ */
+static const fwk_id_t mod_platform_system_event_check_ppu_off =
+    FWK_ID_EVENT(FWK_MODULE_IDX_SI0_PLATFORM, MOD_SI0_PLATFORM_CHECK_PD_OFF);
 
 /*!
  * @}

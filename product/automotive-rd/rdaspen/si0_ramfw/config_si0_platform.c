@@ -16,4 +16,12 @@
 #include <fwk_module.h>
 #include <fwk_module_idx.h>
 
-struct fwk_module_config config_si0_platform = { 0 };
+struct mod_si0_platform_config system_config = {
+    .primary_cpu_mpid = 0,
+    .isolated_cpu_info = { .isolated_cpu_mpid_list = NULL,
+                           .isolated_cpu_count = 0 }
+};
+
+struct fwk_module_config config_si0_platform = {
+    .data = &system_config,
+};
