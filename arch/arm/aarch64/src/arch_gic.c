@@ -77,20 +77,23 @@ static void write_icc_eoir0_el1(uint64_t value)
 void irq_global(void)
 {
     struct isr_callback *entry;
+    uint32_t iar;
 
 #ifdef GIC_V2
-    current_iar = fwk_mmio_read_32(FMW_GICD_BASE + GICC_BASE + GICC_IAR);
-    fwk_mmio_write_32(FMW_GICD_BASE + GICC_BASE + GICC_EOIR, current_iar);
-    current_iar = current_iar & 0x00000FFFUL;
+    iar = fwk_mmio_read_32(FMW_GICD_BASE + GICC_BASE + GICC_IAR);
+    fwk_mmio_write_32(FMW_GICD_BASE + GICC_BASE + GICC_EOIR, iar);
+    iar = iar & 0x00000FFFUL;
 #else
-    current_iar = read_icc_iar0_el1();
+    iar = read_icc_iar0_el1();
 #endif
 
-    if (current_iar >= INTERRUPT_ID_ISR_LIMIT) {
+    current_iar = iar;
+
+    if (iar >= INTERRUPT_ID_ISR_LIMIT) {
         return;
     }
 
-    entry = &callback[current_iar];
+    entry = &callback[iar];
 
     if (entry->use_param == false) {
         if (entry->func != NULL) {
@@ -103,7 +106,7 @@ void irq_global(void)
     }
 
 #ifndef GIC_V2
-    write_icc_eoir0_el1(current_iar);
+    write_icc_eoir0_el1(iar);
 #endif
     current_iar = INTERRUPT_ID_INVALID;
 }
