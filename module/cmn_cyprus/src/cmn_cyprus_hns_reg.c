@@ -261,17 +261,15 @@ void hns_configure_non_hashed_region_addr_range(
     /* Configure non-hashed region based on address range comparison mode */
     if (hnsam_range_comp_en_mode) {
         /* Configure end address of the region */
-        base_reg |= (base / hns_ctx.min_region_size)
-            << HNS_SAM_MEMREGION_BASE_POS;
-        end_reg |= (base + size - 1);
+        base_reg |= base & FWK_GEN_MASK_64(51, 20);
+        end_reg |= (base + size - 1) & FWK_GEN_MASK_64(51, 20);
     } else {
         /* Configure region size */
         base_reg |= sam_encode_region_size(size, hns_ctx.min_region_size)
             << HNS_SAM_MEMREGION_SIZE_POS;
 
         /* Configure region base */
-        end_reg |= (base / hns_ctx.min_region_size)
-            << HNS_SAM_MEMREGION_BASE_POS;
+        base_reg |= base & FWK_GEN_MASK_64(51, 20);
     }
 
     if (non_hashed_region_idx < 2) {
