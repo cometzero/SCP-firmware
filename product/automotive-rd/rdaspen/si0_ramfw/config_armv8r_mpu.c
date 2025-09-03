@@ -80,7 +80,7 @@ static struct mod_armv8r_mpu_region mem_regions[] = {
       .prlar = PRLAR_VALUE(
           SI0_ATW_MEM_BASE + SI0_ATW_MEM_SIZE - 1,
           PRLAR_NS_SECURE,
-          MPU_ATTR_0,
+          MPU_ATTR_2,
           PRLAR_EN_ENABLED) },
     { .prbar = PRBAR_VALUE(
           SI0_MHU_BASE,
