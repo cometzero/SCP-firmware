@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2025, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -85,7 +85,10 @@ struct cmn_cyprus_hns_reg {
             uint8_t   RESERVED8[0x3C00 - 0x1908];
     FWK_RW  uint64_t
         HNS_RN_CLUSTER_PHYSID[HNS_RN_CLUSTER_MAX][HNS_RN_PHYIDS_REG_MAX];
-            uint8_t   RESERVED9[0x7000 - 0x4C00];
+            uint8_t   RESERVED9[0x5000 - 0x4C00];
+    FWK_RW  uint64_t  SAM_NONHASH_CFG1_MEMREGION[64];
+    FWK_RW  uint64_t  SAM_NONHASH_CFG2_MEMREGION[64];
+            uint8_t   RESERVED10[0x7000 - 0x5400];
     FWK_RW  uint64_t  LCN_HASHED_TGT_GRP_CFG1_REGION[32];
     FWK_RW  uint64_t  LCN_HASHED_TGT_GRP_CFG2_REGION[32];
     FWK_RW  uint64_t  LCN_HASHED_TGT_GRP_SEC_CFG1_REGION[32];
@@ -94,7 +97,7 @@ struct cmn_cyprus_hns_reg {
     FWK_RW  uint64_t  LCN_HASHED_TARGET_GROUP_HN_COUNT_REG[4];
     FWK_RW  uint64_t  LCN_HASHED_TARGET_GRP_CAL_MODE_REG[8];
     FWK_RW  uint64_t  LCN_HASHED_TARGET_GRP_HNF_CPA_EN_REG[2];
-            uint8_t   RESERVED10[0x7580 - 0x7570];
+            uint8_t   RESERVED11[0x7580 - 0x7570];
     FWK_RW  uint64_t  LCN_HASHED_TARGET_GRP_CPAG_PERHNF_REG[16];
 };
 

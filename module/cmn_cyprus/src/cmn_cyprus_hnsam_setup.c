@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2025, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -220,8 +220,8 @@ static int configure_non_hashed_region(
     uint64_t base;
     struct cmn_cyprus_hns_reg *hns;
 
-    /* Only 2 range-based memory regions can be configured */
-    if (non_hashed_region_idx > 1) {
+    /* Only 64 range-based memory regions can be configured */
+    if (non_hashed_region_idx >= 64) {
         return FWK_E_DATA;
     }
 

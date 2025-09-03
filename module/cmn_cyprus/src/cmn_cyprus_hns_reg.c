@@ -240,27 +240,46 @@ void hns_configure_non_hashed_region_addr_range(
     uint64_t size,
     unsigned int non_hashed_region_idx)
 {
-    /* Only 2 SAM_MEMREGION registers have been defined in the driver */
-    fwk_assert(non_hashed_region_idx < 2);
+    uint64_t base_reg;
+    uint64_t end_reg;
+
+    /* Only 64 SAM_MEMREGION registers are supported */
+    fwk_assert(non_hashed_region_idx < 64);
+
+    if (non_hashed_region_idx >= 64) {
+        return;
+    }
+
+    if (non_hashed_region_idx < 2) {
+        base_reg = hns->SAM_MEMREGION[non_hashed_region_idx];
+        end_reg = hns->SAM_MEMREGION_END_ADDR[non_hashed_region_idx];
+    } else {
+        base_reg = hns->SAM_NONHASH_CFG1_MEMREGION[non_hashed_region_idx];
+        end_reg = hns->SAM_NONHASH_CFG2_MEMREGION[non_hashed_region_idx];
+    }
 
     /* Configure non-hashed region based on address range comparison mode */
     if (hnsam_range_comp_en_mode) {
         /* Configure end address of the region */
-        hns->SAM_MEMREGION_END_ADDR[non_hashed_region_idx] =
-            ((base + size - 1));
-
-        /* Configure base address of the region */
-        hns->SAM_MEMREGION[non_hashed_region_idx] |=
-            ((base / hns_ctx.min_region_size) << HNS_SAM_MEMREGION_BASE_POS);
+        base_reg |= (base / hns_ctx.min_region_size)
+            << HNS_SAM_MEMREGION_BASE_POS;
+        end_reg |= (base + size - 1);
     } else {
         /* Configure region size */
-        hns->SAM_MEMREGION[non_hashed_region_idx] |=
-            (sam_encode_region_size(size, hns_ctx.min_region_size)
-             << HNS_SAM_MEMREGION_SIZE_POS);
+        base_reg |= sam_encode_region_size(size, hns_ctx.min_region_size)
+            << HNS_SAM_MEMREGION_SIZE_POS;
 
         /* Configure region base */
-        hns->SAM_MEMREGION[non_hashed_region_idx] |=
-            ((base / hns_ctx.min_region_size) << HNS_SAM_MEMREGION_BASE_POS);
+        end_reg |= (base / hns_ctx.min_region_size)
+            << HNS_SAM_MEMREGION_BASE_POS;
+    }
+
+    if (non_hashed_region_idx < 2) {
+        hns->SAM_MEMREGION[non_hashed_region_idx] = base_reg;
+        hns->SAM_MEMREGION_END_ADDR[non_hashed_region_idx] = end_reg;
+    } else {
+        hns->SAM_NONHASH_CFG1_MEMREGION[non_hashed_region_idx] = base_reg;
+        hns->SAM_NONHASH_CFG2_MEMREGION[non_hashed_region_idx] = end_reg;
     }
 }
 
@@ -269,29 +288,48 @@ void hns_configure_non_hashed_region_sn_node_id(
     unsigned int sn_node_id,
     unsigned int non_hashed_region_idx)
 {
-    /*
-     * Only 2 registers have been defined in the driver for configuring
-     * non-hashed memory regions.
-     */
-    fwk_assert(non_hashed_region_idx < 2);
+    /* Only 64 SAM_MEMREGION registers are supported */
+    fwk_assert(non_hashed_region_idx < 64);
 
-    /* Clear the SN node ID */
-    hns->SAM_MEMREGION[non_hashed_region_idx] &=
-        ~(HNS_SAM_MEMREGION_SN_NODE_ID_MASK);
+    if (non_hashed_region_idx >= 64) {
+        return;
+    }
 
-    /* Configure target node ID */
-    hns->SAM_MEMREGION[non_hashed_region_idx] |= sn_node_id;
+    if (non_hashed_region_idx < 2) {
+        /* Clear the SN node ID */
+        hns->SAM_MEMREGION[non_hashed_region_idx] &=
+            ~(HNS_SAM_MEMREGION_SN_NODE_ID_MASK);
+
+        /* Configure target node ID */
+        hns->SAM_MEMREGION[non_hashed_region_idx] |= sn_node_id;
+    } else {
+        /* Clear the SN node ID */
+        hns->SAM_NONHASH_CFG1_MEMREGION[non_hashed_region_idx] &=
+            ~(HNS_SAM_MEMREGION_SN_NODE_ID_MASK);
+
+        /* Configure target node ID */
+        hns->SAM_NONHASH_CFG1_MEMREGION[non_hashed_region_idx] |= sn_node_id;
+    }
 }
 
 void hns_set_non_hashed_region_valid(
     struct cmn_cyprus_hns_reg *hns,
     unsigned int non_hashed_region_idx)
 {
-    /* Only 2 SAM_MEMREGION registers have been defined in the driver */
-    fwk_assert(non_hashed_region_idx < 2);
+    /* Only 64 SAM_MEMREGION registers are supported */
+    fwk_assert(non_hashed_region_idx < 64);
+
+    if (non_hashed_region_idx >= 64) {
+        return;
+    }
 
     /* Set the region as valid */
-    hns->SAM_MEMREGION[non_hashed_region_idx] |= HNS_SAM_MEMREGION_VALID;
+    if (non_hashed_region_idx < 2) {
+        hns->SAM_MEMREGION[non_hashed_region_idx] |= HNS_SAM_MEMREGION_VALID;
+    } else {
+        hns->SAM_NONHASH_CFG1_MEMREGION[non_hashed_region_idx] |=
+            HNS_SAM_MEMREGION_VALID;
+    }
 }
 
 void hns_set_pwpr_dynamic_enable(struct cmn_cyprus_hns_reg *hns)
