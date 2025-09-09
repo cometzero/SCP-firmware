@@ -43,12 +43,14 @@ list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../../module/test_ssu"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/sbistc"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/test_sbistc"
+     "${CMAKE_CURRENT_LIST_DIR}/../../module/gicx00_multiview"
      "${CMAKE_CURRENT_LIST_DIR}/../module/pfdi_monitor"
      "${CMAKE_CURRENT_LIST_DIR}/../module/scmi_pfdi_monitor")
 
 list(APPEND SCP_MODULES
     "armv8r-mpu"
     "pl011"
+    "gicx00-multiview"
     "gicx00"
     "ni-710ae"
     "system-pll"
