@@ -11,6 +11,7 @@
 #include "platform_core.h"
 #include "si0_cfgd_power_domain.h"
 #include "si0_mmap.h"
+#include "si_scr_info.h"
 
 #include <mod_power_domain.h>
 #include <mod_ppu_v1.h>
@@ -29,6 +30,10 @@
 #define PPU_STATIC_ELEMENT_COUNT 1
 #define PPU_CORE_NAME_SIZE       12
 #define PPU_CLUS_NAME_SIZE       7
+
+#define SI1_PPU_AE_BASE      (SI1_CLUSTER_UTILITY_BUS_BASE + 0x80000)
+#define SI1_CORE_BASE_OFFSET (0x40000)
+#define SI1_CORE_STRIDE      (0x100000)
 
 /* Module configuration data */
 static struct mod_ppu_v1_config ppu_v1_config_data = {
@@ -89,6 +94,73 @@ static inline uintptr_t cluster_utility_ae_base(unsigned int cluster_idx)
         SI0_CLUSTER_UTILITY_CLUSTER_AE_OFFSET);
 }
 
+/* SI Cluster 1 core PPU base address */
+static inline uintptr_t si_cluster_ppu_base(unsigned int core_index)
+{
+    return SI1_CLUSTER_UTILITY_BUS_BASE + SI1_CORE_BASE_OFFSET +
+        (core_index * SI1_CORE_STRIDE);
+}
+
+/* Setup SI Cluster 1 elements */
+static int setup_si_cluster1_elements(
+    struct fwk_element *element_table,
+    unsigned int base_index,
+    unsigned int element_capacity)
+{
+    int snprintf_ret;
+    struct fwk_element *element;
+    struct mod_ppu_v1_pd_config *pd_config;
+    struct mod_ppu_v1_pd_config *pd_config_table_si;
+
+    if (element_table == NULL)
+        return FWK_E_PARAM;
+
+    if (base_index > element_capacity)
+        return FWK_E_RANGE;
+    if (SI1_TOTAL_ELEMENTS > (element_capacity - base_index))
+        return FWK_E_RANGE;
+
+    pd_config_table_si =
+        fwk_mm_calloc(SI1_TOTAL_ELEMENTS, sizeof(struct mod_ppu_v1_pd_config));
+
+    for (unsigned int i = 0; i < SI1_CORE_COUNT; ++i) {
+        pd_config = &pd_config_table_si[i];
+        element = &element_table[base_index + i];
+
+        pd_config->pd_type = MOD_PD_TYPE_CORE;
+        pd_config->ppu.reg_base = si_cluster_ppu_base(i);
+        pd_config->cluster_ae_reg_base = SI1_PPU_AE_BASE;
+        pd_config->ppu.irq = FWK_INTERRUPT_NONE;
+        pd_config->cluster_id =
+            FWK_ID_ELEMENT(FWK_MODULE_IDX_PPU_V1, base_index + SI1_CORE_COUNT);
+        pd_config->observer_id = FWK_ID_NONE;
+
+        element->name = fwk_mm_alloc(PPU_CORE_NAME_SIZE, 1);
+
+        snprintf_ret = snprintf(
+            (char *)element->name, PPU_CORE_NAME_SIZE, "CLUS1CORE%u", i);
+        fwk_assert((snprintf_ret >= 0) && (snprintf_ret <= PPU_CORE_NAME_SIZE));
+        element->data = pd_config;
+    }
+
+    /* Configure SI Cluster 1 */
+    pd_config = &pd_config_table_si[SI1_CORE_COUNT];
+    element = &element_table[base_index + SI1_CORE_COUNT];
+
+    pd_config->pd_type = MOD_PD_TYPE_CLUSTER;
+    pd_config->ppu.reg_base = SI1_CLUSTER_UTILITY_BUS_BASE + 0x10000;
+    pd_config->cluster_ae_reg_base = SI1_PPU_AE_BASE;
+    pd_config->ppu.irq = FWK_INTERRUPT_NONE;
+    pd_config->observer_id = FWK_ID_NONE;
+    pd_config->observer_api = FWK_ID_NONE;
+    pd_config->opmode = PPU_V1_OPMODE_07;
+
+    element->name = "CLUS1";
+    element->data = pd_config;
+
+    return FWK_SUCCESS;
+}
+
 static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
 {
     struct fwk_element *element_table;
@@ -98,20 +170,28 @@ static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
     unsigned int cluster_count;
     unsigned int core_element_count = 0;
     unsigned int number_elements;
+    unsigned int extended_elements = 0;
     int snprintf_ret_val;
+    unsigned int static_table_count = FWK_ARRAY_SIZE(ppu_element_table);
 
     core_count = platform_get_core_count();
     cluster_count = platform_get_cluster_count();
+    if (si_cl1_present()) {
+        extended_elements = SI1_TOTAL_ELEMENTS;
+    }
 
     /*
      * Allocate element descriptors based on:
      *   Number of cores
      *   + Number of cluster descriptors
      *   + Number of system power domain descriptors
+     *   + Number of SI power domain descriptors (only for MID variant):
+     *      cluster1: core0-3, cluster1 - ( 5 elements)
      *   + 1 terminator descriptor
      */
     number_elements =
-        core_count + cluster_count + FWK_ARRAY_SIZE(ppu_element_table) + 1;
+        core_count + cluster_count + static_table_count + extended_elements + 1;
+
     element_table = fwk_mm_calloc(number_elements, sizeof(struct fwk_element));
 
     pd_config_table = fwk_mm_calloc(
@@ -183,6 +263,19 @@ static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
         &element_table[core_count + cluster_count],
         ppu_element_table,
         sizeof(ppu_element_table));
+
+    if (si_cl1_present()) {
+        /* Insert SI CLUS1 elements after static table */
+        unsigned int si_base_index =
+            core_count + cluster_count + static_table_count;
+        /* usable capacity excludes the terminator slot */
+        unsigned int usable_capacity = number_elements - 1;
+
+        if (setup_si_cluster1_elements(
+                element_table, si_base_index, usable_capacity) != FWK_SUCCESS) {
+            return NULL;
+        }
+    }
 
     /*
      * Configure pd_source_id with the SYSTOP identifier from the power domain
