@@ -6,6 +6,8 @@
  *
  */
 
+#include "si_scr_info.h"
+
 #include <mod_ni_710ae.h>
 
 #include <fwk_element.h>
@@ -65,52 +67,93 @@ static const struct ni_710ae_component_apu_config
  * The table below lists primary ASNI and AMNI components and
  * marks which are enabled in APU configuration.
  *
- * | Component ID                        | Type  | APU Enabled |
- * |-------------------------------------|-------|-------------|
- * | SI_PRIMARY_ASNI_CLUSTER0_MM_ID      | ASNI  | Yes         |
- * | SI_PRIMARY_ASNI_CLUSTER0_SPP_ID     | ASNI  | No          |
- * | SI_PRIMARY_ASNI_DTE_ID              | ASNI  | No          |
- * | SI_PRIMARY_ASNI_EXP_SUB_ID          | ASNI  | Yes         |
- * | SI_PRIMARY_ASNI_ICS_ICP_ACC_ID      | ASNI  | Yes         |
- * | SI_PRIMARY_ASNI_IO_EXTENSION_ID     | ASNI  | Yes         |
- * |-------------------------------------|-------|-------------|
- * | SI_PRIMARY_AMNI_SH1_ACC_ID          | AMNI  | Yes         |
- * | SI_PRIMARY_AMNI_GIC_ID              | AMNI  | No          |
- * | SI_PRIMARY_AMNI_ROM_ACC_ID          | AMNI  | No          |
- * | SI_PRIMARY_AMNI_ICM_CL0_ID          | AMNI  | No          |
- * | SI_PRIMARY_AMNI_ICM_DTE_ID          | AMNI  | No          |
- * | SI_PRIMARY_AMNI_ATU_ACC_MA_ID       | AMNI  | No          |
- * | SI_PRIMARY_AMNI_ATU_ACC_PA_ID       | AMNI  | No          |
- * | SI_PRIMARY_AMNI_CLUSTER0_ACEL_ID    | AMNI  | No          |
- * | SI_PRIMARY_AMNI_CLUSTER0_UTILITY_ID | AMNI  | No          |
- * | SI_PRIMARY_AMNI_EXP0_ID             | AMNI  | No          |
- * | SI_PRIMARY_AMNI_ICS_CFG_ID          | AMNI  | No          |
- * | SI_PRIMARY_AMNI_QSPI_ID             | AMNI  | No          |
- * -------------------------------------------------------------
+ * | Component ID                                | Type  | APU Enabled |
+ * |---------------------------------------------|-------|-------------|
+ * | SI_MIN/MID_PRIMARY_ASNI_CLUSTER0_MM_ID      | ASNI  | Yes         |
+ * | SI_MIN/MID_PRIMARY_ASNI_CLUSTER0_SPP_ID     | ASNI  | No          |
+ * | SI_MID_PRIMARY_ASNI_CLUSTER1_MM_ID          | ASNI  | Yes         |
+ * | SI_MID_PRIMARY_ASNI_CLUSTER1_SPP_ID         | ASNI  | No          |
+ * | SI_MIN/MID_PRIMARY_ASNI_DTE_ID              | ASNI  | No          |
+ * | SI_MIN/MID_PRIMARY_ASNI_EXP_SUB_ID          | ASNI  | Yes         |
+ * | SI_MIN/MID_PRIMARY_ASNI_ICS_ICP_ACC_ID      | ASNI  | Yes         |
+ * | SI_MIN/MID_PRIMARY_ASNI_IO_EXTENSION_ID     | ASNI  | Yes         |
+ * | SI_MID_PRIMARY_ASNI_IO_EXTENSION_ID_1       | ASNI  | Yes         |
+ * |---------------------------------------------|-------|-------------|
+ * | SI_MIN/MID_PRIMARY_AMNI_SH1_ACC_ID          | AMNI  | Yes         |
+ * | SI_MID_PRIMARY_AMNI_SH2_ACC_ID              | AMNI  | Yes         |
+ * | SI_MIN/MID_PRIMARY_AMNI_GIC_ID              | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_ROM_ACC_ID          | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_ICM_CL0_ID          | AMNI  | No          |
+ * | SI_MID_PRIMARY_AMNI_ICM_CL1_ID              | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_ICM_DTE_ID          | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_ATU_ACC_MA_ID       | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_ATU_ACC_PA_ID       | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_CLUSTER0_ACEL_ID    | AMNI  | No          |
+ * | SI_MID_PRIMARY_AMNI_CLUSTER1_ACEL_ID        | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_CLUSTER0_UTILITY_ID | AMNI  | No          |
+ * | SI_MID_PRIMARY_AMNI_CLUSTER1_UTILITY_ID     | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_EXP0_ID             | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_EXP1_ID             | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_ICS_CFG_ID          | AMNI  | No          |
+ * | SI_MIN/MID_PRIMARY_AMNI_QSPI_ID             | AMNI  | No          |
+ * ---------------------------------------------------------------------
  */
 
-enum si_primary_ASNI_ids {
-    SI_PRIMARY_ASNI_CLUSTER0_MM_ID = 0,
-    SI_PRIMARY_ASNI_CLUSTER0_SPP_ID,
-    SI_PRIMARY_ASNI_DTE_ID, // Debug Trace Extension
-    SI_PRIMARY_ASNI_EXP_SUB_ID,
-    SI_PRIMARY_ASNI_ICS_ICP_ACC_ID, // Secondary to Primary Interconnect conn.
-    SI_PRIMARY_ASNI_IO_EXTENSION_ID,
+enum si_primary_ASNI_ids_mid {
+    SI_MID_PRIMARY_ASNI_CLUSTER0_MM_ID = 0,
+    SI_MID_PRIMARY_ASNI_CLUSTER0_SPP_ID,
+    SI_MID_PRIMARY_ASNI_CLUSTER1_MM_ID,
+    SI_MID_PRIMARY_ASNI_CLUSTER1_SPP_ID,
+    SI_MID_PRIMARY_ASNI_DTE_ID,
+    SI_MID_PRIMARY_ASNI_EXP_SUB_ID,
+    SI_MID_PRIMARY_ASNI_ICS_ICP_ACC_ID,
+    SI_MID_PRIMARY_ASNI_IO_EXTENSION_ID,
+    SI_MID_PRIMARY_ASNI_IO_EXTENSION_ID_1,
 };
 
-enum si_primary_AMNI_ids {
-    SI_PRIMARY_AMNI_EXP0_ID = 0,
-    SI_PRIMARY_AMNI_ATU_ACC_MA_ID,
-    SI_PRIMARY_AMNI_ATU_ACC_PA_ID,
-    SI_PRIMARY_AMNI_CLUSTER0_ACEL_ID,
-    SI_PRIMARY_AMNI_CLUSTER0_UTILITY_ID,
-    SI_PRIMARY_AMNI_GIC_ID,
-    SI_PRIMARY_AMNI_ICM_CL0_ID, // MHU Interconnect CL0
-    SI_PRIMARY_AMNI_ICM_DTE_ID, // MHU Interconnect DTE
-    SI_PRIMARY_AMNI_ICS_CFG_ID, // Secondary Interconnect Configuration
-    SI_PRIMARY_AMNI_ROM_ACC_ID, // Boot ROM
-    SI_PRIMARY_AMNI_SH1_ACC_ID, // SRAM0
-    SI_PRIMARY_AMNI_QSPI_ID,
+enum si_primary_AMNI_ids_mid {
+    SI_MID_PRIMARY_AMNI_EXP0_ID = 0,
+    SI_MID_PRIMARY_AMNI_EXP1_ID,
+    SI_MID_PRIMARY_AMNI_ATU_ACC_MA_ID,
+    SI_MID_PRIMARY_AMNI_ATU_ACC_PA_ID,
+    SI_MID_PRIMARY_AMNI_CLUSTER0_ACEL_ID,
+    SI_MID_PRIMARY_AMNI_CLUSTER0_UTILITY_ID,
+    SI_MID_PRIMARY_AMNI_CLUSTER1_ACEL_ID,
+    SI_MID_PRIMARY_AMNI_CLUSTER1_UTILITY_ID,
+    SI_MID_PRIMARY_AMNI_GIC_ID,
+    SI_MID_PRIMARY_AMNI_ICM_CL0_ID,
+    SI_MID_PRIMARY_AMNI_ICM_CL1_ID,
+    SI_MID_PRIMARY_AMNI_ICM_DTE_ID,
+    SI_MID_PRIMARY_AMNI_ICS_CFG_ID,
+    SI_MID_PRIMARY_AMNI_ROM_ACC_ID,
+    SI_MID_PRIMARY_AMNI_SH1_ACC_ID,
+    SI_MID_PRIMARY_AMNI_SH2_ACC_ID,
+    SI_MID_PRIMARY_AMNI_QSPI_ID,
+};
+
+enum si_primary_ASNI_ids_min {
+    SI_MIN_PRIMARY_ASNI_CLUSTER0_MM_ID = 0,
+    SI_MIN_PRIMARY_ASNI_CLUSTER0_SPP_ID,
+    SI_MIN_PRIMARY_ASNI_DTE_ID, // Debug Trace Extension
+    SI_MIN_PRIMARY_ASNI_EXP_SUB_ID,
+    SI_MIN_PRIMARY_ASNI_ICS_ICP_ACC_ID, // Secondary to Primary Interconnect
+                                        // conn.
+    SI_MIN_PRIMARY_ASNI_IO_EXTENSION_ID,
+};
+
+enum si_primary_AMNI_ids_min {
+    SI_MIN_PRIMARY_AMNI_EXP0_ID = 0,
+    SI_MIN_PRIMARY_AMNI_ATU_ACC_MA_ID,
+    SI_MIN_PRIMARY_AMNI_ATU_ACC_PA_ID,
+    SI_MIN_PRIMARY_AMNI_CLUSTER0_ACEL_ID,
+    SI_MIN_PRIMARY_AMNI_CLUSTER0_UTILITY_ID,
+    SI_MIN_PRIMARY_AMNI_GIC_ID,
+    SI_MIN_PRIMARY_AMNI_ICM_CL0_ID, // MHU Interconnect CL0
+    SI_MIN_PRIMARY_AMNI_ICM_DTE_ID, // MHU Interconnect DTE
+    SI_MIN_PRIMARY_AMNI_ICS_CFG_ID, // Secondary Interconnect Configuration
+    SI_MIN_PRIMARY_AMNI_ROM_ACC_ID, // Boot ROM
+    SI_MIN_PRIMARY_AMNI_SH1_ACC_ID, // SRAM0
+    SI_MIN_PRIMARY_AMNI_QSPI_ID,
 };
 
 // clang-format off
@@ -165,10 +208,10 @@ static const struct ni_710ae_apu_subregion_configs primary_nci_amni_sh1_acc[] =
 // clang-format on
 
 static const struct ni_710ae_component_apu_config
-    ni_710ae_primary_nci_components[] = {
+    ni_710ae_primary_nci_components_min[] = {
         /* ASNI – Cluster0 MM */
         {
-            .component_id = SI_PRIMARY_ASNI_CLUSTER0_MM_ID,
+            .component_id = SI_MIN_PRIMARY_ASNI_CLUSTER0_MM_ID,
             .component_type = NI710AE_NODE_TYPE_ASNI,
             .regions = (struct ni_710ae_apu_subregion_configs *)
                 primary_nci_asni_cluster0_mm,
@@ -176,7 +219,7 @@ static const struct ni_710ae_component_apu_config
         },
         /* ASNI – Expansion Sub. Port0 */
         {
-            .component_id = SI_PRIMARY_ASNI_EXP_SUB_ID,
+            .component_id = SI_MIN_PRIMARY_ASNI_EXP_SUB_ID,
             .component_type = NI710AE_NODE_TYPE_ASNI,
             .regions = (struct ni_710ae_apu_subregion_configs *)
                 primary_nci_asni_expansion_port0,
@@ -185,7 +228,7 @@ static const struct ni_710ae_component_apu_config
         },
         /* ASNI – Secondary to Primary Interconnect Node */
         {
-            .component_id = SI_PRIMARY_ASNI_ICS_ICP_ACC_ID,
+            .component_id = SI_MIN_PRIMARY_ASNI_ICS_ICP_ACC_ID,
             .component_type = NI710AE_NODE_TYPE_ASNI,
             .regions = (struct ni_710ae_apu_subregion_configs *)
                 primary_nci_asni_ics_icp_acc,
@@ -193,7 +236,7 @@ static const struct ni_710ae_component_apu_config
         },
         /* ASNI – IO Extension */
         {
-            .component_id = SI_PRIMARY_ASNI_IO_EXTENSION_ID,
+            .component_id = SI_MIN_PRIMARY_ASNI_IO_EXTENSION_ID,
             .component_type = NI710AE_NODE_TYPE_ASNI,
             .regions =
                 (struct ni_710ae_apu_subregion_configs *)primary_nci_asni_ioe,
@@ -201,7 +244,52 @@ static const struct ni_710ae_component_apu_config
         },
         /* AMNI – Local SRAM Group-0 */
         {
-            .component_id = SI_PRIMARY_AMNI_SH1_ACC_ID,
+            .component_id = SI_MIN_PRIMARY_AMNI_SH1_ACC_ID,
+            .component_type = NI710AE_NODE_TYPE_AMNI,
+            .regions = (struct ni_710ae_apu_subregion_configs *)
+                primary_nci_amni_sh1_acc,
+            .apu_subregion_count = FWK_ARRAY_SIZE(primary_nci_amni_sh1_acc),
+        },
+    };
+
+static const struct ni_710ae_component_apu_config
+    ni_710ae_primary_nci_components_mid[] = {
+        /* ASNI – Cluster0 MM */
+        {
+            .component_id = SI_MID_PRIMARY_ASNI_CLUSTER0_MM_ID,
+            .component_type = NI710AE_NODE_TYPE_ASNI,
+            .regions = (struct ni_710ae_apu_subregion_configs *)
+                primary_nci_asni_cluster0_mm,
+            .apu_subregion_count = FWK_ARRAY_SIZE(primary_nci_asni_cluster0_mm),
+        },
+        /* ASNI – Expansion Sub. Port0 */
+        {
+            .component_id = SI_MID_PRIMARY_ASNI_EXP_SUB_ID,
+            .component_type = NI710AE_NODE_TYPE_ASNI,
+            .regions = (struct ni_710ae_apu_subregion_configs *)
+                primary_nci_asni_expansion_port0,
+            .apu_subregion_count =
+                FWK_ARRAY_SIZE(primary_nci_asni_expansion_port0),
+        },
+        /* ASNI – Secondary to Primary Interconnect Node */
+        {
+            .component_id = SI_MID_PRIMARY_ASNI_ICS_ICP_ACC_ID,
+            .component_type = NI710AE_NODE_TYPE_ASNI,
+            .regions = (struct ni_710ae_apu_subregion_configs *)
+                primary_nci_asni_ics_icp_acc,
+            .apu_subregion_count = FWK_ARRAY_SIZE(primary_nci_asni_ics_icp_acc),
+        },
+        /* ASNI – IO Extension */
+        {
+            .component_id = SI_MID_PRIMARY_ASNI_IO_EXTENSION_ID,
+            .component_type = NI710AE_NODE_TYPE_ASNI,
+            .regions =
+                (struct ni_710ae_apu_subregion_configs *)primary_nci_asni_ioe,
+            .apu_subregion_count = FWK_ARRAY_SIZE(primary_nci_asni_ioe),
+        },
+        /* AMNI – Local SRAM Group-0 */
+        {
+            .component_id = SI_MID_PRIMARY_AMNI_SH1_ACC_ID,
             .component_type = NI710AE_NODE_TYPE_AMNI,
             .regions = (struct ni_710ae_apu_subregion_configs *)
                 primary_nci_amni_sh1_acc,
@@ -215,20 +303,29 @@ static const struct ni_710ae_component_apu_config
  * The table below lists MHU ASNI components and marks which are enabled
  * in APU configuration.
  *
- * | Component ID                      | Type  | APU Enabled |
- * |-----------------------------------|-------|-------------|
- * | SI_MHU_ASNI_CL0_MHU_PROG_ID       | ASNI  | No          |
- * | SI_MHU_ASNI_DTE_MHU_PROG_ID       | ASNI  | No          |
- * | SI_MHU_ASNI_PC_MHU_PROG_ID        | ASNI  | No          |
- * | SI_MHU_ASNI_RSE_MHU_PROG_ID       | ASNI  | Yes         |
- * -----------------------------------------------------------
+ * | Component ID                                  | Type  | APU Enabled |
+ * |-----------------------------------------------|-------|-------------|
+ * | SI_MIN_MHU_ASNI_CL0_MHU_PROG_ID               | ASNI  | No          |
+ * | SI_MID_MHU_ASNI_CL1_MHU_PROG_ID               | ASNI  | No          |
+ * | SI_MIN/MID_MHU_ASNI_DTE_MHU_PROG_ID           | ASNI  | No          |
+ * | SI_MIN/MID_MHU_ASNI_PC_MHU_PROG_ID            | ASNI  | No          |
+ * | SI_MIN/MID_MHU_ASNI_RSE_MHU_PROG_ID           | ASNI  | Yes         |
+ * -----------------------------------------------------------------------
  */
 
-enum si_mhu_asni_ids {
-    SI_MHU_ASNI_CL0_MHU_PROG_ID = 0, // Primary to MHU interconnect conn.
-    SI_MHU_ASNI_DTE_MHU_PROG_ID,
-    SI_MHU_ASNI_PC_MHU_PROG_ID,
-    SI_MHU_ASNI_RSE_MHU_PROG_ID,
+enum si_mhu_asni_ids_mid {
+    SI_MID_MHU_ASNI_CL0_MHU_PROG_ID = 0,
+    SI_MID_MHU_ASNI_CL1_MHU_PROG_ID,
+    SI_MID_MHU_ASNI_DTE_MHU_PROG_ID,
+    SI_MID_MHU_ASNI_PC_MHU_PROG_ID,
+    SI_MID_MHU_ASNI_RSE_MHU_PROG_ID,
+};
+
+enum si_mhu_asni_ids_min {
+    SI_MIN_MHU_ASNI_CL0_MHU_PROG_ID = 0, // Primary to MHU interconnect conn.
+    SI_MIN_MHU_ASNI_DTE_MHU_PROG_ID,
+    SI_MIN_MHU_ASNI_PC_MHU_PROG_ID,
+    SI_MIN_MHU_ASNI_RSE_MHU_PROG_ID,
 };
 
 // clang-format off
@@ -241,9 +338,9 @@ mhu_nci_asni_rse_mhu_prog[] = {
 // clang-format on
 
 static const struct ni_710ae_component_apu_config
-    ni_710ae_mhu_nci_components[] = {
+    ni_710ae_mhu_nci_components_min[] = {
         {
-            .component_id = SI_MHU_ASNI_RSE_MHU_PROG_ID,
+            .component_id = SI_MIN_MHU_ASNI_RSE_MHU_PROG_ID,
             .component_type = NI710AE_NODE_TYPE_ASNI,
             .regions = mhu_nci_asni_rse_mhu_prog,
             .apu_subregion_count = FWK_ARRAY_SIZE(mhu_nci_asni_rse_mhu_prog),
@@ -251,38 +348,71 @@ static const struct ni_710ae_component_apu_config
 
     };
 
-/* List of static APU Config elements */
-static struct fwk_element ni_710ae_element_table[] = {
-    [SI_NI710AE_NCI_MHU] = {
-        .name = "SI_MHU_NCI",
-        .data = &((struct mod_ni_710ae_element_config){
-            .periphbase_addr = 0x00002A300000ULL,
-            .apu_configs = ni_710ae_mhu_nci_components,
-            .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_mhu_nci_components),
-            .max_number_of_nodes = 32,
-        }),
-    },
-    [SI_NI710AE_NCI_SECONDARY] = {
-        .name = "SI_SECONDARY_NCI",
-        .data = &((struct mod_ni_710ae_element_config){
-            .periphbase_addr = 0x00002A200000ULL,
-            .apu_configs = ni_710ae_secondary_nci_components,
-            .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_secondary_nci_components),
-            .max_number_of_nodes = 32,
-        }),
-    },
-    [SI_NI710AE_NCI_PRIMARY] = {
-        .name = "SI_PRIMARY_NCI",
-        .data = &((struct mod_ni_710ae_element_config){
-            .periphbase_addr = 0x00002A000000ULL,
-            .apu_configs = ni_710ae_primary_nci_components,
-            .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_primary_nci_components),
-            .max_number_of_nodes = 64,
-        }),
-    },
-    [SI_NI710AE_NCI_COUNT] = { 0 },
+static const struct ni_710ae_component_apu_config
+    ni_710ae_mhu_nci_components_mid[] = {
+        {
+            .component_id = SI_MID_MHU_ASNI_RSE_MHU_PROG_ID,
+            .component_type = NI710AE_NODE_TYPE_ASNI,
+            .regions = mhu_nci_asni_rse_mhu_prog,
+            .apu_subregion_count = FWK_ARRAY_SIZE(mhu_nci_asni_rse_mhu_prog),
+        },
+
+    };
+
+/* Element configs for each case */
+static const struct mod_ni_710ae_element_config cfg_mhu_min = {
+    .periphbase_addr = 0x00002A300000ULL,
+    .apu_configs = ni_710ae_mhu_nci_components_min,
+    .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_mhu_nci_components_min),
+    .max_number_of_nodes = 32,
+};
+static const struct mod_ni_710ae_element_config cfg_mhu_mid = {
+    .periphbase_addr = 0x00002A300000ULL,
+    .apu_configs = ni_710ae_mhu_nci_components_mid,
+    .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_mhu_nci_components_mid),
+    .max_number_of_nodes = 32,
+};
+static const struct mod_ni_710ae_element_config cfg_secondary = {
+    .periphbase_addr = 0x00002A200000ULL,
+    .apu_configs = ni_710ae_secondary_nci_components,
+    .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_secondary_nci_components),
+    .max_number_of_nodes = 32,
+};
+static const struct mod_ni_710ae_element_config cfg_primary_min = {
+    .periphbase_addr = 0x00002A000000ULL,
+    .apu_configs = ni_710ae_primary_nci_components_min,
+    .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_primary_nci_components_min),
+    .max_number_of_nodes = 64,
+};
+static const struct mod_ni_710ae_element_config cfg_primary_mid = {
+    .periphbase_addr = 0x00002A000000ULL,
+    .apu_configs = ni_710ae_primary_nci_components_mid,
+    .apu_config_count = FWK_ARRAY_SIZE(ni_710ae_primary_nci_components_mid),
+    .max_number_of_nodes = 64,
 };
 
+/* Dynamic elements getter */
+static const struct fwk_element *ni_710ae_element_get_table(fwk_id_t module_id)
+{
+    (void)module_id;
+    const bool cl1 = si_cl1_present();
+
+    static struct fwk_element elems[] = {
+        [SI_NI710AE_NCI_MHU] = { .name = "SI_MHU_NCI" },
+        [SI_NI710AE_NCI_SECONDARY] = { .name = "SI_SECONDARY_NCI" },
+        [SI_NI710AE_NCI_PRIMARY] = { .name = "SI_PRIMARY_NCI" },
+        [SI_NI710AE_NCI_COUNT] = { 0 }, /* sentinel */
+    };
+
+    elems[SI_NI710AE_NCI_MHU].data =
+        cl1 ? (const void *)&cfg_mhu_mid : (const void *)&cfg_mhu_min;
+    elems[SI_NI710AE_NCI_SECONDARY].data = (const void *)&cfg_secondary;
+    elems[SI_NI710AE_NCI_PRIMARY].data =
+        cl1 ? (const void *)&cfg_primary_mid : (const void *)&cfg_primary_min;
+
+    return elems;
+}
+
 const struct fwk_module_config config_ni_710ae = {
-    .elements = FWK_MODULE_STATIC_ELEMENTS_PTR(ni_710ae_element_table),
+    .elements = FWK_MODULE_DYNAMIC_ELEMENTS(ni_710ae_element_get_table),
 };
