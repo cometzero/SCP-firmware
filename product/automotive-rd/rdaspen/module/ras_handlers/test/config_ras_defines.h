@@ -64,5 +64,4 @@ static const struct mod_ras_isr_desc valid_intr_desc[] = {
     },
 };
 
-
 #endif /* CONFIG_RAS_DEFINES_H */

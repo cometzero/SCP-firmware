@@ -20,6 +20,39 @@
 
 static struct ras_context ras_ctx;
 
+/* Flop parity Error strings */
+static const char *tfp_error_strings[TFP_ERROR_SOURCES_COUNT] = {
+    "DSIDE",     "VECTOR_UNIT", "MMU",        "LEVEL_2", "GIC_CPU_INTERFACE",
+    "DBG_TRACE", "ISIDE",       "DECODE",     "RENAME",  "COMMIT",
+    "ISSUE",     "IEXECUTE",    "AXIS_BRIDGE"
+};
+
+/* Check if the TFP error source value is within valid range */
+static inline bool is_valid_tfp_ierr(uint64_t tfp_source)
+{
+    return (
+        (tfp_source >= TFP_ERROR_STRING_OFFSET) &&
+        (tfp_source < TFP_ERROR_SOURCES_COUNT + TFP_ERROR_STRING_OFFSET));
+}
+
+static void check_tfp_error(uint64_t err_status)
+{
+    /* Check if the error status indicates a Transient Fault error */
+    if ((err_status & ERX_STATUS_V) &&
+        (ERX_STATUS_SERR(err_status) == TFP_ERROR_SERR)) {
+        /* Check if source of TFP is valid */
+        if (!is_valid_tfp_ierr(ERX_STATUS_IERR(err_status))) {
+            FWK_LOG_WARN("AP detected TFP Error : Unknown");
+        } else {
+            /* Prints the TFP error source */
+            FWK_LOG_WARN(
+                "AP detected TFP Error : %s",
+                tfp_error_strings
+                    [ERX_STATUS_IERR(err_status) - TFP_ERROR_STRING_OFFSET]);
+        }
+    }
+}
+
 /* Utility function to check if AP doorbell is rung */
 static bool is_ap_doorbell_rung(void *unused)
 {
@@ -128,6 +161,9 @@ static void cpu_ras_intr_handler()
         ras_ctx.ssu_sys_reg_api_ctx->set_sys_ctrl(
             ras_ctx.ras_config->ssu_sys_elem_id, MOD_SSU_FSM_CE_STATE);
     }
+
+    /* Check if Transient fault */
+    check_tfp_error(erx_status);
 
     status = ras_ctx.timer_api->wait(
         ras_ctx.ras_config->timer_elem_id,

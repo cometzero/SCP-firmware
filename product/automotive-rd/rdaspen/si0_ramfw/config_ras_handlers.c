@@ -5,9 +5,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "si0_mmap.h"
-#include "si0_cfgd_transport.h"
 #include "si0_cfgd_ssu.h"
+#include "si0_cfgd_transport.h"
+#include "si0_mmap.h"
 
 #include <mod_ras_handlers.h>
 

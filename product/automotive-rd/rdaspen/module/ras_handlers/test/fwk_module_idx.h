@@ -41,5 +41,4 @@ static const fwk_id_t fwk_element_id_ras_handlers[] = {
     FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TEST_MODULE, 3),
 };
 
-
 #endif /* TEST_FWK_MODULE_MODULE_IDX_H */

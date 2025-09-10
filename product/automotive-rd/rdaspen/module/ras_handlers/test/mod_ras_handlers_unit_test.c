@@ -13,7 +13,6 @@
 #include <fwk_module_idx.h>
 #include UNIT_TEST_SRC
 #include "config_ras_defines.h"
-
 #include "si0_cfgd_ssu.h"
 #include "si0_cfgd_transport.h"
 
@@ -48,7 +47,7 @@ void test_ras_handlers_failed_init(void)
 void test_ras_handlers_search_by_intr_id(void)
 {
     int status;
-    status = mod_ras_handler_init(fwk_module_id_ras_handlers, IPCOUNT , NULL);
+    status = mod_ras_handler_init(fwk_module_id_ras_handlers, IPCOUNT, NULL);
 
     TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
 
@@ -66,7 +65,6 @@ void test_ras_handlers_search_by_intr_id(void)
          * list*/
         TEST_ASSERT_EQUAL(idx, fidx);
     }
-
 }
 
 void test_ras_handlers_request_bind_success(void)
@@ -123,7 +121,6 @@ void test_bind_all_binds_success(void)
     fwk_module_bind_ExpectAnyArgsAndReturn(FWK_SUCCESS);
 
     fwk_module_bind_ExpectAnyArgsAndReturn(FWK_SUCCESS);
-
 
     int result = ras_handler_bind(fwk_module_id_ras_handlers, 0);
     TEST_ASSERT_EQUAL(FWK_SUCCESS, result);

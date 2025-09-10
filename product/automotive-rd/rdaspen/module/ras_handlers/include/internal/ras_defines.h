@@ -21,6 +21,15 @@
 #define ERX_STATUS_CE (1UL << 25)
 #define ERX_STATUS_DE (1UL << 23)
 
+/* RAS Error status register IERR value */
+#define ERX_STATUS_IERR(err_status) (((err_status) >> 8UL) & 0x1FUL)
+/* RAS Error status register SERR value */
+#define ERX_STATUS_SERR(err_status) ((err_status)&0x1FUL)
+
+#define TFP_ERROR_SERR          (0x1AUL)
+#define TFP_ERROR_STRING_OFFSET (0x4UL)
+#define TFP_ERROR_SOURCES_COUNT (0xDUL)
+
 // clang-format off
 struct ext_cpu_ras_cluster_regs {
     FWK_R   uint64_t  ERRXFR;
