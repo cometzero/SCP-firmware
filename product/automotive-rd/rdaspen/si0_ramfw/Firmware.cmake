@@ -45,7 +45,8 @@ list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../../module/test_sbistc"
      "${CMAKE_CURRENT_LIST_DIR}/../../module/gicx00_multiview"
      "${CMAKE_CURRENT_LIST_DIR}/../module/pfdi_monitor"
-     "${CMAKE_CURRENT_LIST_DIR}/../module/scmi_pfdi_monitor")
+     "${CMAKE_CURRENT_LIST_DIR}/../module/scmi_pfdi_monitor"
+     "${CMAKE_CURRENT_LIST_DIR}/../module/safety_island_platform")
 
 list(APPEND SCP_MODULES
     "armv8r-mpu"
@@ -78,6 +79,7 @@ list(APPEND SCP_MODULES
     "cluster-control"
     "si0-platform"
     "ras-handlers"
+    "safety-island-platform"
 )
 
 if(SCP_ENABLE_DEBUGGER)

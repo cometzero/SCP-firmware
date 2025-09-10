@@ -41,6 +41,7 @@ target_sources(rdaspen-si0-bl2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/config_ras_handlers.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_ssu.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_sbistc.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_safety_island_platform.c"
     )
 
 if(SCP_ENABLE_DEBUGGER)
