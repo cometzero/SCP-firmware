@@ -18,9 +18,11 @@
 
 /* Safety Island Cluster1 info */
 
+#define SI_CL1_ID          0U
 #define SI1_CORE_COUNT     4U
 #define SI1_CLUSTER_COUNT  1U
 #define SI1_TOTAL_ELEMENTS (SI1_CORE_COUNT + SI1_CLUSTER_COUNT)
+#define SI_CL1_CORE_OFS    1U
 
 static inline unsigned int platform_get_cluster_count(void)
 {
