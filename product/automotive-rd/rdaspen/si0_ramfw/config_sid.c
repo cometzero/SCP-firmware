@@ -16,7 +16,7 @@
 #include <fwk_id.h>
 #include <fwk_module.h>
 
-#define RDASPEN_PART_NUMBER 0x73E
+#define RDASPEN_PART_NUMBER 0x73C
 
 static const struct fwk_element subsystem_table[] = {
     { .name = "RD-Aspen",
@@ -41,8 +41,8 @@ const struct fwk_module_config config_sid = {
             MOD_PCID_REGISTER_CID2 |
             MOD_PCID_REGISTER_CID3,
         .pcid_expected = {
-            .PID0 = 0xBCU,
-            .PID1 = 0xB0U,
+            .PID0 = 0x3CU,
+            .PID1 = 0xB7U,
             .PID2 = 0x0BU,
             .PID3 = 0x00U,
             .PID4 = 0x04U,
