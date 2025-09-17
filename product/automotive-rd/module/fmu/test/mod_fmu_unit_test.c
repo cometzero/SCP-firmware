@@ -22,22 +22,27 @@
 
 #include <mod_fmu.h>
 
-static bool system_next_fault(
+static bool system_fault_peek(
     const struct mod_fmu_dev_config *config,
-    struct mod_fmu_fault *fault,
-    unsigned int *next_node_idx)
+    unsigned int *node_idx)
 {
     static unsigned int counter = 0;
-    bool ret = false;
-
     if (counter == 0) {
-        fault->node_idx = 33;
-        fault->sm_idx = 17;
-        ret = true;
+        counter = 1;
+        *node_idx = 33;
+        return true;
     }
+    return false;
+}
 
-    counter++;
-    return ret;
+static void system_fault_ack(
+    const struct mod_fmu_dev_config *config,
+    struct mod_fmu_fault *fault,
+    unsigned int node_idx,
+    bool *fault_tracked)
+{
+    fault->node_idx = 33;
+    fault->sm_idx = 17;
 }
 
 static int system_inject(
@@ -70,7 +75,8 @@ static int system_get_threshold(
 }
 
 struct mod_fmu_impl_api mod_fmu_system_api = {
-    .next_fault = system_next_fault,
+    .fault_peek = system_fault_peek,
+    .fault_ack = system_fault_ack,
     .inject = system_inject,
     .set_threshold = system_set_threshold,
     .get_threshold = system_get_threshold,

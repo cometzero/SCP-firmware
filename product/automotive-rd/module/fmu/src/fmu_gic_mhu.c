@@ -128,46 +128,63 @@ static int fmu_device_update(
     return fmu_device_wait_busy(config);
 }
 
-static bool next_fault(
+static bool fault_peek(
     const struct mod_fmu_dev_config *config,
-    struct mod_fmu_fault *fault,
-    unsigned int *next_device_idx)
+    unsigned int *node_idx)
 {
     uint64_t errgsr, status;
-    uint32_t record_id, blktype, smid;
+    uint32_t record_id;
 
     fwk_assert(config != NULL);
-    fwk_assert(fault != NULL);
-    fwk_assert(next_device_idx != NULL);
 
-    /* Determine fault record idx */
     errgsr = fwk_mmio_read_64(config->base + FMU_FIELD_ERRGSR);
+    /* Check if there is a record */
     if (errgsr == 0) {
         return false;
     }
 
     record_id = fwk_math_log2(LSB_GET(errgsr));
     status = fwk_mmio_read_64(config->base + FMU_FIELD_ERRSTATUS(record_id));
+    /* Check for spurious fault */
     if ((status & FMU_ERRSTATUS_V_MASK) == 0) {
         return false;
     }
+    return true;
+}
+
+static void fault_ack(
+    const struct mod_fmu_dev_config *config,
+    struct mod_fmu_fault *fault,
+    unsigned int node_idx,
+    bool *fault_tracked)
+{
+    uint64_t errgsr, status;
+    uint32_t record_id, blktype, smid;
+
+    fwk_assert(config != NULL);
+    fwk_assert(fault != NULL);
+    fwk_assert(fault_tracked != NULL);
+
+    errgsr = fwk_mmio_read_64(config->base + FMU_FIELD_ERRGSR);
+    record_id = fwk_math_log2(LSB_GET(errgsr));
+    status = fwk_mmio_read_64(config->base + FMU_FIELD_ERRSTATUS(record_id));
+    status &= ~FMU_ERRSTATUS_V_MASK;
+    fmu_write_64(config->base, FMU_FIELD_ERRSTATUS(record_id), status);
+    fmu_device_wait_busy(config);
 
     /* 2 error records per BLKTYPE, one critical and one non-critical */
     blktype = record_id / 2;
     smid = (status & FMU_ERRSTATUS_SMID_MASK) >> FMU_ERRSTATUS_SMID_SHIFT;
-    fault->node_idx = blktype;
-    fault->sm_idx = smid;
-
-    status &= ~FMU_ERRSTATUS_V_MASK;
-    fmu_write_64(config->base, FMU_FIELD_ERRSTATUS(record_id), status);
-    fmu_device_wait_busy(config);
+    if (!(*fault_tracked)) {
+        fault->node_idx = blktype;
+        fault->sm_idx = smid;
+        *fault_tracked = true;
+    }
 
     /* Check if error buffer has overflowed and should be updated */
     if (status & FMU_STATUS_OFX_MASK) {
         fmu_device_update(config, record_id);
     }
-
-    return true;
 }
 
 static int configure(const struct mod_fmu_config *config)
@@ -269,7 +286,8 @@ static int set_critical(
 struct mod_fmu_impl_api mod_fmu_gic_mhu_api = {
     .configure = configure,
     .bind = bind,
-    .next_fault = next_fault,
+    .fault_peek = fault_peek,
+    .fault_ack = fault_ack,
     .inject = inject,
     .set_enabled = set_enabled,
     .set_critical = set_critical,

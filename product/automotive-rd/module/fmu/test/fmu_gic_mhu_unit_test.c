@@ -79,7 +79,8 @@ void test_fmu_gic_next_fault_simple(void)
         .node_idx = 1,
         .sm_idx = 2,
     };
-    unsigned int next_device_idx = MOD_FMU_PARENT_NONE;
+    bool fault_tracked = false;
+    unsigned int node;
 
     /* Set up FMU fault response */
     fwk_mmio_write_64(fmu_config.base + FMU_FIELD_ERRGSR, FWK_BIT(3));
@@ -87,10 +88,12 @@ void test_fmu_gic_next_fault_simple(void)
         fmu_config.base + FMU_FIELD_ERRSTATUS(3),
         (2UL << FMU_ERRSTATUS_SMID_SHIFT) | FMU_ERRSTATUS_V_MASK);
 
-    exists = next_fault(&fmu_config, &fault, &next_device_idx);
+    exists = fault_peek(&fmu_config, &node);
+    fault_ack(&fmu_config, &fault, node, &fault_tracked);
     TEST_ASSERT_TRUE(exists);
     TEST_ASSERT_EQUAL(1, fault.node_idx);
     TEST_ASSERT_EQUAL(2, fault.sm_idx);
+    TEST_ASSERT_TRUE(fault_tracked);
 }
 
 void test_fmu_gic_set_enabled(void)

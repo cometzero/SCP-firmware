@@ -26,11 +26,29 @@ struct mod_fmu_impl_api {
     /*! Bind to other modules */
     int (*bind)(fwk_id_t id);
 
-    /*! Discover the next reported fault (required) */
-    bool (*next_fault)(
+    /*! Discover the next reported fault (required)
+     *
+     * @param config The selected device configuration
+     * @param node_idx Index of the first node that currently has a valid fault
+     * @return false if no fault record is pending in this device, else true
+     */
+    bool (*fault_peek)(
+        const struct mod_fmu_dev_config *config,
+        unsigned int *node_idx);
+
+    /*! Clear a specific fault record and return its details (required)
+     *
+     * @param config The selected device configuration
+     * @param fault Populated with node_idx and SMID of the cleared record
+     * @param node_idx Node index (previously obtained via fault_peek())
+     * @param fault_tracked Points to false only on first call to this function,
+     *        in order to store fault of the most-childish device
+     */
+    void (*fault_ack)(
         const struct mod_fmu_dev_config *config,
         struct mod_fmu_fault *fault,
-        unsigned int *next_node_idx);
+        unsigned int node_idx,
+        bool *fault_tracked);
 
     /*! Inject a fault */
     int (*inject)(

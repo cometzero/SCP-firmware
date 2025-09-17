@@ -93,36 +93,50 @@ static unsigned int find_active_node(const struct mod_fmu_dev_config *config)
     return MOD_FMU_PARENT_NONE;
 }
 
-static bool next_fault(
+static bool fault_peek(
+    const struct mod_fmu_dev_config *config,
+    unsigned int *node_idx)
+{
+    unsigned int next_node_idx;
+
+    fwk_assert(config != NULL);
+    fwk_assert(node_idx != NULL);
+
+    /* If current FMU has an active fault record */
+    next_node_idx = find_active_node(config);
+    if (next_node_idx == MOD_FMU_PARENT_NONE) {
+        return false;
+    }
+    *node_idx = next_node_idx;
+
+    return true;
+}
+
+static void fault_ack(
     const struct mod_fmu_dev_config *config,
     struct mod_fmu_fault *fault,
-    unsigned int *next_node_idx)
+    unsigned int node_idx,
+    bool *fault_tracked)
 {
     uint32_t val;
-    unsigned int node_idx;
 
     fwk_assert(config != NULL);
     fwk_assert(fault != NULL);
-    fwk_assert(next_node_idx != NULL);
-
-    /* If current FMU has an active fault record, select and acknowledge it */
-    node_idx = find_active_node(config);
-    if (node_idx == MOD_FMU_PARENT_NONE) {
-        return false;
-    }
+    fwk_assert(fault_tracked != NULL);
 
     /* Acknowledge the fault */
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_idx));
     val |= FMU_ERRIMPDEF_IC_MASK;
     fmu_write_32(config->base, FMU_FIELD_ERRIMPDEF(node_idx), val);
 
-    *next_node_idx = node_idx;
-    fault->node_idx = node_idx;
-    fault->sm_idx = (fmu_read_32(config->base, FMU_FIELD_ERR_STATUS(node_idx)) &
-                     FMU_ERR_STATUS_IERR_MASK) >>
-        FMU_ERR_STATUS_IERR_SHIFT;
-
-    return true;
+    if (!(*fault_tracked)) {
+        fault->node_idx = node_idx;
+        fault->sm_idx =
+            (fmu_read_32(config->base, FMU_FIELD_ERR_STATUS(node_idx)) &
+             FMU_ERR_STATUS_IERR_MASK) >>
+            FMU_ERR_STATUS_IERR_SHIFT;
+        *fault_tracked = true;
+    }
 }
 
 /*
@@ -297,7 +311,8 @@ static int set_upgrade_enabled(
 }
 
 struct mod_fmu_impl_api mod_fmu_system_api = {
-    .next_fault = next_fault,
+    .fault_peek = fault_peek,
+    .fault_ack = fault_ack,
     .inject = inject,
     .get_enabled = get_enabled,
     .set_enabled = set_enabled,

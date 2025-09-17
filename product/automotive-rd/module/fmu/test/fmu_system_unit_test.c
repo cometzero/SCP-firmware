@@ -67,7 +67,8 @@ void test_fmu_system_next_fault_simple(void)
         .node_idx = 1,
         .sm_idx = MOD_FMU_SM_SYSTEM_INPUT_ERROR,
     };
-    unsigned int next_device_idx = MOD_FMU_PARENT_NONE;
+    bool fault_tracked = false;
+    unsigned int node;
 
     /* Set up FMU fault response */
     fwk_mmio_write_32((uintptr_t)fmu_reg + FMU_FIELD_ERRGSR_L(0), FWK_BIT(1));
@@ -75,19 +76,20 @@ void test_fmu_system_next_fault_simple(void)
         (uintptr_t)fmu_reg + FMU_FIELD_ERR_STATUS(1),
         MOD_FMU_SM_SYSTEM_INPUT_ERROR << FMU_ERR_STATUS_IERR_SHIFT);
 
-    exists = next_fault(&fmu_config, &fault, &next_device_idx);
+    exists = fault_peek(&fmu_config, &node);
+    fault_ack(&fmu_config, &fault, node, &fault_tracked);
     TEST_ASSERT_TRUE(exists);
     TEST_ASSERT_EQUAL(1, fault.node_idx);
     TEST_ASSERT_EQUAL(MOD_FMU_SM_SYSTEM_INPUT_ERROR, fault.sm_idx);
+    TEST_ASSERT_TRUE(fault_tracked);
 }
 
 void test_fmu_system_next_fault_upstream(void)
 {
     bool exists;
-    struct mod_fmu_fault fault = { 0 };
-    unsigned int next_device_idx = MOD_FMU_PARENT_NONE;
+    unsigned int node;
 
-    exists = next_fault(&fmu_config, &fault, &next_device_idx);
+    exists = fault_peek(&fmu_config, &node);
     TEST_ASSERT_FALSE(exists);
 }
 

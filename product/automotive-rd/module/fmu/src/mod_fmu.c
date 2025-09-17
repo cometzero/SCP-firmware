@@ -50,46 +50,82 @@ static unsigned int find_next_fmu(
     return MOD_FMU_PARENT_NONE;
 }
 
+/*!
+ * \brief Structure to store a discovered fault entry
+ */
+struct fault_entry {
+    uint32_t dev;
+    uint32_t node;
+};
+
 static bool next_fault(bool critical)
 {
-    unsigned int notifications_sent, depth;
-    unsigned int device_idx;
-    unsigned int next_node_idx;
-    const struct mod_fmu_dev_config *config;
+    const struct mod_fmu_dev_config *cfg;
     struct mod_fmu_fault fault = { 0 };
-    bool (*func)(
-        const struct mod_fmu_dev_config *config,
-        struct mod_fmu_fault *fault,
-        unsigned int *next_node_idx);
+    bool (*peek_funct)(const struct mod_fmu_dev_config *, unsigned int *);
+    void (*ack_funct)(
+        const struct mod_fmu_dev_config *,
+        struct mod_fmu_fault *,
+        unsigned int,
+        bool *);
+    unsigned int depth = 0;
+    unsigned int dev = FMU_ROOT_IDX;
+    unsigned int node;
+    unsigned int notifications_sent;
+    struct fault_entry fault_entry_stack[FMU_MAX_TREE_DEPTH] = { 0 };
+    bool fault_tracked = false;
 #ifdef BUILD_HAS_NOTIFICATION
     struct mod_fmu_fault_notification_params *params;
 #endif
 
-    /* Traverse tree until no device is found for fault record */
-    for (device_idx = FMU_ROOT_IDX, depth = 0;
-         device_idx != MOD_FMU_PARENT_NONE;
-         depth++) {
+    /* Traverse through the tree root-first and push fault (device + node) onto
+     * the fault stack*/
+    while (dev != MOD_FMU_PARENT_NONE) {
+        /* Check if maximum tree depth reached */
         if (depth >= FMU_MAX_TREE_DEPTH) {
             FWK_LOG_ERR(MOD_NAME "Maximum tree depth reached");
             fwk_trap();
         }
 
-        config = ctx.device_config[device_idx];
-        func = ctx.impl_apis[device_idx]->next_fault;
-        fwk_assert(func != NULL);
-        next_node_idx = MOD_FMU_PARENT_NONE;
-        if (!func(config, &fault, &next_node_idx)) {
+        /* Find fault entry in this device */
+        cfg = ctx.device_config[dev];
+        peek_funct = ctx.impl_apis[dev]->fault_peek;
+        fwk_assert(peek_funct != NULL);
+
+        /* Check if errors in this FMU and stop if not */
+        if (!peek_funct(cfg, &node)) {
             break;
         }
 
-        fault.device_idx = device_idx;
-        device_idx = find_next_fmu(device_idx, next_node_idx);
+        /* Push next fault entry onto stack */
+        fault_entry_stack[depth++] =
+            (struct fault_entry){ .dev = dev, .node = node };
+
+        /* Get next device */
+        dev = find_next_fmu(dev, node);
     }
 
     /* Return false if no fault found at the root FMU */
-    if (device_idx == FMU_ROOT_IDX && fault.device_idx == FMU_ROOT_IDX) {
+    if (depth == 0) {
         return false;
     }
+
+    /* Set device of fault to last discovered fault */
+    fault.device_idx = fault_entry_stack[depth - 1].dev;
+
+    /* Pop entries one by one from the fault stack and acknowledge them */
+    do {
+        depth--;
+
+        /* Pop entry */
+        cfg = ctx.device_config[fault_entry_stack[depth].dev];
+        ack_funct = ctx.impl_apis[fault_entry_stack[depth].dev]->fault_ack;
+        fwk_assert(ack_funct != NULL);
+
+        /* Acknowledge fault */
+        ack_funct(cfg, &fault, fault_entry_stack[depth].node, &fault_tracked);
+
+    } while (depth != 0);
 
     /* Log details and raise event */
     FWK_LOG_INFO(
@@ -434,7 +470,8 @@ static int fmu_device_init(
     ctx.device_config[element_idx] = data;
     ctx.impl_apis[element_idx] =
         implementation_apis[ctx.device_config[element_idx]->implementation];
-    fwk_assert(ctx.impl_apis[element_idx]->next_fault != NULL);
+    fwk_assert(ctx.impl_apis[element_idx]->fault_peek != NULL);
+    fwk_assert(ctx.impl_apis[element_idx]->fault_ack != NULL);
 
     configure = ctx.impl_apis[element_idx]->configure;
 
