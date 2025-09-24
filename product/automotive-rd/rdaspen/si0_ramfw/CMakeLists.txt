@@ -42,7 +42,17 @@ target_sources(rdaspen-si0-bl2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/config_ssu.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_sbistc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_safety_island_platform.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_dvfs.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_psu.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_scmi_perf.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_mock_psu.c"
     )
+
+if(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS)
+    target_sources(rdaspen-si0-bl2 PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/config_fch_polled.c"
+)
+endif()
 
 if(SCP_ENABLE_DEBUGGER)
     target_compile_definitions(rdaspen-si0-bl2 PRIVATE BUILD_HAS_DEBUGGER)

@@ -90,10 +90,19 @@ struct mod_mhu3_channel_config
             MOD_MHU3_INIT_DBCH(16, 0, 16, 0),
     };
 
-/* SI0<->AP RAS Sync Secure MHUv3 doorbell channel configuration */
-struct mod_mhu3_channel_config si02ap_s_ras_dbch_config[] = {
-    /* PBX CH 0, FLAG 0, MBX CH 0, FLAG 0 is used for RAS sync */
+/*
+ * SI0<->AP RAS Sync and SCMI performance protocol with non secure
+ * doorbell channel configuration
+ */
+struct mod_mhu3_channel_config si02ap_ns_dbch_config[] = {
+    /* PBX CH 0, FLAG 1, MBX CH 0, FLAG 1 is used for RAS sync */
     [0] = MOD_MHU3_INIT_DBCH(0, 1, 0, 1),
+    /* PBX CH 0, FLAG 0, MBX CH 0, FLAG 0 used for SCMI performance protocol */
+    [1] = MOD_MHU3_INIT_DBCH(0, 0, 0, 0),
+#ifdef BUILD_HAS_SCMI_NOTIFICATIONS
+    /* PBX CH 0, FLAG 2, MBX CH 0, FLAG 2 used for SCMI performance protocol */
+    [2] = MOD_MHU3_INIT_DBCH(0, 2, 0, 2),
+#endif
 };
 
 /* Module element table */
@@ -122,14 +131,14 @@ static const struct fwk_element mhu_element_table[]  = {
             .resp_wait_timeout_us = RESP_WAIT_TIMEOUT_US,
         },
     },
-    [SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_S_RAS] = {
-        .name = "SI02AP_RAS_S_MHU_DBCH",
-        .sub_element_count = FWK_ARRAY_SIZE(si02ap_s_ras_dbch_config),
+    [SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_NS] = {
+        .name = "SI02AP_NS_MHU_DBCH",
+        .sub_element_count = FWK_ARRAY_SIZE(si02ap_ns_dbch_config),
         .data = &(struct mod_mhu3_device_config) {
             .irq = (unsigned int) CL0_MHU3_AP2SI0_NS_IRQ,
             .in = SI0_AP2SI0_NS_MHUV3_RCV_BASE,
             .out = SI0_SI02AP_NS_MHUV3_SEND_BASE,
-            .channels = si02ap_s_ras_dbch_config,
+            .channels = si02ap_ns_dbch_config,
             .timer_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
             .resp_wait_timeout_us = RESP_WAIT_TIMEOUT_US,
         },

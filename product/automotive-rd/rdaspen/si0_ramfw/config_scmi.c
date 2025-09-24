@@ -110,6 +110,46 @@ static const struct fwk_element service_table[SI0_CFGD_MOD_SCMI_EIDX_COUNT + 1] 
     [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_1] = SCMI_PFDI_MONITOR_AP(3, 1),
     [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_2] = SCMI_PFDI_MONITOR_AP(3, 2),
     [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_3] = SCMI_PFDI_MONITOR_AP(3, 3),
+    [SI0_CFGD_MOD_SCMI_IDX_OSPM_A2P] = {
+        .name = "OSPM_A2P",
+        .data = &((struct mod_scmi_service_config) {
+            .transport_id = FWK_ID_ELEMENT_INIT(
+                FWK_MODULE_IDX_TRANSPORT,
+                SI0_CFGD_MOD_TRANSPORT_IDX_OSPM_A2P),
+            .transport_api_id = FWK_ID_API_INIT(
+                FWK_MODULE_IDX_TRANSPORT,
+                MOD_TRANSPORT_API_IDX_SCMI_TO_TRANSPORT),
+            .transport_notification_init_id = FWK_ID_NOTIFICATION_INIT(
+                FWK_MODULE_IDX_TRANSPORT,
+                MOD_TRANSPORT_NOTIFICATION_IDX_INITIALIZED),
+            .scmi_agent_id = SI0_SCMI_AGENT_IDX_OSPM,
+#ifdef BUILD_HAS_SCMI_NOTIFICATIONS
+            .scmi_p2a_id = FWK_ID_ELEMENT_INIT(
+                FWK_MODULE_IDX_SCMI,
+                SI0_CFGD_MOD_SCMI_IDX_OSPM_P2A),
+#else
+            .scmi_p2a_id = FWK_ID_NONE_INIT,
+#endif
+        }),
+    },
+#ifdef BUILD_HAS_SCMI_NOTIFICATIONS
+    [SI0_CFGD_MOD_SCMI_IDX_OSPM_P2A] = {
+        .name = "OSPM_P2A",
+        .data = &((struct mod_scmi_service_config) {
+            .transport_id = FWK_ID_ELEMENT_INIT(
+                FWK_MODULE_IDX_TRANSPORT,
+                SI0_CFGD_MOD_TRANSPORT_IDX_OSPM_P2A),
+            .transport_api_id = FWK_ID_API_INIT(
+                FWK_MODULE_IDX_TRANSPORT,
+                MOD_TRANSPORT_API_IDX_SCMI_TO_TRANSPORT),
+            .transport_notification_init_id = FWK_ID_NOTIFICATION_INIT(
+                FWK_MODULE_IDX_TRANSPORT,
+                MOD_TRANSPORT_NOTIFICATION_IDX_INITIALIZED),
+            .scmi_agent_id = SI0_SCMI_AGENT_IDX_RSE,
+            .scmi_p2a_id = FWK_ID_NONE_INIT,
+        }),
+    },
+#endif
     [SI0_CFGD_MOD_SCMI_EIDX_COUNT] = { 0 }
 };
 
@@ -131,13 +171,17 @@ static struct mod_scmi_agent agent_table[SI0_SCMI_AGENT_IDX_COUNT] = {
         .type = SCMI_AGENT_TYPE_OTHER,
         .name = "SI0_SCMI_AGENT_PFDI_MONITOR",
     },
+    [SI0_SCMI_AGENT_IDX_OSPM] = {
+        .type = SCMI_AGENT_TYPE_OSPM,
+        .name = "SI0_SCMI_AGENT_OSPM",
+    },
 };
 
 const struct fwk_module_config config_scmi = {
     .data =
         &(struct mod_scmi_config){
-            .protocol_count_max = 5,
-            .protocol_requester_count_max = 2,
+            .protocol_count_max = 6,
+            .protocol_requester_count_max = 3,
             .agent_count = FWK_ARRAY_SIZE(agent_table) - 1,
             .agent_table = agent_table,
             .vendor_identifier = "arm",

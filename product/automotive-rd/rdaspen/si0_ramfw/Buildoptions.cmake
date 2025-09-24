@@ -10,3 +10,14 @@ cmake_dependent_option(
     "${SCP_ENABLE_SCMI_PFDI_MONITOR_INIT}"
     "DEFINED SCP_ENABLE_SCMI_PFDI_MONITOR_INIT"
     "${SCP_ENABLE_SCMI_PFDI_MONITOR}")
+
+cmake_dependent_option(
+    SCP_ENABLE_SCMI_PERF_FAST_CHANNELS "Enable the SCMI-perf Fast channels?"
+    "${SCP_ENABLE_SCMI_PERF_FAST_CHANNELS_INIT}"
+    "DEFINED SCP_ENABLE_SCMI_PERF_FAST_CHANNELS_INIT"
+    "${SCP_ENABLE_SCMI_PERF_FAST_CHANNELS}")
+
+if(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS)
+    option(BUILD_HAS_MOD_TRANSPORT_FC
+           "SCMI-PERF fast channel requires transport layer to be enabled" ON)
+endif()

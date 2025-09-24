@@ -30,9 +30,19 @@ static const struct mod_ros_clock_rate rate_table_clusterclk[] = {
 /* Core clock rate table */
 static const struct mod_ros_clock_rate rate_table_coreclk[] = {
     {
-        .rate = CLOCK_RATE_COREROSCLK,
+        .rate = CLOCK_RATE_COREROSCLK0,
         .source = MOD_ROS_CLOCK_CORE_CLK_SOURCE_COREPLL0CLK,
-        .divider = CLOCK_RATE_COREPLL0CLK / CLOCK_RATE_COREROSCLK,
+        .divider = CLOCK_RATE_COREPLL0CLK / CLOCK_RATE_COREROSCLK0,
+    },
+    {
+        .rate = CLOCK_RATE_COREROSCLK1,
+        .source = MOD_ROS_CLOCK_CORE_CLK_SOURCE_COREPLL0CLK,
+        .divider = CLOCK_RATE_COREPLL0CLK / CLOCK_RATE_COREROSCLK1,
+    },
+    {
+        .rate = CLOCK_RATE_COREROSCLK2,
+        .source = MOD_ROS_CLOCK_CORE_CLK_SOURCE_COREPLL0CLK,
+        .divider = CLOCK_RATE_COREPLL0CLK / CLOCK_RATE_COREROSCLK2,
     },
 };
 
@@ -133,7 +143,7 @@ static const struct fwk_element ros_clock_table[] = {
             .control_reg = &ROS_CLOCK_PTR->CORECLK,
             .rate_table = rate_table_coreclk,
             .rate_count = FWK_ARRAY_SIZE(rate_table_coreclk),
-            .initial_rate = CLOCK_RATE_COREROSCLK,
+            .initial_rate = CLOCK_RATE_COREROSCLK2,
         }),
     },
     [CFGD_MOD_ROS_CLOCK_EIDX_SYS] = {

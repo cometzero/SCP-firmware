@@ -24,6 +24,10 @@ set(SCP_ENABLE_SCMI_NOTIFICATIONS TRUE)
 
 set(SCP_ENABLE_SCMI_PFDI_MONITOR_INIT FALSE)
 
+set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS_INIT FALSE)
+
+set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS TRUE)
+
 if (NOT DEFINED SCP_PC_CONFIGURED_CORES_COUNT)
     set(SCP_PC_CONFIGURED_CORES_COUNT 4)
 endif()
@@ -80,6 +84,11 @@ list(APPEND SCP_MODULES
     "si0-platform"
     "ras-handlers"
     "safety-island-platform"
+    "dvfs"
+    "scmi-perf"
+    "mock-psu"
+    "psu"
+    "fch-polled"
 )
 
 if(SCP_ENABLE_DEBUGGER)
