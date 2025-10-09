@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2024-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -67,6 +67,8 @@ void utest_smcf_element_init(void)
         smcf_interrupt_handlers,
         (uintptr_t)element_ctx,
         FWK_SUCCESS);
+    fwk_interrupt_clear_pending_ExpectAndReturn(config.irq, FWK_SUCCESS);
+    fwk_interrupt_enable_ExpectAndReturn(config.irq, FWK_SUCCESS);
 
     status = smcf_element_init(mgi_0_id, MGI0_MLI_COUNT, (const void *)&config);
 

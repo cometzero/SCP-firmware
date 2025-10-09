@@ -467,14 +467,35 @@ static void smcf_enable_interrupt(struct smcf_element_ctx *element_ctx)
 static void smcf_element_init_setup_interrupt(
     struct smcf_element_ctx *element_ctx)
 {
+    int status;
+
     if (element_ctx->config->irq == FWK_INTERRUPT_NONE) {
         return;
     }
 
-    fwk_interrupt_set_isr_param(
+    status = fwk_interrupt_set_isr_param(
         element_ctx->config->irq,
         smcf_interrupt_handlers,
         (uintptr_t)element_ctx);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR("[SMCF] Error: Can not set ISR. status: %d", status);
+        fwk_unexpected();
+    }
+
+    status = fwk_interrupt_clear_pending(element_ctx->config->irq);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR(
+            "[SMCF] Error: Can not clear pending interrupt. status: %d",
+            status);
+        fwk_unexpected();
+    }
+
+    status = fwk_interrupt_enable(element_ctx->config->irq);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR(
+            "[SMCF] Error: Can not enable interrupt. status: %d", status);
+        fwk_unexpected();
+    }
 
     smcf_enable_interrupt(element_ctx);
 }
