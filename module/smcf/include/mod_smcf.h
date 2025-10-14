@@ -46,6 +46,10 @@ struct mod_smcf_element_config {
 
     /*! Data location and header format */
     struct mod_smcf_data_config data_config;
+
+    /*! Sampling period in clock cycles, if sampling type is
+     * SMCF_SAMPLE_TYPE_PERIODIC */
+    unsigned int sample_period;
 };
 
 /*!

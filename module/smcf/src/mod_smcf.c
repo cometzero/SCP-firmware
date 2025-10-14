@@ -412,6 +412,10 @@ static int smcf_element_init_config_sample_type(
     case SMCF_SAMPLE_TYPE_PERIODIC:
         status = mgi_set_sample_type(
             element_ctx->mgi, SMCF_MGI_SAMPLE_TYPE_PERIODIC);
+        if (status == FWK_SUCCESS) {
+            status = mgi_set_sample_period(
+                element_ctx->mgi, element_ctx->config->sample_period);
+        }
         break;
 
     case SMCF_SAMPLE_TYPE_DATA_READ:

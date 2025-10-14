@@ -526,6 +526,9 @@ uint32_t mgi_get_end_sample_id(struct smcf_mgi_reg *smcf_mgi);
 /* Check data valid */
 bool mgi_is_data_valid(struct smcf_mgi_reg *smcf_mgi, uint32_t monitor);
 
+/* Set sample period value */
+int mgi_set_sample_period(struct smcf_mgi_reg *smcf_mgi, uint32_t period);
+
 /*
  * Interrupts
  */
