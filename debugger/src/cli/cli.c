@@ -63,6 +63,11 @@ static struct fwk_slist cli_commands_list;
 /* This array holds the common command available for all platforms */
 extern cli_command_st cli_commands[];
 
+bool is_cli_running(void)
+{
+    return (CLI_RUNNING == cli_state);
+}
+
 int cli_command_register(cli_command_st new_cmd)
 {
     struct fwk_slist *node = NULL;

@@ -8,6 +8,9 @@
  *      SCMI Performance FastChannels support.
  *      This module works with the support of SCMI Performance.
  */
+#ifdef BUILD_HAS_DEBUGGER
+#    include <cli.h>
+#endif
 #include <internal/scmi_perf.h>
 
 #include <mod_dvfs.h>
@@ -378,13 +381,25 @@ static void fast_channel_callback(uintptr_t param)
         .target_id = FWK_ID_MODULE(FWK_MODULE_IDX_SCMI_PERF),
     };
 
-    status = fwk_put_event(&event);
-    if (status != FWK_SUCCESS) {
-        FWK_LOG_DEBUG("[SCMI-PERF] Error creating FC process event.");
-        return;
+    /*
+     * After entering the debug CLI, the fast channel pending requests
+     * are not processed anymore. Due to this, the event buffer is filled
+     * up resulting in a crash.
+     * Stop the SCMI fast channel events to be put in the queue when
+     * the CLI is active.
+     */
+#ifdef BUILD_HAS_DEBUGGER
+    if (false == is_cli_running()) {
+#endif
+        status = fwk_put_event(&event);
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_DEBUG("[SCMI-PERF] Error creating FC process event.");
+            return;
+        }
+        log_and_increment_pending_req_count();
+#ifdef BUILD_HAS_DEBUGGER
     }
-
-    log_and_increment_pending_req_count();
+#endif
 }
 
 static inline void load_tlimits(

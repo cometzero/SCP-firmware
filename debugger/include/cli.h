@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2020-2021, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2020-2025, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -271,6 +271,13 @@ uint32_t cli_getline(
  * silicon.
  */
 int32_t cli_strncmp(const char *s1, const char *s2, uint32_t limit);
+
+/*!
+ * \brief Checks if CLI has started.
+ *
+ * \retval CLI running status.
+ */
+bool is_cli_running(void);
 
 #ifdef BUILD_HAS_DEBUGGER
 
