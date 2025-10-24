@@ -319,19 +319,23 @@ enum smcf_sample_identifier_status_encoding {
 /*
  * Bit definitions for MGI_ERR_CODE Error Code Register
  */
-#define SMCF_MGI_ERR_CODE_ERROR_CODE_POS 0
-#define SMCF_MGI_ERR_CODE_MON_ID_POS     8
+#define SMCF_MGI_ERR_CODE_ERROR_CODE_POS   0
+#define SMCF_MGI_ERR_CODE_MON_ID_POS       8
+#define SMCF_MGI_ERR_CODE_VALID_ERROR_POS  30
+#define SMCF_MGI_ERR_CODE_SECOND_ERROR_POS 31
 
-#define SMCF_MGI_ERR_CODE_ERROR_CODE UINT32_C(0X0000001F)
-#define SMCF_MGI_ERR_CODE_MON_ID     UINT32_C(0X00001F00)
+#define SMCF_MGI_ERR_CODE_ERROR_CODE_MASK   UINT32_C(0X0000001F)
+#define SMCF_MGI_ERR_CODE_MON_ID_MASK       UINT32_C(0X00001F00)
+#define SMCF_MGI_ERR_CODE_VALID_ERROR_MASK  UINT32_C(0X40000000)
+#define SMCF_MGI_ERR_CODE_SECOND_ERROR_MASK UINT32_C(0X80000000)
 
 enum smcf_mgi_error_code {
     SMCF_MGI_ERR_CODE_SAMPLE = 0,
-    SMCF_MGI_ERR_CODE_SAMPLE_ON_DISABLED_MONITOR,
-    SMCF_MGI_ERR_CODE_ENABLE,
-    SMCF_MGI_ERR_CODE_DISABLE,
-    SMCF_MGI_ERR_CODE_MODE,
-    SMCF_MGI_ERR_CODE_MONITOR_MODE_ON_DISABLED_MONITOR,
+    SMCF_MGI_ERR_CODE_SAMPLE_ON_DISABLED_MONITOR = 1,
+    SMCF_MGI_ERR_CODE_ENABLE = 2,
+    SMCF_MGI_ERR_CODE_DISABLE = 3,
+    SMCF_MGI_ERR_CODE_MODE = 4,
+    SMCF_MGI_ERR_CODE_MONITOR_MODE_ON_DISABLED_MONITOR = 5,
     SMCF_MGI_ERR_CODE_UNKNOWN_CMD_MLI = 7,
     SMCF_MGI_ERR_CODE_SAMPLE_PERIOD_WARNING = 16,
     SMCF_MGI_ERR_CODE_UNKNOWN_CMD_MGI = 23,
@@ -528,6 +532,18 @@ bool mgi_is_data_valid(struct smcf_mgi_reg *smcf_mgi, uint32_t monitor);
 
 /* Set sample period value */
 int mgi_set_sample_period(struct smcf_mgi_reg *smcf_mgi, uint32_t period);
+
+/* Get monitor error code */
+uint32_t mgi_get_error_code(struct smcf_mgi_reg *smcf_mgi);
+
+/* Get monitor valid_error */
+uint32_t mgi_get_valid_error(struct smcf_mgi_reg *smcf_mgi);
+
+/* Get monitor second_error */
+uint32_t mgi_get_second_error(struct smcf_mgi_reg *smcf_mgi);
+
+/* Get monitor id that generated an error */
+uint32_t scmf_get_error_monitor_id(struct smcf_mgi_reg *smcf_mgi);
 
 /*
  * Interrupts

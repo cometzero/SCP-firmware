@@ -176,7 +176,8 @@ static int smcf_get_element_data(
 }
 
 static void sample_data_set_complete_handler(
-    struct smcf_element_ctx *element_ctx)
+    struct smcf_element_ctx *element_ctx,
+    uint32_t irq_source)
 {
     struct fwk_event_light req;
     int status;
@@ -191,21 +192,169 @@ static void sample_data_set_complete_handler(
     if (status != FWK_SUCCESS) {
         FWK_LOG_LOCAL("[SMCF] Send data sample event failed!");
     }
+
+    mgi_interrupt_source_clear(element_ctx->mgi, irq_source);
+}
+
+static int handle_error_sample(void)
+{
+    FWK_LOG_LOCAL("[SMCF] ERROR: Sample error occured");
+    return FWK_SUCCESS;
+}
+
+static int handle_error_sample_on_disabled_mon(
+    struct smcf_mgi_reg *mgi,
+    uint32_t monitor_id)
+{
+    int status = FWK_SUCCESS;
+
+    fwk_assert(mgi != NULL);
+
+    FWK_LOG_LOCAL("[SMCF] ERROR: Sample on disabled monitor error occured");
+
+    status = mgi_enable_monitor(mgi, monitor_id);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_LOCAL("[SMCF] Enable monitor %d failed", monitor_id);
+        return status;
+    }
+
+    return FWK_SUCCESS;
+}
+
+static int handle_error_enable(uint32_t monitor_id)
+{
+    FWK_LOG_LOCAL(
+        "[SMCF] ERROR: Monitor enable error occured on monitor %d", monitor_id);
+    return FWK_SUCCESS;
+}
+
+static int handle_error_disable(uint32_t monitor_id)
+{
+    FWK_LOG_LOCAL(
+        "[SMCF] ERROR: Monitor disable error occured on monitor %d",
+        monitor_id);
+    return FWK_SUCCESS;
+}
+
+static int handle_error_mode(void)
+{
+    FWK_LOG_LOCAL("[SMCF] ERROR: Set mode error occured");
+    return FWK_SUCCESS;
+}
+
+static int handle_error_monitor_mode_on_disabled_mon(uint32_t monitor_id)
+{
+    FWK_LOG_LOCAL(
+        "[SMCF] ERROR: Set mode on disabled monitor error occured on monitor "
+        "%d",
+        monitor_id);
+    return FWK_SUCCESS;
+}
+
+static int handle_error_unknown_cmd_mli(void)
+{
+    FWK_LOG_LOCAL("[SMCF] ERROR: Unknown command error occured");
+    return FWK_SUCCESS;
+}
+
+static int handle_error_sample_period_warning(void)
+{
+    FWK_LOG_LOCAL("[SMCF] WARNING: Sample period warning occured");
+    return FWK_SUCCESS;
+}
+
+static int handle_error_unknown_cmd_mgi(void)
+{
+    FWK_LOG_LOCAL("[SMCF] ERROR: Unknown MGI command error occured");
+    return FWK_SUCCESS;
+}
+
+static void error_handler(
+    struct smcf_element_ctx *element_ctx,
+    uint32_t irq_source)
+{
+    static const uint32_t MAX_NUM_ERROR_ITERATIONS = 256U;
+    uint32_t error_is_valid, err_value, err_mon_id, num_iter = 0;
+    int status = FWK_SUCCESS;
+
+    fwk_assert(element_ctx != NULL);
+
+    while ((error_is_valid = mgi_get_valid_error(element_ctx->mgi))) {
+        /* Read MGI_ERR_CODE register */
+        err_value = mgi_get_error_code(element_ctx->mgi);
+
+        /* Get MON_ID monitor that reported error */
+        err_mon_id = scmf_get_error_monitor_id(element_ctx->mgi);
+
+        switch (err_value) {
+        case (SMCF_MGI_ERR_CODE_SAMPLE):
+            status = handle_error_sample();
+            break;
+        case (SMCF_MGI_ERR_CODE_SAMPLE_ON_DISABLED_MONITOR):
+            status = handle_error_sample_on_disabled_mon(
+                element_ctx->mgi, err_mon_id);
+            break;
+        case (SMCF_MGI_ERR_CODE_ENABLE):
+            status = handle_error_enable(err_mon_id);
+            break;
+        case (SMCF_MGI_ERR_CODE_DISABLE):
+            status = handle_error_disable(err_mon_id);
+            break;
+        case (SMCF_MGI_ERR_CODE_MODE):
+            status = handle_error_mode();
+            break;
+        case (SMCF_MGI_ERR_CODE_MONITOR_MODE_ON_DISABLED_MONITOR):
+            status = handle_error_monitor_mode_on_disabled_mon(err_mon_id);
+            break;
+        case (SMCF_MGI_ERR_CODE_UNKNOWN_CMD_MLI):
+            status = handle_error_unknown_cmd_mli();
+            break;
+        case (SMCF_MGI_ERR_CODE_SAMPLE_PERIOD_WARNING):
+            status = handle_error_sample_period_warning();
+            break;
+        case (SMCF_MGI_ERR_CODE_UNKNOWN_CMD_MGI):
+            status = handle_error_unknown_cmd_mgi();
+            break;
+        default:
+            FWK_LOG_LOCAL("[SMCF] Unknown error code");
+            break;
+        }
+
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_LOCAL("[SMCF] Error while handling MGI error");
+            fwk_unexpected();
+        }
+
+        /* Clear the IRQ source in every round until it does not get reset,
+         * i.e. no error interrupts pending. Necessary to do here because FVP
+         * implementation only generates one interrupt if a second error is
+         * reported while another error is still pending. */
+        mgi_interrupt_source_clear(element_ctx->mgi, irq_source);
+
+        /* Increment number of iterations */
+        if (++num_iter >= MAX_NUM_ERROR_ITERATIONS) {
+            FWK_LOG_LOCAL("[SMCF] Back-to-back error limit reached");
+            fwk_unexpected();
+        }
+    }
 }
 
 static void no_handler_for_this_interrupt_source(
-    struct smcf_element_ctx *element_ctx)
+    struct smcf_element_ctx *element_ctx,
+    uint32_t irq_source)
 {
     FWK_LOG_LOCAL("[SMCF] Interrupt received but the event is not handled");
+    mgi_interrupt_source_clear(element_ctx->mgi, irq_source);
 }
 
 static void (*mgi_interrupt_manager_table[SMCF_MGI_IRQ_SOURCE_MAX])(
-    struct smcf_element_ctx *element_ctx) = {
+    struct smcf_element_ctx *element_ctx,
+    uint32_t irq_source) = {
     [SMCF_MGI_IRQ_SOURCE_SMP_CMP] = sample_data_set_complete_handler,
     [SMCF_MGI_IRQ_SOURCE_MON_EN] = no_handler_for_this_interrupt_source,
     [SMCF_MGI_IRQ_SOURCE_MON_MODE] = no_handler_for_this_interrupt_source,
     [SMCF_MGI_IRQ_SOURCE_CMD_RECV] = no_handler_for_this_interrupt_source,
-    [SMCF_MGI_IRQ_SOURCE_ERR] = no_handler_for_this_interrupt_source,
+    [SMCF_MGI_IRQ_SOURCE_ERR] = error_handler,
     [SMCF_MGI_IRQ_SOURCE_MON_TRIG] = no_handler_for_this_interrupt_source,
     [SMCF_MGI_IRQ_SOURCE_IN_TRIG] = no_handler_for_this_interrupt_source,
     [SMCF_MGI_IRQ_SOURCE_CFG] = no_handler_for_this_interrupt_source,
@@ -224,10 +373,9 @@ static void smcf_mgi_interrupt_handler(
     uint32_t interrupt_source)
 {
     if (mgi_interrupt_manager_table[interrupt_source] != NULL) {
-        mgi_interrupt_manager_table[interrupt_source](element_ctx);
+        mgi_interrupt_manager_table[interrupt_source](
+            element_ctx, interrupt_source);
     }
-
-    mgi_interrupt_source_clear(element_ctx->mgi, interrupt_source);
 }
 
 static void smcf_interrupt_handlers(uintptr_t element_ctx_param)

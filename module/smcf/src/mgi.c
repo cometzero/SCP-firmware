@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -382,15 +382,33 @@ int mgi_set_alternate_data_address(
 uint32_t mgi_get_error_code(struct smcf_mgi_reg *smcf_mgi)
 {
     return (
-        (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_ERROR_CODE) >>
+        (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_ERROR_CODE_MASK) >>
         SMCF_MGI_ERR_CODE_ERROR_CODE_POS);
+}
+
+/* Get monitor valid_error */
+uint32_t mgi_get_valid_error(struct smcf_mgi_reg *smcf_mgi)
+{
+    fwk_assert(smcf_mgi != NULL);
+    return (
+        (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_VALID_ERROR_MASK) >>
+        SMCF_MGI_ERR_CODE_VALID_ERROR_POS);
+}
+
+/* Get monitor second_error */
+uint32_t mgi_get_second_error(struct smcf_mgi_reg *smcf_mgi)
+{
+    fwk_assert(smcf_mgi != NULL);
+    return (
+        (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_SECOND_ERROR_MASK) >>
+        SMCF_MGI_ERR_CODE_SECOND_ERROR_POS);
 }
 
 /* Get monitor id that generated an error */
 uint32_t scmf_get_error_monitor_id(struct smcf_mgi_reg *smcf_mgi)
 {
     return (
-        (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_MON_ID) >>
+        (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_MON_ID_MASK) >>
         SMCF_MGI_ERR_CODE_MON_ID_POS);
 }
 
@@ -403,9 +421,9 @@ bool mgi_is_monitor_id_generated_error(
     const uint32_t monitor_id,
     uint32_t *err_code)
 {
-    if (((smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_MON_ID) >>
+    if (((smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_MON_ID_MASK) >>
          SMCF_MGI_ERR_CODE_MON_ID_POS) == monitor_id) {
-        *err_code = (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_ERROR_CODE) >>
+        *err_code = (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_ERROR_CODE_MASK) >>
             SMCF_MGI_ERR_CODE_ERROR_CODE_POS;
         return true;
     }
