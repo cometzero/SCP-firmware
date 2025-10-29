@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -12,6 +12,7 @@ enum integration_test {
     TEST_FMU,
     TEST_SSU,
     TEST_SBISTC,
+    TEST_SMCF,
     TEST_COUNT,
 };
 
@@ -40,6 +41,15 @@ static const struct fwk_element config_integration_test_elements[] = {
             .num_test_cases = 32,
         },
     },
+    [TEST_SMCF] = {
+        .name = "smcf",
+        .data = &(struct mod_integration_test_config){
+            .test_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_SMCF),
+            .run_at_start = false,
+            .num_test_cases = 1,
+        },
+    },
+
     [TEST_COUNT] = {0},
 };
 

@@ -54,7 +54,8 @@ list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../module/scmi_pfdi_monitor"
      "${CMAKE_CURRENT_LIST_DIR}/../module/safety_island_platform"
      "${CMAKE_CURRENT_LIST_DIR}/../module/platform_smcf"
-     "${CMAKE_CURRENT_LIST_DIR}/../module/smcf_client")
+     "${CMAKE_CURRENT_LIST_DIR}/../module/smcf_client"
+     "${CMAKE_CURRENT_LIST_DIR}/../../module/test_smcf")
 
 list(APPEND SCP_MODULES
     "armv8r-mpu"
@@ -106,7 +107,8 @@ if(SCP_ENABLE_DEBUGGER)
         "integration-test"
         "test-fmu"
         "test-ssu"
-        "test-sbistc")
+        "test-sbistc"
+        "test-smcf")
 endif()
 
 if(SCP_ENABLE_SCMI_PFDI_MONITOR)
