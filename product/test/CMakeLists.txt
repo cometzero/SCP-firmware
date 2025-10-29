@@ -124,6 +124,7 @@ list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/platform_smcf)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/ras_handlers)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/ros_clock)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/si0_platform)
+list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/smcf_client)
 list(APPEND UNIT_PRODUCT optee/common/module/mbx)
 
 list(LENGTH UNIT_PRODUCT UNIT_PRODUCT_MAX)
