@@ -92,6 +92,7 @@ list(APPEND SCP_MODULES
     "psu"
     "fch-polled"
     "smcf"
+    "amu-smcf-drv"
 )
 
 if(SCP_ENABLE_DEBUGGER)
