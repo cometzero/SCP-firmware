@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2024-2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2024-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -120,6 +120,7 @@ list(APPEND UNIT_PRODUCT automotive-rd/module/ssu)
 list(APPEND UNIT_PRODUCT automotive-rd/rd1ae/module/safety_island_platform)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/cluster_control)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/pfdi_monitor)
+list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/platform_smcf)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/ras_handlers)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/ros_clock)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/si0_platform)

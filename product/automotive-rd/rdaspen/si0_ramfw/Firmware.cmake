@@ -52,7 +52,8 @@ list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../../module/gicx00_multiview"
      "${CMAKE_CURRENT_LIST_DIR}/../module/pfdi_monitor"
      "${CMAKE_CURRENT_LIST_DIR}/../module/scmi_pfdi_monitor"
-     "${CMAKE_CURRENT_LIST_DIR}/../module/safety_island_platform")
+     "${CMAKE_CURRENT_LIST_DIR}/../module/safety_island_platform"
+     "${CMAKE_CURRENT_LIST_DIR}/../module/platform_smcf")
 
 list(APPEND SCP_MODULES
     "armv8r-mpu"
@@ -95,6 +96,7 @@ list(APPEND SCP_MODULES
     "amu-smcf-drv"
     "sensor-smcf-drv"
     "sensor"
+    "platform-smcf"
 )
 
 if(SCP_ENABLE_DEBUGGER)
