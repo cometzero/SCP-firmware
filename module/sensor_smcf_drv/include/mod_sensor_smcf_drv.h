@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -18,8 +18,8 @@
 #include <stddef.h>
 
 #define SENSOR_SMCF_DATA_SIZE_IN_BYTES 8
-#define SENSOR_SMCF_DATA_SIZE_IN_WORDS 2
-#define SENSOR_SMCF_TAG_BUFFER_SIZE    16
+#define SENSOR_SMCF_DATA_SIZE_IN_WORDS  2
+#define SENSOR_SMCF_TAG_BUFFER_SIZE_MAX 128
 
 /*!
  * \brief sensor_smcf_drv element config.
@@ -33,6 +33,9 @@ struct sensor_smcf_drv_element_config {
 
     /*! Per Monitor maximum sample data size in Bytes */
     uint32_t max_samples_size;
+
+    /*! SMCF Tag buffer size */
+    uint32_t sensor_tag_buffer_size;
 };
 
 /*!

@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -42,16 +42,18 @@ static int _get_smcf_sensor_data(unsigned int device_index)
 {
     int status;
     struct mod_smcf_buffer smcf_tag_buf;
-    static uint32_t tag_buf[SENSOR_SMCF_TAG_BUFFER_SIZE];
+    static uint32_t tag_buf[SENSOR_SMCF_TAG_BUFFER_SIZE_MAX];
+    struct sensor_smcf_drv_element_config *sensor_cfg =
+        &(sensor_smcf_drv_ctx.element_config_table[device_index]);
 
     /* Prepare smcf get_data arguments */
-    memset(tag_buf, 0, sizeof(uint32_t) * SENSOR_SMCF_TAG_BUFFER_SIZE);
+    memset(tag_buf, 0, sizeof(uint32_t) * sensor_cfg->sensor_tag_buffer_size);
     memset(
         sensor_smcf_drv_ctx.sensor_smcf_data_buf.ptr,
         0,
         sensor_smcf_drv_ctx.sensor_smcf_data_buf.size);
     smcf_tag_buf.ptr = tag_buf;
-    smcf_tag_buf.size = SENSOR_SMCF_TAG_BUFFER_SIZE;
+    smcf_tag_buf.size = sensor_cfg->sensor_tag_buffer_size;
 
     /* Prepare smcf get data arguments */
     status = sensor_smcf_drv_ctx.data_api->get_data(
