@@ -8,6 +8,7 @@
 #ifndef MOD_GICX00_MULTIVIEW_H
 #define MOD_GICX00_MULTIVIEW_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /*!
@@ -20,15 +21,15 @@
  * \brief Enumeration of the GIC views
  */
 enum mod_gicx00_multiview_view {
-    /*! \brief View 0 */
+    /*! View 0 */
     MOD_GICX00_MULTIVIEW_VIEW_0,
-    /*! \brief View 1 */
+    /*! View 1 */
     MOD_GICX00_MULTIVIEW_VIEW_1,
-    /*! \brief View 2 */
+    /*! View 2 */
     MOD_GICX00_MULTIVIEW_VIEW_2,
-    /*! \brief View 3 */
+    /*! View 3 */
     MOD_GICX00_MULTIVIEW_VIEW_3,
-    /*! \brief View count */
+    /*! View count */
     MOD_GICX00_MULTIVIEW_VIEW_COUNT,
 };
 
@@ -36,9 +37,9 @@ enum mod_gicx00_multiview_view {
  * \brief Structure for GIC Multiple View PE to View mapping
  */
 struct mod_gicx00_multiview_redistributor_map {
-    /*! \brief View 0 GIC redistributor base address */
+    /*! View 0 GIC redistributor base address */
     uintptr_t gicr_base;
-    /*! \brief View number */
+    /*! View number */
     enum mod_gicx00_multiview_view view;
 };
 
@@ -46,9 +47,9 @@ struct mod_gicx00_multiview_redistributor_map {
  * \brief Structure for GIC Multiple View SPI to View mapping
  */
 struct mod_gicx00_multiview_spi_map {
-    /*! \brief SPI interrupt ID */
+    /*! SPI interrupt ID */
     uint16_t spi;
-    /*! \brief View number */
+    /*! View number */
     enum mod_gicx00_multiview_view view;
 };
 
@@ -56,16 +57,18 @@ struct mod_gicx00_multiview_spi_map {
  * \brief Structure for GIC multiple view device
  */
 struct mod_gicx00_multiview_config {
-    /*! \brief View 0 GIC distributor base address */
+    /*! View 0 GIC distributor base address */
     uintptr_t gicd_base;
-    /*! \brief Map of view 0 redistributors to view numbers */
+    /*! Map of view 0 redistributors to view numbers */
     const struct mod_gicx00_multiview_redistributor_map *redistributor_map;
-    /*! \brief Number of redistributors */
+    /*! Number of redistributors */
     unsigned int redistributor_map_count;
-    /*! \brief Map of interrupt IDs to view numbers */
+    /*! Map of interrupt IDs to view numbers */
     const struct mod_gicx00_multiview_spi_map *spi_map;
-    /*! \brief Length of interrupt map */
+    /*! Length of interrupt map */
     unsigned int spi_map_count;
+    /*! Whether to do the initialization during element_init */
+    bool delayed;
 };
 
 /*!

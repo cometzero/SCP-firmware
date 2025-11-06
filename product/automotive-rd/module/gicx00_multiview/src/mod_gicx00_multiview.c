@@ -33,18 +33,10 @@ static int assign_redistributor_to_view(uintptr_t gicr_base, uint8_t view)
         reg = fwk_mmio_read_32(gicr_base + GICR_PWRR);
     } while ((reg & GICR_PWRR_RDPD) != 0);
 
-    /* Wake up redistributor */
-    reg = fwk_mmio_read_32(gicr_base + GICR_WAKER);
-    reg &= ~GICR_WAKER_PROCESSOR_SLEEP;
-    fwk_mmio_write_32(gicr_base + GICR_WAKER, reg);
-    do {
-        reg = fwk_mmio_read_32(gicr_base + GICR_WAKER);
-    } while (reg & GICR_WAKER_CHILDREN_ASLEEP);
-
     /* Update MPID corresponding GICR_VIEWR to view-id */
     fwk_mmio_write_32(gicr_base + GICR_VIEWR, view);
 
-    return 0;
+    return FWK_SUCCESS;
 }
 
 static int assign_spi_to_view(
@@ -120,45 +112,25 @@ static int configure_multiview_spi(
     return FWK_SUCCESS;
 }
 
-static int gicx00_multiview_init(
-    fwk_id_t module_id,
-    unsigned int element_count,
-    const void *data)
+static int configure_multiview(
+    fwk_id_t element_id,
+    const struct mod_gicx00_multiview_config *config)
 {
-    if (element_count == 0U) {
-        /* No element to configure */
-        return FWK_E_PARAM;
-    }
-
-    fwk_assert(data == NULL);
-
-    return FWK_SUCCESS;
-}
-
-static int gicx00_multiview_element_init(
-    fwk_id_t module_id,
-    unsigned int element_count,
-    const void *data)
-{
-    const struct mod_gicx00_multiview_config *config;
     int status;
 
-    if (data == NULL)
-        return FWK_E_PARAM;
-
-    config = data;
+    fwk_assert(config != NULL);
 
     /* Verify multiview support. If unsupported, skip remaining
      * configuration steps and exit silently with a warning.
      */
     status = check_multiview_support(config);
     if (status == FWK_E_SUPPORT) {
-        FWK_LOG_WARN(MOD_NAME
-                     "GIC-multiview does not support in curremt HW variant\n");
+        FWK_LOG_WARN(
+            MOD_NAME "%s GIC-multiview is not supported in current HW variant",
+            fwk_module_get_element_name(element_id));
         return FWK_SUCCESS;
     }
 
-    /* Perform multiview configuration */
     status = configure_multiview_redistributors(config);
     if (status != FWK_SUCCESS) {
         return status;
@@ -181,7 +153,68 @@ static int gicx00_multiview_element_init(
         GICD_CTLR_ENABLE_GROUP_0 | GICD_CTLR_ENABLE_GROUP_1NS |
             GICD_CTLR_ENABLE_GROUP_1S);
 
+    FWK_LOG_INFO(
+        MOD_NAME "%s GIC-multiview configured successfully",
+        fwk_module_get_element_name(element_id));
+
     return FWK_SUCCESS;
+}
+
+static int gicx00_multiview_init(
+    fwk_id_t module_id,
+    unsigned int element_count,
+    const void *data)
+{
+    if (element_count == 0U) {
+        /* No element to configure */
+        return FWK_E_PARAM;
+    }
+
+    fwk_assert(data == NULL);
+
+    return FWK_SUCCESS;
+}
+
+static int gicx00_multiview_element_init(
+    fwk_id_t element_id,
+    unsigned int element_count,
+    const void *data)
+{
+    const struct mod_gicx00_multiview_config *config;
+
+    if (data == NULL)
+        return FWK_E_PARAM;
+
+    config = data;
+
+    /* Check if the element depends on other parts of the platform being
+     * initialized */
+    if (config->delayed) {
+        return FWK_SUCCESS;
+    }
+
+    /* Perform multiview configuration */
+    return configure_multiview(element_id, config);
+}
+
+static int gicx00_multiview_start(fwk_id_t id)
+{
+    const struct mod_gicx00_multiview_config *config;
+
+    if (fwk_id_is_type(id, FWK_ID_TYPE_MODULE)) {
+        return FWK_SUCCESS;
+    }
+
+    config = fwk_module_get_data(id);
+
+    fwk_assert(config != NULL);
+
+    if (!config->delayed) {
+        return FWK_SUCCESS;
+    }
+
+    /* Perform multiview configuration */
+    return configure_multiview(id, config);
 }
 
 /* Module description */
@@ -189,4 +222,5 @@ const struct fwk_module module_gicx00_multiview = {
     .type = FWK_MODULE_TYPE_DRIVER,
     .init = gicx00_multiview_init,
     .element_init = gicx00_multiview_element_init,
+    .start = gicx00_multiview_start,
 };

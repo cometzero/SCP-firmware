@@ -46,14 +46,15 @@ static const struct mod_gicx00_multiview_spi_map spi_map[] = {
 const struct fwk_module_config config_gicx00_multiview = {
     .elements = FWK_MODULE_STATIC_ELEMENTS({
         [0] = {
-            .name = "si-gic",
+            .name = "SI",
             .data =
                 &(struct mod_gicx00_multiview_config){
                     .gicd_base = SI0_GICD_BASE_VIEW0,
                     .redistributor_map = redistributor_map,
                     .redistributor_map_count = FWK_ARRAY_SIZE(redistributor_map),
                     .spi_map = spi_map,
-                    .spi_map_count = FWK_ARRAY_SIZE(spi_map)
+                    .spi_map_count = FWK_ARRAY_SIZE(spi_map),
+                    .delayed = false,
                 },
         },
         [1] = { 0 },
