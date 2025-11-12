@@ -119,7 +119,11 @@ static int test_sbistc_inject(
         TEST_ASSERT_NOT_NULL(ssu_sys_api);
         status = ssu_sys_api->get_sys_status(ssu_dev_id, &ssu_state);
         TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
-        TEST_ASSERT_EQUAL(MOD_SSU_SAFETY_STATUS_ERRN, ssu_state);
+        if (flt->is_critical) {
+            TEST_ASSERT_EQUAL(MOD_SSU_SAFETY_STATUS_ERRC, ssu_state);
+        } else {
+            TEST_ASSERT_EQUAL(MOD_SSU_SAFETY_STATUS_ERRN, ssu_state);
+        }
 
         FWK_LOG_INFO(
             MOD_NAME "fault:%u: count:%u, flag:%s, ssu_state:0x%X",

@@ -92,6 +92,9 @@ struct sbistc_fault_config {
     /*! FMU node ID for this SBISTC fault */
     const uint16_t fmu_node_id;
 
+    /*! Criticality of the fault */
+    const bool is_critical;
+
     /*! Pointer to handler function for this fault */
     void (*handler)(void);
 };

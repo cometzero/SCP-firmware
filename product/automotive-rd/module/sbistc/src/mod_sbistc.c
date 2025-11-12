@@ -98,12 +98,24 @@ static int sbistc_set_enabled(uint8_t fault_id, bool enable)
         return status;
 
     /**
+     * If fault severity is critical and request is to enable the fault,
+     * then set upgrade enable.
+     */
+    if (cfg->is_critical && enable) {
+        fwk_id_t fmu_id =
+            FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, fault.device_idx);
+        status = fmu_api->set_upgrade_enabled(fmu_id, fault.node_idx, true);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
+
+    /**
      * If enabling, walk up the parent chain and enable each parent node
      * But if disabling, we do not need to disable parents as there are
      * other faults which might be active on the same parent.
      */
     if (enable) {
-        status = enable_fmu_parent_chain(cfg->fmu_device_id, NON_CRITICAL);
+        status = enable_fmu_parent_chain(cfg->fmu_device_id, cfg->is_critical);
         if (status != FWK_SUCCESS)
             return status;
     }
