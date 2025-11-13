@@ -19,16 +19,11 @@
  * These are Core Fault SPIs on SI0 that trigger
  * with Core Fault PPI from AP
  */
-#define CLUSTER0_FAULT_INT 324
-#define CLUSTER1_FAULT_INT 326
-#define CLUSTER2_FAULT_INT 328
-#define CLUSTER3_FAULT_INT 330
-
-/* RAS MHU Sync based constants */
-#define RAS_SYNC_FLAG            0x2u
-#define RAS_SYNC_CHANNEL         0x0u
-#define RAS_MAX_RETRIES          100000
-#define RAS_SYNC_WAIT_TIMEOUT_US (800 * 1000)
+#define CLUSTER0_ERR_INT 325
+#define CLUSTER1_ERR_INT 327
+#define CLUSTER2_ERR_INT 329
+#define CLUSTER3_ERR_INT 331
+/* Add priority for RAS interrupts */
 #define RAS_INTR_PRIORITY        (0x10)
 
 #define CPU_RAS_ERR_RECORD_REG_ADDR(core_idx) \
@@ -49,12 +44,6 @@ enum ras_ip_idx {
 static const struct mod_ras_config ras_config_data = {
     .ssu_sys_elem_id =
         FWK_ID_ELEMENT(FWK_MODULE_IDX_SSU, CONFIG_SSU_ELEMENT_IDX),
-    .transport_elem_id = FWK_ID_ELEMENT_INIT(
-        FWK_MODULE_IDX_TRANSPORT,
-        SI0_CFGD_MOD_TRANSPORT_EIDX_RAS),
-    /* Use the REFCLK as the source */
-    .timer_elem_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
-    .ras_sync_wait_us = RAS_SYNC_WAIT_TIMEOUT_US,
 };
 
 // Make this a formal struct with core number and the respective Err Record
@@ -96,7 +85,7 @@ static const struct fwk_element ras_config_table[] = {
     [CPU_CL0] = {
         .name = "Cluster0 Fault IRQ",
         .data = &((struct mod_ras_isr_desc) {
-            .interrupt_no = CLUSTER0_FAULT_INT,
+            .interrupt_no = CLUSTER0_ERR_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
             .interrupt_priority = RAS_INTR_PRIORITY,
@@ -109,7 +98,7 @@ static const struct fwk_element ras_config_table[] = {
     [CPU_CL1] = {
         .name = "Cluster1 Fault IRQ",
         .data = &((struct mod_ras_isr_desc) {
-            .interrupt_no = CLUSTER1_FAULT_INT,
+            .interrupt_no = CLUSTER1_ERR_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
             .interrupt_priority = RAS_INTR_PRIORITY,
@@ -122,7 +111,7 @@ static const struct fwk_element ras_config_table[] = {
     [CPU_CL2] = {
         .name = "Cluster2 Fault IRQ",
         .data = &((struct mod_ras_isr_desc) {
-            .interrupt_no = CLUSTER2_FAULT_INT,
+            .interrupt_no = CLUSTER2_ERR_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
             .interrupt_priority = RAS_INTR_PRIORITY,
@@ -135,7 +124,7 @@ static const struct fwk_element ras_config_table[] = {
     [CPU_CL3] = {
         .name = "Cluster3 Fault IRQ",
         .data = &((struct mod_ras_isr_desc) {
-            .interrupt_no = CLUSTER3_FAULT_INT,
+            .interrupt_no = CLUSTER3_ERR_INT,
             .ip_type  = TYPE_CPU_IP,
             .interrupt_trigger_type = GIC_LEVEL_TRIGGER_INTR,
             .interrupt_priority = RAS_INTR_PRIORITY,

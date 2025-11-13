@@ -14,4 +14,4 @@ target_sources(${SCP_MODULE_TARGET}
                PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/mod_ras_handlers.c")
 
 target_link_libraries(${SCP_MODULE_TARGET}
-                PRIVATE module-ssu module-transport module-timer)
+                PRIVATE module-ssu )

@@ -91,11 +91,11 @@ struct mod_mhu3_channel_config
     };
 
 /*
- * SI0<->AP RAS Sync and SCMI performance protocol with non secure
+ * SI0<->AP SCMI performance protocol with non secure
  * doorbell channel configuration
  */
 struct mod_mhu3_channel_config si02ap_ns_dbch_config[] = {
-    /* PBX CH 0, FLAG 1, MBX CH 0, FLAG 1 is used for RAS sync */
+    /* PBX CH 0, FLAG 1, MBX CH 0, FLAG 1  Unused */
     [0] = MOD_MHU3_INIT_DBCH(0, 1, 0, 1),
     /* PBX CH 0, FLAG 0, MBX CH 0, FLAG 0 used for SCMI performance protocol */
     [1] = MOD_MHU3_INIT_DBCH(0, 0, 0, 0),

@@ -9,8 +9,6 @@
 #define MOD_RAS_HANDLER_H
 
 #include <mod_ssu.h>
-#include <mod_timer.h>
-#include <mod_transport.h>
 
 #include <fwk_id.h>
 #include <fwk_interrupt.h>
@@ -40,16 +38,6 @@ enum ras_ip_type {
 };
 
 /*!
- * \brief RAS handler API
- */
-enum mod_ras_handler_api {
-    /*! api to allow signals to be bound to MHU sync */
-    MOD_RAS_API_IDX_SIGNALS,
-    /*! Number of exposed interfaces */
-    MOD_RAS_API_COUNT
-};
-
-/*!
  * \brief Platform interupts descriptions acts as a dictionary to classify RAS
  *  interrupts to various IPs, and assign interrupt handlers.
  */
@@ -76,27 +64,22 @@ struct mod_ras_isr_desc {
  * \brief SCP platform configuration data.
  */
 struct mod_ras_config {
-    /*! Transport channel identifier */
-    fwk_id_t transport_elem_id;
     /*! SSU system API ID to be used */
     fwk_id_t ssu_sys_elem_id;
-    /*! Timer ID  for timeout of the Sync */
-    fwk_id_t timer_elem_id;
-    /*! Timeout for the sync doorbell wait */
-    uint32_t ras_sync_wait_us;
 };
 
 /*!
  * \brief RAS context configuration.
  */
 struct ras_context {
+    /*! ISR based RAS descriptors for RAS IPs */
     struct mod_ras_isr_desc *descriptors;
+    /*! Number of ISR Descriptors */
     unsigned int desc_count;
+    /*! RAS module configuration */
     const struct mod_ras_config *ras_config;
+    /*! SSU API context */
     struct mod_ssu_sys_register_api *ssu_sys_reg_api_ctx;
-    struct mod_transport_firmware_api *transport_api;
-    const struct mod_timer_api *timer_api;
-    bool ap_door_bell_recieved;
 };
 
 /*!

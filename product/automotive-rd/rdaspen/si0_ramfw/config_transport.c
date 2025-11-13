@@ -133,31 +133,6 @@ static const struct fwk_element element_table[]  = {
         }),
     },
 #endif
-    [SI0_CFGD_MOD_TRANSPORT_EIDX_RAS] = {
-        .name = "RAS Sync",
-        .data = &((
-            struct mod_transport_channel_config) {
-                .transport_type = MOD_TRANSPORT_CHANNEL_TRANSPORT_TYPE_NONE,
-                .policies = MOD_TRANSPORT_POLICY_NONE,
-                .channel_type = MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER,
-                .out_band_mailbox_address =
-                    (uintptr_t) SI0_SCMI_PAYLOAD_S_A2P_BASE,
-                .out_band_mailbox_size = SI0_SCMI_PAYLOAD_SIZE,
-                .driver_id =
-                    FWK_ID_SUB_ELEMENT_INIT(
-                        FWK_MODULE_IDX_MHU3,
-                        SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_NS,
-                        0),
-                .driver_api_id =
-                    FWK_ID_API_INIT(
-                        FWK_MODULE_IDX_MHU3,
-                        MOD_MHU3_API_IDX_TRANSPORT_DRIVER),
-                .signal_api_id =
-                    FWK_ID_API_INIT(
-                        FWK_MODULE_IDX_RAS_HANDLERS,
-                        MOD_RAS_API_IDX_SIGNALS),
-        }),
-    },
     [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_0] = TRANSPORT_PFDI_MONITOR_AP(0, 0),
     [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_1] = TRANSPORT_PFDI_MONITOR_AP(0, 1),
     [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_2] = TRANSPORT_PFDI_MONITOR_AP(0, 2),
