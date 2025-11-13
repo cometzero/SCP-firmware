@@ -38,9 +38,29 @@ static fwk_id_t pc2_cl0_mhu_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 12);
 static fwk_id_t cl0_pc2_mhu_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 13);
 static fwk_id_t pc3_cl0_mhu_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 14);
 static fwk_id_t cl0_pc3_mhu_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 15);
+static fwk_id_t cl0_ni710ae_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 16);
+static fwk_id_t cl1_ni710ae_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 17);
+static fwk_id_t cl2_ni710ae_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 18);
+static fwk_id_t cl3_ni710ae_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 19);
+static fwk_id_t sys_ctl_ni710ae_fmu =
+    FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 20);
+static fwk_id_t smb_ni710ae_fmu = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_FMU, 21);
 
 #define GIC_FMU_BLOCK_TYPE_WAKE 1
 #define MHU_FMU_BLOCK_TYPE_FMU  2
+#define NI710AE_CLUSTER_NODE_IDX      0xb
+#define NI710AE_SYS_CTL_NODE_IDX      0x11
+#define NI710AE_SMB_NODE_IDX          0x17
+#define NI710AE_NON_CRITICAL_CR_SMID  14
+#define NI710AE_NON_CRITICAL_UCR_SMID 13
+#define NI710AE_CRITICAL_SMID         2
+
+#define NI710AE_CL0_CR_INT     3
+#define NI710AE_CL1_CR_INT     18
+#define NI710AE_CL2_CR_INT     33
+#define NI710AE_CL3_CR_INT     48
+#define NI710AE_SYS_CTL_CR_INT 68
+#define NI710AE_SMB_CR_INT     167
 
 enum test_inject_state {
     STEP_START,
@@ -204,6 +224,50 @@ static int inject_fault(
     }
 }
 
+static int inject_fault_ni710ae(
+    fwk_id_t fmu_id,
+    int node_idx,
+    unsigned int step_idx,
+    const struct fwk_event *event)
+{
+    fwk_assert(step_idx < STEP_COUNT);
+    struct mod_fmu_fault fault = { .device_idx = fwk_id_get_element_idx(fmu_id),
+                                   .node_idx = node_idx,
+                                   .sm_idx = NI710AE_CRITICAL_SMID };
+    switch (step_idx) {
+    case STEP_START:
+        enable_and_inject(&fault, true);
+        return FWK_PENDING;
+    case STEP_INJECT_0:
+        validate_fault(fmu_id, node_idx, NI710AE_CRITICAL_SMID, true, event);
+        struct mod_fmu_fault nc_cr_fault = { .device_idx =
+                                                 fwk_id_get_element_idx(fmu_id),
+                                             .node_idx = node_idx,
+                                             .sm_idx =
+                                                 NI710AE_NON_CRITICAL_CR_SMID };
+        fmu_api->set_critical(&nc_cr_fault, false);
+        enable_and_inject(&nc_cr_fault, false);
+        return FWK_PENDING;
+    case STEP_INJECT_1:
+        validate_fault(
+            fmu_id, node_idx, NI710AE_NON_CRITICAL_CR_SMID, false, event);
+        struct mod_fmu_fault nc_fault = { .device_idx =
+                                              fwk_id_get_element_idx(fmu_id),
+                                          .node_idx = node_idx,
+                                          .sm_idx =
+                                              NI710AE_NON_CRITICAL_UCR_SMID };
+        fmu_api->set_critical(&nc_fault, false);
+        enable_and_inject(&nc_fault, false);
+        return FWK_PENDING;
+    case STEP_INJECT_2:
+        validate_fault(
+            fmu_id, node_idx, NI710AE_NON_CRITICAL_UCR_SMID, true, event);
+        return FWK_SUCCESS;
+    default:
+        fwk_unreachable();
+    }
+}
+
 static int test_inject_gic_fmu(
     unsigned int step_idx,
     const struct fwk_event *event)
@@ -289,6 +353,89 @@ static int test_inject_cl0_pc3_mhu_fmu(
 {
     return inject_fault(
         cl0_pc3_mhu_fmu, MHU_FMU_BLOCK_TYPE_FMU, step_idx, event);
+}
+
+static void upgrade_fault(struct mod_fmu_fault *fault, uint16_t idx)
+{
+    uint32_t status;
+
+    fault->device_idx = fwk_id_get_element_idx(fmu1);
+    fault->node_idx = idx;
+    fault->sm_idx = NI710AE_CRITICAL_SMID;
+
+    status = fmu_api->set_upgrade_enabled(fmu1, fault->node_idx, true);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
+}
+
+static int test_inject_cl0_ni710ae_fmu(
+    unsigned int step_idx,
+    const struct fwk_event *event)
+{
+    struct mod_fmu_fault fault;
+
+    upgrade_fault(&fault, NI710AE_CL0_CR_INT);
+
+    return inject_fault_ni710ae(
+        cl0_ni710ae_fmu, NI710AE_CLUSTER_NODE_IDX, step_idx, event);
+}
+
+static int test_inject_cl1_ni710ae_fmu(
+    unsigned int step_idx,
+    const struct fwk_event *event)
+{
+    struct mod_fmu_fault fault;
+
+    upgrade_fault(&fault, NI710AE_CL1_CR_INT);
+
+    return inject_fault_ni710ae(
+        cl1_ni710ae_fmu, NI710AE_CLUSTER_NODE_IDX, step_idx, event);
+}
+
+static int test_inject_cl2_ni710ae_fmu(
+    unsigned int step_idx,
+    const struct fwk_event *event)
+{
+    struct mod_fmu_fault fault;
+
+    upgrade_fault(&fault, NI710AE_CL2_CR_INT);
+
+    return inject_fault_ni710ae(
+        cl2_ni710ae_fmu, NI710AE_CLUSTER_NODE_IDX, step_idx, event);
+}
+
+static int test_inject_cl3_ni710ae_fmu(
+    unsigned int step_idx,
+    const struct fwk_event *event)
+{
+    struct mod_fmu_fault fault;
+
+    upgrade_fault(&fault, NI710AE_CL3_CR_INT);
+
+    return inject_fault_ni710ae(
+        cl3_ni710ae_fmu, NI710AE_CLUSTER_NODE_IDX, step_idx, event);
+}
+
+static int test_inject_sys_ctl_ni710ae_fmu(
+    unsigned int step_idx,
+    const struct fwk_event *event)
+{
+    struct mod_fmu_fault fault;
+
+    upgrade_fault(&fault, NI710AE_SYS_CTL_CR_INT);
+
+    return inject_fault_ni710ae(
+        sys_ctl_ni710ae_fmu, NI710AE_SYS_CTL_NODE_IDX, step_idx, event);
+}
+
+static int test_inject_smb_ni710ae_fmu(
+    unsigned int step_idx,
+    const struct fwk_event *event)
+{
+    struct mod_fmu_fault fault;
+
+    upgrade_fault(&fault, NI710AE_SMB_CR_INT);
+    return inject_fault_ni710ae(
+        smb_ni710ae_fmu, NI710AE_SMB_NODE_IDX, step_idx, event);
 }
 
 static int test_set_enabled(
@@ -473,6 +620,12 @@ enum test_case {
     TEST_CASE_INJECT_CL0_PC2_MHU_FMU,
     TEST_CASE_INJECT_PC3_CL0_MHU_FMU,
     TEST_CASE_INJECT_CL0_PC3_MHU_FMU,
+    TEST_CASE_INJECT_CL0_NI710AE_FMU,
+    TEST_CASE_INJECT_CL1_NI710AE_FMU,
+    TEST_CASE_INJECT_CL2_NI710AE_FMU,
+    TEST_CASE_INJECT_CL3_NI710AE_FMU,
+    TEST_CASE_INJECT_SYS_CTL_NI710AE_FMU,
+    TEST_CASE_INJECT_SMB_NI710AE_FMU,
     TEST_CASE_SET_ENABLED,
     TEST_CASE_UPGRADE,
     TEST_CASE_COUNT,
@@ -511,6 +664,18 @@ static const char *test_name(unsigned int case_idx)
         return "test_set_enabled";
     case TEST_CASE_UPGRADE:
         return "test_upgrade";
+    case TEST_CASE_INJECT_CL0_NI710AE_FMU:
+        return "test_inject_cl0_ni710ae_fmu";
+    case TEST_CASE_INJECT_CL1_NI710AE_FMU:
+        return "test_inject_cl1_ni710ae_fmu";
+    case TEST_CASE_INJECT_CL2_NI710AE_FMU:
+        return "test_inject_cl2_ni710ae_fmu";
+    case TEST_CASE_INJECT_CL3_NI710AE_FMU:
+        return "test_inject_cl3_ni710ae_fmu";
+    case TEST_CASE_INJECT_SYS_CTL_NI710AE_FMU:
+        return "test_inject_sys_ctl_ni710ae_fmu";
+    case TEST_CASE_INJECT_SMB_NI710AE_FMU:
+        return "test_inject_smb_ni710ae_fmu";
     default:
         return NULL;
     }
@@ -548,6 +713,18 @@ static int run(
         return test_inject_pc3_cl0_mhu_fmu(step_idx, event);
     case TEST_CASE_INJECT_CL0_PC3_MHU_FMU:
         return test_inject_cl0_pc3_mhu_fmu(step_idx, event);
+    case TEST_CASE_INJECT_CL0_NI710AE_FMU:
+        return test_inject_cl0_ni710ae_fmu(step_idx, event);
+    case TEST_CASE_INJECT_CL1_NI710AE_FMU:
+        return test_inject_cl1_ni710ae_fmu(step_idx, event);
+    case TEST_CASE_INJECT_CL2_NI710AE_FMU:
+        return test_inject_cl2_ni710ae_fmu(step_idx, event);
+    case TEST_CASE_INJECT_CL3_NI710AE_FMU:
+        return test_inject_cl3_ni710ae_fmu(step_idx, event);
+    case TEST_CASE_INJECT_SYS_CTL_NI710AE_FMU:
+        return test_inject_sys_ctl_ni710ae_fmu(step_idx, event);
+    case TEST_CASE_INJECT_SMB_NI710AE_FMU:
+        return test_inject_smb_ni710ae_fmu(step_idx, event);
     case TEST_CASE_SET_ENABLED:
         return test_set_enabled(step_idx, event);
     case TEST_CASE_UPGRADE:
