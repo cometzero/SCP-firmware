@@ -449,10 +449,12 @@ static int fmu_init(
 
 extern struct mod_fmu_impl_api mod_fmu_system_api;
 extern struct mod_fmu_impl_api mod_fmu_gic_mhu_api;
+extern struct mod_fmu_impl_api mod_ni710ae_fmu_api;
 
 struct mod_fmu_impl_api *implementation_apis[MOD_FMU_IMPL_COUNT] = {
     [MOD_FMU_SYSTEM_IMPL] = &mod_fmu_system_api,
     [MOD_FMU_GIC_MHU_IMPL] = &mod_fmu_gic_mhu_api,
+    [MOD_FMU_NI710AE_IMPL] = &mod_ni710ae_fmu_api,
 };
 
 static int fmu_device_init(
