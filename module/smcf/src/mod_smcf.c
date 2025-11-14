@@ -284,7 +284,7 @@ static void error_handler(
         err_value = mgi_get_error_code(element_ctx->mgi);
 
         /* Get MON_ID monitor that reported error */
-        err_mon_id = scmf_get_error_monitor_id(element_ctx->mgi);
+        err_mon_id = mgi_get_error_monitor_id(element_ctx->mgi);
 
         switch (err_value) {
         case (SMCF_MGI_ERR_CODE_SAMPLE):

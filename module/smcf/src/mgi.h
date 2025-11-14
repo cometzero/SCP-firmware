@@ -543,7 +543,7 @@ uint32_t mgi_get_valid_error(struct smcf_mgi_reg *smcf_mgi);
 uint32_t mgi_get_second_error(struct smcf_mgi_reg *smcf_mgi);
 
 /* Get monitor id that generated an error */
-uint32_t scmf_get_error_monitor_id(struct smcf_mgi_reg *smcf_mgi);
+uint32_t mgi_get_error_monitor_id(struct smcf_mgi_reg *smcf_mgi);
 
 /*
  * Interrupts

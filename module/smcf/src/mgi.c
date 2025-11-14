@@ -405,7 +405,7 @@ uint32_t mgi_get_second_error(struct smcf_mgi_reg *smcf_mgi)
 }
 
 /* Get monitor id that generated an error */
-uint32_t scmf_get_error_monitor_id(struct smcf_mgi_reg *smcf_mgi)
+uint32_t mgi_get_error_monitor_id(struct smcf_mgi_reg *smcf_mgi)
 {
     return (
         (smcf_mgi->ERR_CODE & SMCF_MGI_ERR_CODE_MON_ID_MASK) >>
