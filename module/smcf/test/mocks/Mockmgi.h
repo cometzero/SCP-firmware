@@ -346,6 +346,26 @@ void mgi_enable_sample_CMockExpectWithArray(UNITY_LINE_TYPE cmock_line, struct s
 void mgi_enable_sample_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size);
 #define mgi_enable_sample_IgnoreArg_smcf_mgi() mgi_enable_sample_CMockIgnoreArg_smcf_mgi(__LINE__)
 void mgi_enable_sample_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
+#define mgi_disable_sample_Ignore() mgi_disable_sample_CMockIgnore()
+void mgi_disable_sample_CMockIgnore(void);
+#define mgi_disable_sample_StopIgnore() mgi_disable_sample_CMockStopIgnore()
+void mgi_disable_sample_CMockStopIgnore(void);
+#define mgi_disable_sample_ExpectAnyArgs() mgi_disable_sample_CMockExpectAnyArgs(__LINE__)
+void mgi_disable_sample_CMockExpectAnyArgs(UNITY_LINE_TYPE cmock_line);
+#define mgi_disable_sample_Expect(smcf_mgi) mgi_disable_sample_CMockExpect(__LINE__, smcf_mgi)
+void mgi_disable_sample_CMockExpect(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi);
+typedef void (* CMOCK_mgi_disable_sample_CALLBACK)(struct smcf_mgi_reg* smcf_mgi, int cmock_num_calls);
+void mgi_disable_sample_AddCallback(CMOCK_mgi_disable_sample_CALLBACK Callback);
+void mgi_disable_sample_Stub(CMOCK_mgi_disable_sample_CALLBACK Callback);
+#define mgi_disable_sample_StubWithCallback mgi_disable_sample_Stub
+#define mgi_disable_sample_ExpectWithArray(smcf_mgi, smcf_mgi_Depth) mgi_disable_sample_CMockExpectWithArray(__LINE__, smcf_mgi, smcf_mgi_Depth)
+void mgi_disable_sample_CMockExpectWithArray(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth);
+#define mgi_disable_sample_ReturnThruPtr_smcf_mgi(smcf_mgi) mgi_disable_sample_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, sizeof(struct smcf_mgi_reg))
+#define mgi_disable_sample_ReturnArrayThruPtr_smcf_mgi(smcf_mgi, cmock_len) mgi_disable_sample_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_len * sizeof(*smcf_mgi))
+#define mgi_disable_sample_ReturnMemThruPtr_smcf_mgi(smcf_mgi, cmock_size) mgi_disable_sample_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_size)
+void mgi_disable_sample_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size);
+#define mgi_disable_sample_IgnoreArg_smcf_mgi() mgi_disable_sample_CMockIgnoreArg_smcf_mgi(__LINE__)
+void mgi_disable_sample_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
 #define mgi_is_sample_ongoing_IgnoreAndReturn(cmock_retval) mgi_is_sample_ongoing_CMockIgnoreAndReturn(__LINE__, cmock_retval)
 void mgi_is_sample_ongoing_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, bool cmock_to_return);
 #define mgi_is_sample_ongoing_StopIgnore() mgi_is_sample_ongoing_CMockStopIgnore()
@@ -616,6 +636,108 @@ void mgi_is_data_valid_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line
 void mgi_is_data_valid_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
 #define mgi_is_data_valid_IgnoreArg_monitor() mgi_is_data_valid_CMockIgnoreArg_monitor(__LINE__)
 void mgi_is_data_valid_CMockIgnoreArg_monitor(UNITY_LINE_TYPE cmock_line);
+#define mgi_set_sample_period_IgnoreAndReturn(cmock_retval) mgi_set_sample_period_CMockIgnoreAndReturn(__LINE__, cmock_retval)
+void mgi_set_sample_period_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, int cmock_to_return);
+#define mgi_set_sample_period_StopIgnore() mgi_set_sample_period_CMockStopIgnore()
+void mgi_set_sample_period_CMockStopIgnore(void);
+#define mgi_set_sample_period_ExpectAnyArgsAndReturn(cmock_retval) mgi_set_sample_period_CMockExpectAnyArgsAndReturn(__LINE__, cmock_retval)
+void mgi_set_sample_period_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, int cmock_to_return);
+#define mgi_set_sample_period_ExpectAndReturn(smcf_mgi, period, cmock_retval) mgi_set_sample_period_CMockExpectAndReturn(__LINE__, smcf_mgi, period, cmock_retval)
+void mgi_set_sample_period_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t period, int cmock_to_return);
+typedef int (* CMOCK_mgi_set_sample_period_CALLBACK)(struct smcf_mgi_reg* smcf_mgi, uint32_t period, int cmock_num_calls);
+void mgi_set_sample_period_AddCallback(CMOCK_mgi_set_sample_period_CALLBACK Callback);
+void mgi_set_sample_period_Stub(CMOCK_mgi_set_sample_period_CALLBACK Callback);
+#define mgi_set_sample_period_StubWithCallback mgi_set_sample_period_Stub
+#define mgi_set_sample_period_ExpectWithArrayAndReturn(smcf_mgi, smcf_mgi_Depth, period, cmock_retval) mgi_set_sample_period_CMockExpectWithArrayAndReturn(__LINE__, smcf_mgi, smcf_mgi_Depth, period, cmock_retval)
+void mgi_set_sample_period_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t period, int cmock_to_return);
+#define mgi_set_sample_period_ReturnThruPtr_smcf_mgi(smcf_mgi) mgi_set_sample_period_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, sizeof(struct smcf_mgi_reg))
+#define mgi_set_sample_period_ReturnArrayThruPtr_smcf_mgi(smcf_mgi, cmock_len) mgi_set_sample_period_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_len * sizeof(*smcf_mgi))
+#define mgi_set_sample_period_ReturnMemThruPtr_smcf_mgi(smcf_mgi, cmock_size) mgi_set_sample_period_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_size)
+void mgi_set_sample_period_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size);
+#define mgi_set_sample_period_IgnoreArg_smcf_mgi() mgi_set_sample_period_CMockIgnoreArg_smcf_mgi(__LINE__)
+void mgi_set_sample_period_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
+#define mgi_set_sample_period_IgnoreArg_period() mgi_set_sample_period_CMockIgnoreArg_period(__LINE__)
+void mgi_set_sample_period_CMockIgnoreArg_period(UNITY_LINE_TYPE cmock_line);
+#define mgi_get_error_code_IgnoreAndReturn(cmock_retval) mgi_get_error_code_CMockIgnoreAndReturn(__LINE__, cmock_retval)
+void mgi_get_error_code_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_error_code_StopIgnore() mgi_get_error_code_CMockStopIgnore()
+void mgi_get_error_code_CMockStopIgnore(void);
+#define mgi_get_error_code_ExpectAnyArgsAndReturn(cmock_retval) mgi_get_error_code_CMockExpectAnyArgsAndReturn(__LINE__, cmock_retval)
+void mgi_get_error_code_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_error_code_ExpectAndReturn(smcf_mgi, cmock_retval) mgi_get_error_code_CMockExpectAndReturn(__LINE__, smcf_mgi, cmock_retval)
+void mgi_get_error_code_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return);
+typedef uint32_t (* CMOCK_mgi_get_error_code_CALLBACK)(struct smcf_mgi_reg* smcf_mgi, int cmock_num_calls);
+void mgi_get_error_code_AddCallback(CMOCK_mgi_get_error_code_CALLBACK Callback);
+void mgi_get_error_code_Stub(CMOCK_mgi_get_error_code_CALLBACK Callback);
+#define mgi_get_error_code_StubWithCallback mgi_get_error_code_Stub
+#define mgi_get_error_code_ExpectWithArrayAndReturn(smcf_mgi, smcf_mgi_Depth, cmock_retval) mgi_get_error_code_CMockExpectWithArrayAndReturn(__LINE__, smcf_mgi, smcf_mgi_Depth, cmock_retval)
+void mgi_get_error_code_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return);
+#define mgi_get_error_code_ReturnThruPtr_smcf_mgi(smcf_mgi) mgi_get_error_code_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, sizeof(struct smcf_mgi_reg))
+#define mgi_get_error_code_ReturnArrayThruPtr_smcf_mgi(smcf_mgi, cmock_len) mgi_get_error_code_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_len * sizeof(*smcf_mgi))
+#define mgi_get_error_code_ReturnMemThruPtr_smcf_mgi(smcf_mgi, cmock_size) mgi_get_error_code_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_size)
+void mgi_get_error_code_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size);
+#define mgi_get_error_code_IgnoreArg_smcf_mgi() mgi_get_error_code_CMockIgnoreArg_smcf_mgi(__LINE__)
+void mgi_get_error_code_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
+#define mgi_get_valid_error_IgnoreAndReturn(cmock_retval) mgi_get_valid_error_CMockIgnoreAndReturn(__LINE__, cmock_retval)
+void mgi_get_valid_error_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_valid_error_StopIgnore() mgi_get_valid_error_CMockStopIgnore()
+void mgi_get_valid_error_CMockStopIgnore(void);
+#define mgi_get_valid_error_ExpectAnyArgsAndReturn(cmock_retval) mgi_get_valid_error_CMockExpectAnyArgsAndReturn(__LINE__, cmock_retval)
+void mgi_get_valid_error_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_valid_error_ExpectAndReturn(smcf_mgi, cmock_retval) mgi_get_valid_error_CMockExpectAndReturn(__LINE__, smcf_mgi, cmock_retval)
+void mgi_get_valid_error_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return);
+typedef uint32_t (* CMOCK_mgi_get_valid_error_CALLBACK)(struct smcf_mgi_reg* smcf_mgi, int cmock_num_calls);
+void mgi_get_valid_error_AddCallback(CMOCK_mgi_get_valid_error_CALLBACK Callback);
+void mgi_get_valid_error_Stub(CMOCK_mgi_get_valid_error_CALLBACK Callback);
+#define mgi_get_valid_error_StubWithCallback mgi_get_valid_error_Stub
+#define mgi_get_valid_error_ExpectWithArrayAndReturn(smcf_mgi, smcf_mgi_Depth, cmock_retval) mgi_get_valid_error_CMockExpectWithArrayAndReturn(__LINE__, smcf_mgi, smcf_mgi_Depth, cmock_retval)
+void mgi_get_valid_error_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return);
+#define mgi_get_valid_error_ReturnThruPtr_smcf_mgi(smcf_mgi) mgi_get_valid_error_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, sizeof(struct smcf_mgi_reg))
+#define mgi_get_valid_error_ReturnArrayThruPtr_smcf_mgi(smcf_mgi, cmock_len) mgi_get_valid_error_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_len * sizeof(*smcf_mgi))
+#define mgi_get_valid_error_ReturnMemThruPtr_smcf_mgi(smcf_mgi, cmock_size) mgi_get_valid_error_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_size)
+void mgi_get_valid_error_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size);
+#define mgi_get_valid_error_IgnoreArg_smcf_mgi() mgi_get_valid_error_CMockIgnoreArg_smcf_mgi(__LINE__)
+void mgi_get_valid_error_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
+#define mgi_get_second_error_IgnoreAndReturn(cmock_retval) mgi_get_second_error_CMockIgnoreAndReturn(__LINE__, cmock_retval)
+void mgi_get_second_error_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_second_error_StopIgnore() mgi_get_second_error_CMockStopIgnore()
+void mgi_get_second_error_CMockStopIgnore(void);
+#define mgi_get_second_error_ExpectAnyArgsAndReturn(cmock_retval) mgi_get_second_error_CMockExpectAnyArgsAndReturn(__LINE__, cmock_retval)
+void mgi_get_second_error_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_second_error_ExpectAndReturn(smcf_mgi, cmock_retval) mgi_get_second_error_CMockExpectAndReturn(__LINE__, smcf_mgi, cmock_retval)
+void mgi_get_second_error_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return);
+typedef uint32_t (* CMOCK_mgi_get_second_error_CALLBACK)(struct smcf_mgi_reg* smcf_mgi, int cmock_num_calls);
+void mgi_get_second_error_AddCallback(CMOCK_mgi_get_second_error_CALLBACK Callback);
+void mgi_get_second_error_Stub(CMOCK_mgi_get_second_error_CALLBACK Callback);
+#define mgi_get_second_error_StubWithCallback mgi_get_second_error_Stub
+#define mgi_get_second_error_ExpectWithArrayAndReturn(smcf_mgi, smcf_mgi_Depth, cmock_retval) mgi_get_second_error_CMockExpectWithArrayAndReturn(__LINE__, smcf_mgi, smcf_mgi_Depth, cmock_retval)
+void mgi_get_second_error_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return);
+#define mgi_get_second_error_ReturnThruPtr_smcf_mgi(smcf_mgi) mgi_get_second_error_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, sizeof(struct smcf_mgi_reg))
+#define mgi_get_second_error_ReturnArrayThruPtr_smcf_mgi(smcf_mgi, cmock_len) mgi_get_second_error_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_len * sizeof(*smcf_mgi))
+#define mgi_get_second_error_ReturnMemThruPtr_smcf_mgi(smcf_mgi, cmock_size) mgi_get_second_error_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_size)
+void mgi_get_second_error_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size);
+#define mgi_get_second_error_IgnoreArg_smcf_mgi() mgi_get_second_error_CMockIgnoreArg_smcf_mgi(__LINE__)
+void mgi_get_second_error_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
+#define mgi_get_error_monitor_id_IgnoreAndReturn(cmock_retval) mgi_get_error_monitor_id_CMockIgnoreAndReturn(__LINE__, cmock_retval)
+void mgi_get_error_monitor_id_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_error_monitor_id_StopIgnore() mgi_get_error_monitor_id_CMockStopIgnore()
+void mgi_get_error_monitor_id_CMockStopIgnore(void);
+#define mgi_get_error_monitor_id_ExpectAnyArgsAndReturn(cmock_retval) mgi_get_error_monitor_id_CMockExpectAnyArgsAndReturn(__LINE__, cmock_retval)
+void mgi_get_error_monitor_id_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return);
+#define mgi_get_error_monitor_id_ExpectAndReturn(smcf_mgi, cmock_retval) mgi_get_error_monitor_id_CMockExpectAndReturn(__LINE__, smcf_mgi, cmock_retval)
+void mgi_get_error_monitor_id_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return);
+typedef uint32_t (* CMOCK_mgi_get_error_monitor_id_CALLBACK)(struct smcf_mgi_reg* smcf_mgi, int cmock_num_calls);
+void mgi_get_error_monitor_id_AddCallback(CMOCK_mgi_get_error_monitor_id_CALLBACK Callback);
+void mgi_get_error_monitor_id_Stub(CMOCK_mgi_get_error_monitor_id_CALLBACK Callback);
+#define mgi_get_error_monitor_id_StubWithCallback mgi_get_error_monitor_id_Stub
+#define mgi_get_error_monitor_id_ExpectWithArrayAndReturn(smcf_mgi, smcf_mgi_Depth, cmock_retval) mgi_get_error_monitor_id_CMockExpectWithArrayAndReturn(__LINE__, smcf_mgi, smcf_mgi_Depth, cmock_retval)
+void mgi_get_error_monitor_id_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return);
+#define mgi_get_error_monitor_id_ReturnThruPtr_smcf_mgi(smcf_mgi) mgi_get_error_monitor_id_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, sizeof(struct smcf_mgi_reg))
+#define mgi_get_error_monitor_id_ReturnArrayThruPtr_smcf_mgi(smcf_mgi, cmock_len) mgi_get_error_monitor_id_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_len * sizeof(*smcf_mgi))
+#define mgi_get_error_monitor_id_ReturnMemThruPtr_smcf_mgi(smcf_mgi, cmock_size) mgi_get_error_monitor_id_CMockReturnMemThruPtr_smcf_mgi(__LINE__, smcf_mgi, cmock_size)
+void mgi_get_error_monitor_id_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size);
+#define mgi_get_error_monitor_id_IgnoreArg_smcf_mgi() mgi_get_error_monitor_id_CMockIgnoreArg_smcf_mgi(__LINE__)
+void mgi_get_error_monitor_id_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line);
 #define mgi_is_the_source_triggered_the_interrupt_IgnoreAndReturn(cmock_retval) mgi_is_the_source_triggered_the_interrupt_CMockIgnoreAndReturn(__LINE__, cmock_retval)
 void mgi_is_the_source_triggered_the_interrupt_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, bool cmock_to_return);
 #define mgi_is_the_source_triggered_the_interrupt_StopIgnore() mgi_is_the_source_triggered_the_interrupt_CMockStopIgnore()

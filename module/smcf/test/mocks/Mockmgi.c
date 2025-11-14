@@ -14,6 +14,7 @@ static const char* CMockString_interrupt_source_pos = "interrupt_source_pos";
 static const char* CMockString_mgi_disable_monitor = "mgi_disable_monitor";
 static const char* CMockString_mgi_disable_monitor_blocking = "mgi_disable_monitor_blocking";
 static const char* CMockString_mgi_disable_program_mode = "mgi_disable_program_mode";
+static const char* CMockString_mgi_disable_sample = "mgi_disable_sample";
 static const char* CMockString_mgi_enable__program_mode_multi = "mgi_enable__program_mode_multi";
 static const char* CMockString_mgi_enable_all_monitor = "mgi_enable_all_monitor";
 static const char* CMockString_mgi_enable_count_id_write_to_ram = "mgi_enable_count_id_write_to_ram";
@@ -26,11 +27,15 @@ static const char* CMockString_mgi_enable_sample = "mgi_enable_sample";
 static const char* CMockString_mgi_enable_tag_id_write_to_ram = "mgi_enable_tag_id_write_to_ram";
 static const char* CMockString_mgi_enable_valid_bits_write_to_ram = "mgi_enable_valid_bits_write_to_ram";
 static const char* CMockString_mgi_get_end_sample_id = "mgi_get_end_sample_id";
+static const char* CMockString_mgi_get_error_code = "mgi_get_error_code";
+static const char* CMockString_mgi_get_error_monitor_id = "mgi_get_error_monitor_id";
 static const char* CMockString_mgi_get_num_of_monitors = "mgi_get_num_of_monitors";
 static const char* CMockString_mgi_get_number_of_bits_in_mode_registers = "mgi_get_number_of_bits_in_mode_registers";
 static const char* CMockString_mgi_get_number_of_mode_registers = "mgi_get_number_of_mode_registers";
+static const char* CMockString_mgi_get_second_error = "mgi_get_second_error";
 static const char* CMockString_mgi_get_start_sample_id = "mgi_get_start_sample_id";
 static const char* CMockString_mgi_get_tag_length_in_bits = "mgi_get_tag_length_in_bits";
+static const char* CMockString_mgi_get_valid_error = "mgi_get_valid_error";
 static const char* CMockString_mgi_interrupt_source_clear = "mgi_interrupt_source_clear";
 static const char* CMockString_mgi_interrupt_source_mask = "mgi_interrupt_source_mask";
 static const char* CMockString_mgi_interrupt_source_unmask = "mgi_interrupt_source_unmask";
@@ -49,6 +54,7 @@ static const char* CMockString_mgi_request_start_id_wirte_to_ram = "mgi_request_
 static const char* CMockString_mgi_set_dma_data_address = "mgi_set_dma_data_address";
 static const char* CMockString_mgi_set_monitor_mode = "mgi_set_monitor_mode";
 static const char* CMockString_mgi_set_sample_delay = "mgi_set_sample_delay";
+static const char* CMockString_mgi_set_sample_period = "mgi_set_sample_period";
 static const char* CMockString_mgi_set_sample_type = "mgi_set_sample_type";
 static const char* CMockString_mgi_unpack_data = "mgi_unpack_data";
 static const char* CMockString_mli_idx = "mli_idx";
@@ -56,6 +62,7 @@ static const char* CMockString_mode_idx = "mode_idx";
 static const char* CMockString_monitor = "monitor";
 static const char* CMockString_monitor_mask = "monitor_mask";
 static const char* CMockString_num_of_data = "num_of_data";
+static const char* CMockString_period = "period";
 static const char* CMockString_smcf_mgi = "smcf_mgi";
 static const char* CMockString_type = "type";
 static const char* CMockString_value = "value";
@@ -291,6 +298,19 @@ typedef struct _CMOCK_mgi_enable_sample_CALL_INSTANCE
 
 } CMOCK_mgi_enable_sample_CALL_INSTANCE;
 
+typedef struct _CMOCK_mgi_disable_sample_CALL_INSTANCE
+{
+  UNITY_LINE_TYPE LineNumber;
+  char ExpectAnyArgsBool;
+  struct smcf_mgi_reg* Expected_smcf_mgi;
+  int Expected_smcf_mgi_Depth;
+  char ReturnThruPtr_smcf_mgi_Used;
+  struct smcf_mgi_reg* ReturnThruPtr_smcf_mgi_Val;
+  size_t ReturnThruPtr_smcf_mgi_Size;
+  char IgnoreArg_smcf_mgi;
+
+} CMOCK_mgi_disable_sample_CALL_INSTANCE;
+
 typedef struct _CMOCK_mgi_is_sample_ongoing_CALL_INSTANCE
 {
   UNITY_LINE_TYPE LineNumber;
@@ -483,6 +503,78 @@ typedef struct _CMOCK_mgi_is_data_valid_CALL_INSTANCE
   char IgnoreArg_monitor;
 
 } CMOCK_mgi_is_data_valid_CALL_INSTANCE;
+
+typedef struct _CMOCK_mgi_set_sample_period_CALL_INSTANCE
+{
+  UNITY_LINE_TYPE LineNumber;
+  char ExpectAnyArgsBool;
+  int ReturnVal;
+  struct smcf_mgi_reg* Expected_smcf_mgi;
+  uint32_t Expected_period;
+  int Expected_smcf_mgi_Depth;
+  char ReturnThruPtr_smcf_mgi_Used;
+  struct smcf_mgi_reg* ReturnThruPtr_smcf_mgi_Val;
+  size_t ReturnThruPtr_smcf_mgi_Size;
+  char IgnoreArg_smcf_mgi;
+  char IgnoreArg_period;
+
+} CMOCK_mgi_set_sample_period_CALL_INSTANCE;
+
+typedef struct _CMOCK_mgi_get_error_code_CALL_INSTANCE
+{
+  UNITY_LINE_TYPE LineNumber;
+  char ExpectAnyArgsBool;
+  uint32_t ReturnVal;
+  struct smcf_mgi_reg* Expected_smcf_mgi;
+  int Expected_smcf_mgi_Depth;
+  char ReturnThruPtr_smcf_mgi_Used;
+  struct smcf_mgi_reg* ReturnThruPtr_smcf_mgi_Val;
+  size_t ReturnThruPtr_smcf_mgi_Size;
+  char IgnoreArg_smcf_mgi;
+
+} CMOCK_mgi_get_error_code_CALL_INSTANCE;
+
+typedef struct _CMOCK_mgi_get_valid_error_CALL_INSTANCE
+{
+  UNITY_LINE_TYPE LineNumber;
+  char ExpectAnyArgsBool;
+  uint32_t ReturnVal;
+  struct smcf_mgi_reg* Expected_smcf_mgi;
+  int Expected_smcf_mgi_Depth;
+  char ReturnThruPtr_smcf_mgi_Used;
+  struct smcf_mgi_reg* ReturnThruPtr_smcf_mgi_Val;
+  size_t ReturnThruPtr_smcf_mgi_Size;
+  char IgnoreArg_smcf_mgi;
+
+} CMOCK_mgi_get_valid_error_CALL_INSTANCE;
+
+typedef struct _CMOCK_mgi_get_second_error_CALL_INSTANCE
+{
+  UNITY_LINE_TYPE LineNumber;
+  char ExpectAnyArgsBool;
+  uint32_t ReturnVal;
+  struct smcf_mgi_reg* Expected_smcf_mgi;
+  int Expected_smcf_mgi_Depth;
+  char ReturnThruPtr_smcf_mgi_Used;
+  struct smcf_mgi_reg* ReturnThruPtr_smcf_mgi_Val;
+  size_t ReturnThruPtr_smcf_mgi_Size;
+  char IgnoreArg_smcf_mgi;
+
+} CMOCK_mgi_get_second_error_CALL_INSTANCE;
+
+typedef struct _CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE
+{
+  UNITY_LINE_TYPE LineNumber;
+  char ExpectAnyArgsBool;
+  uint32_t ReturnVal;
+  struct smcf_mgi_reg* Expected_smcf_mgi;
+  int Expected_smcf_mgi_Depth;
+  char ReturnThruPtr_smcf_mgi_Used;
+  struct smcf_mgi_reg* ReturnThruPtr_smcf_mgi_Val;
+  size_t ReturnThruPtr_smcf_mgi_Size;
+  char IgnoreArg_smcf_mgi;
+
+} CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE;
 
 typedef struct _CMOCK_mgi_is_the_source_triggered_the_interrupt_CALL_INSTANCE
 {
@@ -742,6 +834,11 @@ static struct MockmgiInstance
   CMOCK_mgi_enable_sample_CALLBACK mgi_enable_sample_CallbackFunctionPointer;
   int mgi_enable_sample_CallbackCalls;
   CMOCK_MEM_INDEX_TYPE mgi_enable_sample_CallInstance;
+  char mgi_disable_sample_IgnoreBool;
+  char mgi_disable_sample_CallbackBool;
+  CMOCK_mgi_disable_sample_CALLBACK mgi_disable_sample_CallbackFunctionPointer;
+  int mgi_disable_sample_CallbackCalls;
+  CMOCK_MEM_INDEX_TYPE mgi_disable_sample_CallInstance;
   char mgi_is_sample_ongoing_IgnoreBool;
   bool mgi_is_sample_ongoing_FinalReturn;
   char mgi_is_sample_ongoing_CallbackBool;
@@ -820,6 +917,36 @@ static struct MockmgiInstance
   CMOCK_mgi_is_data_valid_CALLBACK mgi_is_data_valid_CallbackFunctionPointer;
   int mgi_is_data_valid_CallbackCalls;
   CMOCK_MEM_INDEX_TYPE mgi_is_data_valid_CallInstance;
+  char mgi_set_sample_period_IgnoreBool;
+  int mgi_set_sample_period_FinalReturn;
+  char mgi_set_sample_period_CallbackBool;
+  CMOCK_mgi_set_sample_period_CALLBACK mgi_set_sample_period_CallbackFunctionPointer;
+  int mgi_set_sample_period_CallbackCalls;
+  CMOCK_MEM_INDEX_TYPE mgi_set_sample_period_CallInstance;
+  char mgi_get_error_code_IgnoreBool;
+  uint32_t mgi_get_error_code_FinalReturn;
+  char mgi_get_error_code_CallbackBool;
+  CMOCK_mgi_get_error_code_CALLBACK mgi_get_error_code_CallbackFunctionPointer;
+  int mgi_get_error_code_CallbackCalls;
+  CMOCK_MEM_INDEX_TYPE mgi_get_error_code_CallInstance;
+  char mgi_get_valid_error_IgnoreBool;
+  uint32_t mgi_get_valid_error_FinalReturn;
+  char mgi_get_valid_error_CallbackBool;
+  CMOCK_mgi_get_valid_error_CALLBACK mgi_get_valid_error_CallbackFunctionPointer;
+  int mgi_get_valid_error_CallbackCalls;
+  CMOCK_MEM_INDEX_TYPE mgi_get_valid_error_CallInstance;
+  char mgi_get_second_error_IgnoreBool;
+  uint32_t mgi_get_second_error_FinalReturn;
+  char mgi_get_second_error_CallbackBool;
+  CMOCK_mgi_get_second_error_CALLBACK mgi_get_second_error_CallbackFunctionPointer;
+  int mgi_get_second_error_CallbackCalls;
+  CMOCK_MEM_INDEX_TYPE mgi_get_second_error_CallInstance;
+  char mgi_get_error_monitor_id_IgnoreBool;
+  uint32_t mgi_get_error_monitor_id_FinalReturn;
+  char mgi_get_error_monitor_id_CallbackBool;
+  CMOCK_mgi_get_error_monitor_id_CALLBACK mgi_get_error_monitor_id_CallbackFunctionPointer;
+  int mgi_get_error_monitor_id_CallbackCalls;
+  CMOCK_MEM_INDEX_TYPE mgi_get_error_monitor_id_CallInstance;
   char mgi_is_the_source_triggered_the_interrupt_IgnoreBool;
   bool mgi_is_the_source_triggered_the_interrupt_FinalReturn;
   char mgi_is_the_source_triggered_the_interrupt_CallbackBool;
@@ -1086,6 +1213,19 @@ void Mockmgi_Verify(void)
     call_instance = CMOCK_GUTS_NONE;
     (void)call_instance;
   }
+  call_instance = Mock.mgi_disable_sample_CallInstance;
+  if (Mock.mgi_disable_sample_IgnoreBool)
+    call_instance = CMOCK_GUTS_NONE;
+  if (CMOCK_GUTS_NONE != call_instance)
+  {
+    UNITY_SET_DETAIL(CMockString_mgi_disable_sample);
+    UNITY_TEST_FAIL(cmock_line, CMockStringCalledLess);
+  }
+  if (Mock.mgi_disable_sample_CallbackFunctionPointer != NULL)
+  {
+    call_instance = CMOCK_GUTS_NONE;
+    (void)call_instance;
+  }
   call_instance = Mock.mgi_is_sample_ongoing_CallInstance;
   if (Mock.mgi_is_sample_ongoing_IgnoreBool)
     call_instance = CMOCK_GUTS_NONE;
@@ -1251,6 +1391,71 @@ void Mockmgi_Verify(void)
     UNITY_TEST_FAIL(cmock_line, CMockStringCalledLess);
   }
   if (Mock.mgi_is_data_valid_CallbackFunctionPointer != NULL)
+  {
+    call_instance = CMOCK_GUTS_NONE;
+    (void)call_instance;
+  }
+  call_instance = Mock.mgi_set_sample_period_CallInstance;
+  if (Mock.mgi_set_sample_period_IgnoreBool)
+    call_instance = CMOCK_GUTS_NONE;
+  if (CMOCK_GUTS_NONE != call_instance)
+  {
+    UNITY_SET_DETAIL(CMockString_mgi_set_sample_period);
+    UNITY_TEST_FAIL(cmock_line, CMockStringCalledLess);
+  }
+  if (Mock.mgi_set_sample_period_CallbackFunctionPointer != NULL)
+  {
+    call_instance = CMOCK_GUTS_NONE;
+    (void)call_instance;
+  }
+  call_instance = Mock.mgi_get_error_code_CallInstance;
+  if (Mock.mgi_get_error_code_IgnoreBool)
+    call_instance = CMOCK_GUTS_NONE;
+  if (CMOCK_GUTS_NONE != call_instance)
+  {
+    UNITY_SET_DETAIL(CMockString_mgi_get_error_code);
+    UNITY_TEST_FAIL(cmock_line, CMockStringCalledLess);
+  }
+  if (Mock.mgi_get_error_code_CallbackFunctionPointer != NULL)
+  {
+    call_instance = CMOCK_GUTS_NONE;
+    (void)call_instance;
+  }
+  call_instance = Mock.mgi_get_valid_error_CallInstance;
+  if (Mock.mgi_get_valid_error_IgnoreBool)
+    call_instance = CMOCK_GUTS_NONE;
+  if (CMOCK_GUTS_NONE != call_instance)
+  {
+    UNITY_SET_DETAIL(CMockString_mgi_get_valid_error);
+    UNITY_TEST_FAIL(cmock_line, CMockStringCalledLess);
+  }
+  if (Mock.mgi_get_valid_error_CallbackFunctionPointer != NULL)
+  {
+    call_instance = CMOCK_GUTS_NONE;
+    (void)call_instance;
+  }
+  call_instance = Mock.mgi_get_second_error_CallInstance;
+  if (Mock.mgi_get_second_error_IgnoreBool)
+    call_instance = CMOCK_GUTS_NONE;
+  if (CMOCK_GUTS_NONE != call_instance)
+  {
+    UNITY_SET_DETAIL(CMockString_mgi_get_second_error);
+    UNITY_TEST_FAIL(cmock_line, CMockStringCalledLess);
+  }
+  if (Mock.mgi_get_second_error_CallbackFunctionPointer != NULL)
+  {
+    call_instance = CMOCK_GUTS_NONE;
+    (void)call_instance;
+  }
+  call_instance = Mock.mgi_get_error_monitor_id_CallInstance;
+  if (Mock.mgi_get_error_monitor_id_IgnoreBool)
+    call_instance = CMOCK_GUTS_NONE;
+  if (CMOCK_GUTS_NONE != call_instance)
+  {
+    UNITY_SET_DETAIL(CMockString_mgi_get_error_monitor_id);
+    UNITY_TEST_FAIL(cmock_line, CMockStringCalledLess);
+  }
+  if (Mock.mgi_get_error_monitor_id_CallbackFunctionPointer != NULL)
   {
     call_instance = CMOCK_GUTS_NONE;
     (void)call_instance;
@@ -3825,6 +4030,139 @@ void mgi_enable_sample_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line)
   cmock_call_instance->IgnoreArg_smcf_mgi = 1;
 }
 
+void mgi_disable_sample(struct smcf_mgi_reg* smcf_mgi)
+{
+  UNITY_LINE_TYPE cmock_line = TEST_LINE_NUM;
+  CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance;
+  UNITY_SET_DETAIL(CMockString_mgi_disable_sample);
+  cmock_call_instance = (CMOCK_mgi_disable_sample_CALL_INSTANCE*)CMock_Guts_GetAddressFor(Mock.mgi_disable_sample_CallInstance);
+  Mock.mgi_disable_sample_CallInstance = CMock_Guts_MemNext(Mock.mgi_disable_sample_CallInstance);
+  if (Mock.mgi_disable_sample_IgnoreBool)
+  {
+    UNITY_CLR_DETAILS();
+    return;
+  }
+  if (!Mock.mgi_disable_sample_CallbackBool &&
+      Mock.mgi_disable_sample_CallbackFunctionPointer != NULL)
+  {
+    Mock.mgi_disable_sample_CallbackFunctionPointer(smcf_mgi, Mock.mgi_disable_sample_CallbackCalls++);
+    UNITY_CLR_DETAILS();
+    return;
+  }
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringCalledMore);
+  cmock_line = cmock_call_instance->LineNumber;
+  if (!cmock_call_instance->ExpectAnyArgsBool)
+  {
+  if (!cmock_call_instance->IgnoreArg_smcf_mgi)
+  {
+    UNITY_SET_DETAILS(CMockString_mgi_disable_sample,CMockString_smcf_mgi);
+    if (cmock_call_instance->Expected_smcf_mgi == NULL)
+      { UNITY_TEST_ASSERT_NULL(smcf_mgi, cmock_line, CMockStringExpNULL); }
+    else
+      { UNITY_TEST_ASSERT_EQUAL_MEMORY_ARRAY((void*)(cmock_call_instance->Expected_smcf_mgi), (void*)(smcf_mgi), sizeof(struct smcf_mgi_reg), cmock_call_instance->Expected_smcf_mgi_Depth, cmock_line, CMockStringMismatch); }
+  }
+  }
+  if (Mock.mgi_disable_sample_CallbackFunctionPointer != NULL)
+  {
+    Mock.mgi_disable_sample_CallbackFunctionPointer(smcf_mgi, Mock.mgi_disable_sample_CallbackCalls++);
+  }
+  if (cmock_call_instance->ReturnThruPtr_smcf_mgi_Used)
+  {
+    UNITY_TEST_ASSERT_NOT_NULL(smcf_mgi, cmock_line, CMockStringPtrIsNULL);
+    memcpy((void*)smcf_mgi, (void*)cmock_call_instance->ReturnThruPtr_smcf_mgi_Val,
+      cmock_call_instance->ReturnThruPtr_smcf_mgi_Size);
+  }
+  UNITY_CLR_DETAILS();
+}
+
+void CMockExpectParameters_mgi_disable_sample(CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth);
+void CMockExpectParameters_mgi_disable_sample(CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth)
+{
+  cmock_call_instance->Expected_smcf_mgi = smcf_mgi;
+  cmock_call_instance->Expected_smcf_mgi_Depth = smcf_mgi_Depth;
+  cmock_call_instance->IgnoreArg_smcf_mgi = 0;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 0;
+}
+
+void mgi_disable_sample_CMockIgnore(void)
+{
+  Mock.mgi_disable_sample_IgnoreBool = (char)1;
+}
+
+void mgi_disable_sample_CMockStopIgnore(void)
+{
+  Mock.mgi_disable_sample_IgnoreBool = (char)0;
+}
+
+void mgi_disable_sample_CMockExpectAnyArgs(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_disable_sample_CALL_INSTANCE));
+  CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_disable_sample_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_disable_sample_CallInstance = CMock_Guts_MemChain(Mock.mgi_disable_sample_CallInstance, cmock_guts_index);
+  Mock.mgi_disable_sample_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ExpectAnyArgsBool = (char)1;
+}
+
+void mgi_disable_sample_CMockExpect(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_disable_sample_CALL_INSTANCE));
+  CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_disable_sample_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_disable_sample_CallInstance = CMock_Guts_MemChain(Mock.mgi_disable_sample_CallInstance, cmock_guts_index);
+  Mock.mgi_disable_sample_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_disable_sample(cmock_call_instance, smcf_mgi, 1);
+}
+
+void mgi_disable_sample_AddCallback(CMOCK_mgi_disable_sample_CALLBACK Callback)
+{
+  Mock.mgi_disable_sample_IgnoreBool = (char)0;
+  Mock.mgi_disable_sample_CallbackBool = (char)1;
+  Mock.mgi_disable_sample_CallbackFunctionPointer = Callback;
+}
+
+void mgi_disable_sample_Stub(CMOCK_mgi_disable_sample_CALLBACK Callback)
+{
+  Mock.mgi_disable_sample_IgnoreBool = (char)0;
+  Mock.mgi_disable_sample_CallbackBool = (char)0;
+  Mock.mgi_disable_sample_CallbackFunctionPointer = Callback;
+}
+
+void mgi_disable_sample_CMockExpectWithArray(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_disable_sample_CALL_INSTANCE));
+  CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_disable_sample_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_disable_sample_CallInstance = CMock_Guts_MemChain(Mock.mgi_disable_sample_CallInstance, cmock_guts_index);
+  Mock.mgi_disable_sample_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_disable_sample(cmock_call_instance, smcf_mgi, smcf_mgi_Depth);
+}
+
+void mgi_disable_sample_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size)
+{
+  CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_disable_sample_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_disable_sample_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringPtrPreExp);
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 1;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Val = smcf_mgi;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Size = cmock_size;
+}
+
+void mgi_disable_sample_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_mgi_disable_sample_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_disable_sample_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_disable_sample_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
+  cmock_call_instance->IgnoreArg_smcf_mgi = 1;
+}
+
 bool mgi_is_sample_ongoing(struct smcf_mgi_reg* smcf_mgi)
 {
   UNITY_LINE_TYPE cmock_line = TEST_LINE_NUM;
@@ -5869,6 +6207,775 @@ void mgi_is_data_valid_CMockIgnoreArg_monitor(UNITY_LINE_TYPE cmock_line)
   CMOCK_mgi_is_data_valid_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_is_data_valid_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_is_data_valid_CallInstance));
   UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
   cmock_call_instance->IgnoreArg_monitor = 1;
+}
+
+int mgi_set_sample_period(struct smcf_mgi_reg* smcf_mgi, uint32_t period)
+{
+  UNITY_LINE_TYPE cmock_line = TEST_LINE_NUM;
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance;
+  UNITY_SET_DETAIL(CMockString_mgi_set_sample_period);
+  cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(Mock.mgi_set_sample_period_CallInstance);
+  Mock.mgi_set_sample_period_CallInstance = CMock_Guts_MemNext(Mock.mgi_set_sample_period_CallInstance);
+  if (Mock.mgi_set_sample_period_IgnoreBool)
+  {
+    UNITY_CLR_DETAILS();
+    if (cmock_call_instance == NULL)
+      return Mock.mgi_set_sample_period_FinalReturn;
+    Mock.mgi_set_sample_period_FinalReturn = cmock_call_instance->ReturnVal;
+    return cmock_call_instance->ReturnVal;
+  }
+  if (!Mock.mgi_set_sample_period_CallbackBool &&
+      Mock.mgi_set_sample_period_CallbackFunctionPointer != NULL)
+  {
+    int cmock_cb_ret = Mock.mgi_set_sample_period_CallbackFunctionPointer(smcf_mgi, period, Mock.mgi_set_sample_period_CallbackCalls++);
+    UNITY_CLR_DETAILS();
+    return cmock_cb_ret;
+  }
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringCalledMore);
+  cmock_line = cmock_call_instance->LineNumber;
+  if (!cmock_call_instance->ExpectAnyArgsBool)
+  {
+  if (!cmock_call_instance->IgnoreArg_smcf_mgi)
+  {
+    UNITY_SET_DETAILS(CMockString_mgi_set_sample_period,CMockString_smcf_mgi);
+    if (cmock_call_instance->Expected_smcf_mgi == NULL)
+      { UNITY_TEST_ASSERT_NULL(smcf_mgi, cmock_line, CMockStringExpNULL); }
+    else
+      { UNITY_TEST_ASSERT_EQUAL_MEMORY_ARRAY((void*)(cmock_call_instance->Expected_smcf_mgi), (void*)(smcf_mgi), sizeof(struct smcf_mgi_reg), cmock_call_instance->Expected_smcf_mgi_Depth, cmock_line, CMockStringMismatch); }
+  }
+  if (!cmock_call_instance->IgnoreArg_period)
+  {
+    UNITY_SET_DETAILS(CMockString_mgi_set_sample_period,CMockString_period);
+    UNITY_TEST_ASSERT_EQUAL_HEX32(cmock_call_instance->Expected_period, period, cmock_line, CMockStringMismatch);
+  }
+  }
+  if (Mock.mgi_set_sample_period_CallbackFunctionPointer != NULL)
+  {
+    cmock_call_instance->ReturnVal = Mock.mgi_set_sample_period_CallbackFunctionPointer(smcf_mgi, period, Mock.mgi_set_sample_period_CallbackCalls++);
+  }
+  if (cmock_call_instance->ReturnThruPtr_smcf_mgi_Used)
+  {
+    UNITY_TEST_ASSERT_NOT_NULL(smcf_mgi, cmock_line, CMockStringPtrIsNULL);
+    memcpy((void*)smcf_mgi, (void*)cmock_call_instance->ReturnThruPtr_smcf_mgi_Val,
+      cmock_call_instance->ReturnThruPtr_smcf_mgi_Size);
+  }
+  UNITY_CLR_DETAILS();
+  return cmock_call_instance->ReturnVal;
+}
+
+void CMockExpectParameters_mgi_set_sample_period(CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t period);
+void CMockExpectParameters_mgi_set_sample_period(CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t period)
+{
+  cmock_call_instance->Expected_smcf_mgi = smcf_mgi;
+  cmock_call_instance->Expected_smcf_mgi_Depth = smcf_mgi_Depth;
+  cmock_call_instance->IgnoreArg_smcf_mgi = 0;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 0;
+  cmock_call_instance->Expected_period = period;
+  cmock_call_instance->IgnoreArg_period = 0;
+}
+
+void mgi_set_sample_period_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, int cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_set_sample_period_CALL_INSTANCE));
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_set_sample_period_CallInstance = CMock_Guts_MemChain(Mock.mgi_set_sample_period_CallInstance, cmock_guts_index);
+  Mock.mgi_set_sample_period_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  Mock.mgi_set_sample_period_IgnoreBool = (char)1;
+}
+
+void mgi_set_sample_period_CMockStopIgnore(void)
+{
+  if(Mock.mgi_set_sample_period_IgnoreBool)
+    Mock.mgi_set_sample_period_CallInstance = CMock_Guts_MemNext(Mock.mgi_set_sample_period_CallInstance);
+  Mock.mgi_set_sample_period_IgnoreBool = (char)0;
+}
+
+void mgi_set_sample_period_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, int cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_set_sample_period_CALL_INSTANCE));
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_set_sample_period_CallInstance = CMock_Guts_MemChain(Mock.mgi_set_sample_period_CallInstance, cmock_guts_index);
+  Mock.mgi_set_sample_period_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  cmock_call_instance->ExpectAnyArgsBool = (char)1;
+}
+
+void mgi_set_sample_period_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t period, int cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_set_sample_period_CALL_INSTANCE));
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_set_sample_period_CallInstance = CMock_Guts_MemChain(Mock.mgi_set_sample_period_CallInstance, cmock_guts_index);
+  Mock.mgi_set_sample_period_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_set_sample_period(cmock_call_instance, smcf_mgi, 1, period);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_set_sample_period_AddCallback(CMOCK_mgi_set_sample_period_CALLBACK Callback)
+{
+  Mock.mgi_set_sample_period_IgnoreBool = (char)0;
+  Mock.mgi_set_sample_period_CallbackBool = (char)1;
+  Mock.mgi_set_sample_period_CallbackFunctionPointer = Callback;
+}
+
+void mgi_set_sample_period_Stub(CMOCK_mgi_set_sample_period_CALLBACK Callback)
+{
+  Mock.mgi_set_sample_period_IgnoreBool = (char)0;
+  Mock.mgi_set_sample_period_CallbackBool = (char)0;
+  Mock.mgi_set_sample_period_CallbackFunctionPointer = Callback;
+}
+
+void mgi_set_sample_period_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t period, int cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_set_sample_period_CALL_INSTANCE));
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_set_sample_period_CallInstance = CMock_Guts_MemChain(Mock.mgi_set_sample_period_CallInstance, cmock_guts_index);
+  Mock.mgi_set_sample_period_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_set_sample_period(cmock_call_instance, smcf_mgi, smcf_mgi_Depth, period);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_set_sample_period_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size)
+{
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_set_sample_period_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringPtrPreExp);
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 1;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Val = smcf_mgi;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Size = cmock_size;
+}
+
+void mgi_set_sample_period_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_set_sample_period_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
+  cmock_call_instance->IgnoreArg_smcf_mgi = 1;
+}
+
+void mgi_set_sample_period_CMockIgnoreArg_period(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_mgi_set_sample_period_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_set_sample_period_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_set_sample_period_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
+  cmock_call_instance->IgnoreArg_period = 1;
+}
+
+uint32_t mgi_get_error_code(struct smcf_mgi_reg* smcf_mgi)
+{
+  UNITY_LINE_TYPE cmock_line = TEST_LINE_NUM;
+  CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance;
+  UNITY_SET_DETAIL(CMockString_mgi_get_error_code);
+  cmock_call_instance = (CMOCK_mgi_get_error_code_CALL_INSTANCE*)CMock_Guts_GetAddressFor(Mock.mgi_get_error_code_CallInstance);
+  Mock.mgi_get_error_code_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_error_code_CallInstance);
+  if (Mock.mgi_get_error_code_IgnoreBool)
+  {
+    UNITY_CLR_DETAILS();
+    if (cmock_call_instance == NULL)
+      return Mock.mgi_get_error_code_FinalReturn;
+    Mock.mgi_get_error_code_FinalReturn = cmock_call_instance->ReturnVal;
+    return cmock_call_instance->ReturnVal;
+  }
+  if (!Mock.mgi_get_error_code_CallbackBool &&
+      Mock.mgi_get_error_code_CallbackFunctionPointer != NULL)
+  {
+    uint32_t cmock_cb_ret = Mock.mgi_get_error_code_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_error_code_CallbackCalls++);
+    UNITY_CLR_DETAILS();
+    return cmock_cb_ret;
+  }
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringCalledMore);
+  cmock_line = cmock_call_instance->LineNumber;
+  if (!cmock_call_instance->ExpectAnyArgsBool)
+  {
+  if (!cmock_call_instance->IgnoreArg_smcf_mgi)
+  {
+    UNITY_SET_DETAILS(CMockString_mgi_get_error_code,CMockString_smcf_mgi);
+    if (cmock_call_instance->Expected_smcf_mgi == NULL)
+      { UNITY_TEST_ASSERT_NULL(smcf_mgi, cmock_line, CMockStringExpNULL); }
+    else
+      { UNITY_TEST_ASSERT_EQUAL_MEMORY_ARRAY((void*)(cmock_call_instance->Expected_smcf_mgi), (void*)(smcf_mgi), sizeof(struct smcf_mgi_reg), cmock_call_instance->Expected_smcf_mgi_Depth, cmock_line, CMockStringMismatch); }
+  }
+  }
+  if (Mock.mgi_get_error_code_CallbackFunctionPointer != NULL)
+  {
+    cmock_call_instance->ReturnVal = Mock.mgi_get_error_code_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_error_code_CallbackCalls++);
+  }
+  if (cmock_call_instance->ReturnThruPtr_smcf_mgi_Used)
+  {
+    UNITY_TEST_ASSERT_NOT_NULL(smcf_mgi, cmock_line, CMockStringPtrIsNULL);
+    memcpy((void*)smcf_mgi, (void*)cmock_call_instance->ReturnThruPtr_smcf_mgi_Val,
+      cmock_call_instance->ReturnThruPtr_smcf_mgi_Size);
+  }
+  UNITY_CLR_DETAILS();
+  return cmock_call_instance->ReturnVal;
+}
+
+void CMockExpectParameters_mgi_get_error_code(CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth);
+void CMockExpectParameters_mgi_get_error_code(CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth)
+{
+  cmock_call_instance->Expected_smcf_mgi = smcf_mgi;
+  cmock_call_instance->Expected_smcf_mgi_Depth = smcf_mgi_Depth;
+  cmock_call_instance->IgnoreArg_smcf_mgi = 0;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 0;
+}
+
+void mgi_get_error_code_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_code_CALL_INSTANCE));
+  CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_code_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_code_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_code_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_code_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  Mock.mgi_get_error_code_IgnoreBool = (char)1;
+}
+
+void mgi_get_error_code_CMockStopIgnore(void)
+{
+  if(Mock.mgi_get_error_code_IgnoreBool)
+    Mock.mgi_get_error_code_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_error_code_CallInstance);
+  Mock.mgi_get_error_code_IgnoreBool = (char)0;
+}
+
+void mgi_get_error_code_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_code_CALL_INSTANCE));
+  CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_code_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_code_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_code_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_code_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  cmock_call_instance->ExpectAnyArgsBool = (char)1;
+}
+
+void mgi_get_error_code_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_code_CALL_INSTANCE));
+  CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_code_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_code_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_code_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_code_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_error_code(cmock_call_instance, smcf_mgi, 1);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_error_code_AddCallback(CMOCK_mgi_get_error_code_CALLBACK Callback)
+{
+  Mock.mgi_get_error_code_IgnoreBool = (char)0;
+  Mock.mgi_get_error_code_CallbackBool = (char)1;
+  Mock.mgi_get_error_code_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_error_code_Stub(CMOCK_mgi_get_error_code_CALLBACK Callback)
+{
+  Mock.mgi_get_error_code_IgnoreBool = (char)0;
+  Mock.mgi_get_error_code_CallbackBool = (char)0;
+  Mock.mgi_get_error_code_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_error_code_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_code_CALL_INSTANCE));
+  CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_code_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_code_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_code_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_code_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_error_code(cmock_call_instance, smcf_mgi, smcf_mgi_Depth);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_error_code_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size)
+{
+  CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_code_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_error_code_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringPtrPreExp);
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 1;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Val = smcf_mgi;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Size = cmock_size;
+}
+
+void mgi_get_error_code_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_mgi_get_error_code_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_code_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_error_code_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
+  cmock_call_instance->IgnoreArg_smcf_mgi = 1;
+}
+
+uint32_t mgi_get_valid_error(struct smcf_mgi_reg* smcf_mgi)
+{
+  UNITY_LINE_TYPE cmock_line = TEST_LINE_NUM;
+  CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance;
+  UNITY_SET_DETAIL(CMockString_mgi_get_valid_error);
+  cmock_call_instance = (CMOCK_mgi_get_valid_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(Mock.mgi_get_valid_error_CallInstance);
+  Mock.mgi_get_valid_error_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_valid_error_CallInstance);
+  if (Mock.mgi_get_valid_error_IgnoreBool)
+  {
+    UNITY_CLR_DETAILS();
+    if (cmock_call_instance == NULL)
+      return Mock.mgi_get_valid_error_FinalReturn;
+    Mock.mgi_get_valid_error_FinalReturn = cmock_call_instance->ReturnVal;
+    return cmock_call_instance->ReturnVal;
+  }
+  if (!Mock.mgi_get_valid_error_CallbackBool &&
+      Mock.mgi_get_valid_error_CallbackFunctionPointer != NULL)
+  {
+    uint32_t cmock_cb_ret = Mock.mgi_get_valid_error_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_valid_error_CallbackCalls++);
+    UNITY_CLR_DETAILS();
+    return cmock_cb_ret;
+  }
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringCalledMore);
+  cmock_line = cmock_call_instance->LineNumber;
+  if (!cmock_call_instance->ExpectAnyArgsBool)
+  {
+  if (!cmock_call_instance->IgnoreArg_smcf_mgi)
+  {
+    UNITY_SET_DETAILS(CMockString_mgi_get_valid_error,CMockString_smcf_mgi);
+    if (cmock_call_instance->Expected_smcf_mgi == NULL)
+      { UNITY_TEST_ASSERT_NULL(smcf_mgi, cmock_line, CMockStringExpNULL); }
+    else
+      { UNITY_TEST_ASSERT_EQUAL_MEMORY_ARRAY((void*)(cmock_call_instance->Expected_smcf_mgi), (void*)(smcf_mgi), sizeof(struct smcf_mgi_reg), cmock_call_instance->Expected_smcf_mgi_Depth, cmock_line, CMockStringMismatch); }
+  }
+  }
+  if (Mock.mgi_get_valid_error_CallbackFunctionPointer != NULL)
+  {
+    cmock_call_instance->ReturnVal = Mock.mgi_get_valid_error_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_valid_error_CallbackCalls++);
+  }
+  if (cmock_call_instance->ReturnThruPtr_smcf_mgi_Used)
+  {
+    UNITY_TEST_ASSERT_NOT_NULL(smcf_mgi, cmock_line, CMockStringPtrIsNULL);
+    memcpy((void*)smcf_mgi, (void*)cmock_call_instance->ReturnThruPtr_smcf_mgi_Val,
+      cmock_call_instance->ReturnThruPtr_smcf_mgi_Size);
+  }
+  UNITY_CLR_DETAILS();
+  return cmock_call_instance->ReturnVal;
+}
+
+void CMockExpectParameters_mgi_get_valid_error(CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth);
+void CMockExpectParameters_mgi_get_valid_error(CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth)
+{
+  cmock_call_instance->Expected_smcf_mgi = smcf_mgi;
+  cmock_call_instance->Expected_smcf_mgi_Depth = smcf_mgi_Depth;
+  cmock_call_instance->IgnoreArg_smcf_mgi = 0;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 0;
+}
+
+void mgi_get_valid_error_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_valid_error_CALL_INSTANCE));
+  CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_valid_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_valid_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_valid_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_valid_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  Mock.mgi_get_valid_error_IgnoreBool = (char)1;
+}
+
+void mgi_get_valid_error_CMockStopIgnore(void)
+{
+  if(Mock.mgi_get_valid_error_IgnoreBool)
+    Mock.mgi_get_valid_error_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_valid_error_CallInstance);
+  Mock.mgi_get_valid_error_IgnoreBool = (char)0;
+}
+
+void mgi_get_valid_error_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_valid_error_CALL_INSTANCE));
+  CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_valid_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_valid_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_valid_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_valid_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  cmock_call_instance->ExpectAnyArgsBool = (char)1;
+}
+
+void mgi_get_valid_error_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_valid_error_CALL_INSTANCE));
+  CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_valid_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_valid_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_valid_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_valid_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_valid_error(cmock_call_instance, smcf_mgi, 1);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_valid_error_AddCallback(CMOCK_mgi_get_valid_error_CALLBACK Callback)
+{
+  Mock.mgi_get_valid_error_IgnoreBool = (char)0;
+  Mock.mgi_get_valid_error_CallbackBool = (char)1;
+  Mock.mgi_get_valid_error_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_valid_error_Stub(CMOCK_mgi_get_valid_error_CALLBACK Callback)
+{
+  Mock.mgi_get_valid_error_IgnoreBool = (char)0;
+  Mock.mgi_get_valid_error_CallbackBool = (char)0;
+  Mock.mgi_get_valid_error_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_valid_error_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_valid_error_CALL_INSTANCE));
+  CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_valid_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_valid_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_valid_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_valid_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_valid_error(cmock_call_instance, smcf_mgi, smcf_mgi_Depth);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_valid_error_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size)
+{
+  CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_valid_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_valid_error_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringPtrPreExp);
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 1;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Val = smcf_mgi;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Size = cmock_size;
+}
+
+void mgi_get_valid_error_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_mgi_get_valid_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_valid_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_valid_error_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
+  cmock_call_instance->IgnoreArg_smcf_mgi = 1;
+}
+
+uint32_t mgi_get_second_error(struct smcf_mgi_reg* smcf_mgi)
+{
+  UNITY_LINE_TYPE cmock_line = TEST_LINE_NUM;
+  CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance;
+  UNITY_SET_DETAIL(CMockString_mgi_get_second_error);
+  cmock_call_instance = (CMOCK_mgi_get_second_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(Mock.mgi_get_second_error_CallInstance);
+  Mock.mgi_get_second_error_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_second_error_CallInstance);
+  if (Mock.mgi_get_second_error_IgnoreBool)
+  {
+    UNITY_CLR_DETAILS();
+    if (cmock_call_instance == NULL)
+      return Mock.mgi_get_second_error_FinalReturn;
+    Mock.mgi_get_second_error_FinalReturn = cmock_call_instance->ReturnVal;
+    return cmock_call_instance->ReturnVal;
+  }
+  if (!Mock.mgi_get_second_error_CallbackBool &&
+      Mock.mgi_get_second_error_CallbackFunctionPointer != NULL)
+  {
+    uint32_t cmock_cb_ret = Mock.mgi_get_second_error_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_second_error_CallbackCalls++);
+    UNITY_CLR_DETAILS();
+    return cmock_cb_ret;
+  }
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringCalledMore);
+  cmock_line = cmock_call_instance->LineNumber;
+  if (!cmock_call_instance->ExpectAnyArgsBool)
+  {
+  if (!cmock_call_instance->IgnoreArg_smcf_mgi)
+  {
+    UNITY_SET_DETAILS(CMockString_mgi_get_second_error,CMockString_smcf_mgi);
+    if (cmock_call_instance->Expected_smcf_mgi == NULL)
+      { UNITY_TEST_ASSERT_NULL(smcf_mgi, cmock_line, CMockStringExpNULL); }
+    else
+      { UNITY_TEST_ASSERT_EQUAL_MEMORY_ARRAY((void*)(cmock_call_instance->Expected_smcf_mgi), (void*)(smcf_mgi), sizeof(struct smcf_mgi_reg), cmock_call_instance->Expected_smcf_mgi_Depth, cmock_line, CMockStringMismatch); }
+  }
+  }
+  if (Mock.mgi_get_second_error_CallbackFunctionPointer != NULL)
+  {
+    cmock_call_instance->ReturnVal = Mock.mgi_get_second_error_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_second_error_CallbackCalls++);
+  }
+  if (cmock_call_instance->ReturnThruPtr_smcf_mgi_Used)
+  {
+    UNITY_TEST_ASSERT_NOT_NULL(smcf_mgi, cmock_line, CMockStringPtrIsNULL);
+    memcpy((void*)smcf_mgi, (void*)cmock_call_instance->ReturnThruPtr_smcf_mgi_Val,
+      cmock_call_instance->ReturnThruPtr_smcf_mgi_Size);
+  }
+  UNITY_CLR_DETAILS();
+  return cmock_call_instance->ReturnVal;
+}
+
+void CMockExpectParameters_mgi_get_second_error(CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth);
+void CMockExpectParameters_mgi_get_second_error(CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth)
+{
+  cmock_call_instance->Expected_smcf_mgi = smcf_mgi;
+  cmock_call_instance->Expected_smcf_mgi_Depth = smcf_mgi_Depth;
+  cmock_call_instance->IgnoreArg_smcf_mgi = 0;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 0;
+}
+
+void mgi_get_second_error_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_second_error_CALL_INSTANCE));
+  CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_second_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_second_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_second_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_second_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  Mock.mgi_get_second_error_IgnoreBool = (char)1;
+}
+
+void mgi_get_second_error_CMockStopIgnore(void)
+{
+  if(Mock.mgi_get_second_error_IgnoreBool)
+    Mock.mgi_get_second_error_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_second_error_CallInstance);
+  Mock.mgi_get_second_error_IgnoreBool = (char)0;
+}
+
+void mgi_get_second_error_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_second_error_CALL_INSTANCE));
+  CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_second_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_second_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_second_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_second_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  cmock_call_instance->ExpectAnyArgsBool = (char)1;
+}
+
+void mgi_get_second_error_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_second_error_CALL_INSTANCE));
+  CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_second_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_second_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_second_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_second_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_second_error(cmock_call_instance, smcf_mgi, 1);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_second_error_AddCallback(CMOCK_mgi_get_second_error_CALLBACK Callback)
+{
+  Mock.mgi_get_second_error_IgnoreBool = (char)0;
+  Mock.mgi_get_second_error_CallbackBool = (char)1;
+  Mock.mgi_get_second_error_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_second_error_Stub(CMOCK_mgi_get_second_error_CALLBACK Callback)
+{
+  Mock.mgi_get_second_error_IgnoreBool = (char)0;
+  Mock.mgi_get_second_error_CallbackBool = (char)0;
+  Mock.mgi_get_second_error_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_second_error_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_second_error_CALL_INSTANCE));
+  CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_second_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_second_error_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_second_error_CallInstance, cmock_guts_index);
+  Mock.mgi_get_second_error_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_second_error(cmock_call_instance, smcf_mgi, smcf_mgi_Depth);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_second_error_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size)
+{
+  CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_second_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_second_error_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringPtrPreExp);
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 1;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Val = smcf_mgi;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Size = cmock_size;
+}
+
+void mgi_get_second_error_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_mgi_get_second_error_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_second_error_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_second_error_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
+  cmock_call_instance->IgnoreArg_smcf_mgi = 1;
+}
+
+uint32_t mgi_get_error_monitor_id(struct smcf_mgi_reg* smcf_mgi)
+{
+  UNITY_LINE_TYPE cmock_line = TEST_LINE_NUM;
+  CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance;
+  UNITY_SET_DETAIL(CMockString_mgi_get_error_monitor_id);
+  cmock_call_instance = (CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE*)CMock_Guts_GetAddressFor(Mock.mgi_get_error_monitor_id_CallInstance);
+  Mock.mgi_get_error_monitor_id_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_error_monitor_id_CallInstance);
+  if (Mock.mgi_get_error_monitor_id_IgnoreBool)
+  {
+    UNITY_CLR_DETAILS();
+    if (cmock_call_instance == NULL)
+      return Mock.mgi_get_error_monitor_id_FinalReturn;
+    Mock.mgi_get_error_monitor_id_FinalReturn = cmock_call_instance->ReturnVal;
+    return cmock_call_instance->ReturnVal;
+  }
+  if (!Mock.mgi_get_error_monitor_id_CallbackBool &&
+      Mock.mgi_get_error_monitor_id_CallbackFunctionPointer != NULL)
+  {
+    uint32_t cmock_cb_ret = Mock.mgi_get_error_monitor_id_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_error_monitor_id_CallbackCalls++);
+    UNITY_CLR_DETAILS();
+    return cmock_cb_ret;
+  }
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringCalledMore);
+  cmock_line = cmock_call_instance->LineNumber;
+  if (!cmock_call_instance->ExpectAnyArgsBool)
+  {
+  if (!cmock_call_instance->IgnoreArg_smcf_mgi)
+  {
+    UNITY_SET_DETAILS(CMockString_mgi_get_error_monitor_id,CMockString_smcf_mgi);
+    if (cmock_call_instance->Expected_smcf_mgi == NULL)
+      { UNITY_TEST_ASSERT_NULL(smcf_mgi, cmock_line, CMockStringExpNULL); }
+    else
+      { UNITY_TEST_ASSERT_EQUAL_MEMORY_ARRAY((void*)(cmock_call_instance->Expected_smcf_mgi), (void*)(smcf_mgi), sizeof(struct smcf_mgi_reg), cmock_call_instance->Expected_smcf_mgi_Depth, cmock_line, CMockStringMismatch); }
+  }
+  }
+  if (Mock.mgi_get_error_monitor_id_CallbackFunctionPointer != NULL)
+  {
+    cmock_call_instance->ReturnVal = Mock.mgi_get_error_monitor_id_CallbackFunctionPointer(smcf_mgi, Mock.mgi_get_error_monitor_id_CallbackCalls++);
+  }
+  if (cmock_call_instance->ReturnThruPtr_smcf_mgi_Used)
+  {
+    UNITY_TEST_ASSERT_NOT_NULL(smcf_mgi, cmock_line, CMockStringPtrIsNULL);
+    memcpy((void*)smcf_mgi, (void*)cmock_call_instance->ReturnThruPtr_smcf_mgi_Val,
+      cmock_call_instance->ReturnThruPtr_smcf_mgi_Size);
+  }
+  UNITY_CLR_DETAILS();
+  return cmock_call_instance->ReturnVal;
+}
+
+void CMockExpectParameters_mgi_get_error_monitor_id(CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth);
+void CMockExpectParameters_mgi_get_error_monitor_id(CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth)
+{
+  cmock_call_instance->Expected_smcf_mgi = smcf_mgi;
+  cmock_call_instance->Expected_smcf_mgi_Depth = smcf_mgi_Depth;
+  cmock_call_instance->IgnoreArg_smcf_mgi = 0;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 0;
+}
+
+void mgi_get_error_monitor_id_CMockIgnoreAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE));
+  CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_monitor_id_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_monitor_id_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)1;
+}
+
+void mgi_get_error_monitor_id_CMockStopIgnore(void)
+{
+  if(Mock.mgi_get_error_monitor_id_IgnoreBool)
+    Mock.mgi_get_error_monitor_id_CallInstance = CMock_Guts_MemNext(Mock.mgi_get_error_monitor_id_CallInstance);
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)0;
+}
+
+void mgi_get_error_monitor_id_CMockExpectAnyArgsAndReturn(UNITY_LINE_TYPE cmock_line, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE));
+  CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_monitor_id_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_monitor_id_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  cmock_call_instance->ReturnVal = cmock_to_return;
+  cmock_call_instance->ExpectAnyArgsBool = (char)1;
+}
+
+void mgi_get_error_monitor_id_CMockExpectAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE));
+  CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_monitor_id_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_monitor_id_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_error_monitor_id(cmock_call_instance, smcf_mgi, 1);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_error_monitor_id_AddCallback(CMOCK_mgi_get_error_monitor_id_CALLBACK Callback)
+{
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)0;
+  Mock.mgi_get_error_monitor_id_CallbackBool = (char)1;
+  Mock.mgi_get_error_monitor_id_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_error_monitor_id_Stub(CMOCK_mgi_get_error_monitor_id_CALLBACK Callback)
+{
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)0;
+  Mock.mgi_get_error_monitor_id_CallbackBool = (char)0;
+  Mock.mgi_get_error_monitor_id_CallbackFunctionPointer = Callback;
+}
+
+void mgi_get_error_monitor_id_CMockExpectWithArrayAndReturn(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, int smcf_mgi_Depth, uint32_t cmock_to_return)
+{
+  CMOCK_MEM_INDEX_TYPE cmock_guts_index = CMock_Guts_MemNew(sizeof(CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE));
+  CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE*)CMock_Guts_GetAddressFor(cmock_guts_index);
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringOutOfMemory);
+  memset(cmock_call_instance, 0, sizeof(*cmock_call_instance));
+  Mock.mgi_get_error_monitor_id_CallInstance = CMock_Guts_MemChain(Mock.mgi_get_error_monitor_id_CallInstance, cmock_guts_index);
+  Mock.mgi_get_error_monitor_id_IgnoreBool = (char)0;
+  cmock_call_instance->LineNumber = cmock_line;
+  cmock_call_instance->ExpectAnyArgsBool = (char)0;
+  CMockExpectParameters_mgi_get_error_monitor_id(cmock_call_instance, smcf_mgi, smcf_mgi_Depth);
+  cmock_call_instance->ReturnVal = cmock_to_return;
+}
+
+void mgi_get_error_monitor_id_CMockReturnMemThruPtr_smcf_mgi(UNITY_LINE_TYPE cmock_line, struct smcf_mgi_reg* smcf_mgi, size_t cmock_size)
+{
+  CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_error_monitor_id_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringPtrPreExp);
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Used = 1;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Val = smcf_mgi;
+  cmock_call_instance->ReturnThruPtr_smcf_mgi_Size = cmock_size;
+}
+
+void mgi_get_error_monitor_id_CMockIgnoreArg_smcf_mgi(UNITY_LINE_TYPE cmock_line)
+{
+  CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE* cmock_call_instance = (CMOCK_mgi_get_error_monitor_id_CALL_INSTANCE*)CMock_Guts_GetAddressFor(CMock_Guts_MemEndOfChain(Mock.mgi_get_error_monitor_id_CallInstance));
+  UNITY_TEST_ASSERT_NOT_NULL(cmock_call_instance, cmock_line, CMockStringIgnPreExp);
+  cmock_call_instance->IgnoreArg_smcf_mgi = 1;
 }
 
 bool mgi_is_the_source_triggered_the_interrupt(struct smcf_mgi_reg* smcf_mgi, uint32_t interrupt_source_pos)
