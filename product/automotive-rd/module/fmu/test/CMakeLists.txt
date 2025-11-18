@@ -44,6 +44,10 @@ set(TEST_SRC fmu_gic_mhu)
 set(TEST_FILE fmu_gic_mhu)
 set(UNIT_TEST_TARGET fmu_gic_mhu_unit_test)
 
+set(TEST_SRC fmu_ni710ae)
+set(TEST_FILE fmu_ni710ae)
+set(UNIT_TEST_TARGET fmu_ni710ae_unit_test)
+
 set(MODULE_SRC ${PRODUCT_ROOT}/${TEST_MODULE}/src)
 set(MODULE_INC ${PRODUCT_ROOT}/${TEST_MODULE}/include)
 set(MODULE_UT_SRC ${CMAKE_CURRENT_LIST_DIR})
