@@ -14,7 +14,6 @@
 #include UNIT_TEST_SRC
 #include "config_ras_defines.h"
 #include "si0_cfgd_ssu.h"
-#include "si0_cfgd_transport.h"
 
 void setUp(void)
 {
@@ -67,58 +66,17 @@ void test_ras_handlers_search_by_intr_id(void)
     }
 }
 
-void test_ras_handlers_request_bind_success(void)
-{
-    fwk_id_get_api_idx_ExpectAnyArgsAndReturn(0);
-    fwk_id_t signal_api_id =
-        FWK_ID_API_INIT(FWK_MODULE_IDX_RAS_HANDLERS, MOD_RAS_API_IDX_SIGNALS);
-
-    const void *api_out = (void *)0x0;
-    int status = ras_handler_bind_request(
-        fwk_module_id_transport,
-        fwk_module_id_ras_handlers,
-        signal_api_id,
-        &api_out);
-
-    TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
-}
-
-void test_ras_handlers_request_bind_fail(void)
-{
-    fwk_id_get_api_idx_ExpectAnyArgsAndReturn(-1);
-    /* Add a fake API index in this case lets consider count */
-    fwk_id_t signal_api_id = FWK_ID_API_INIT(FWK_MODULE_IDX_RAS_HANDLERS, 1);
-
-    const void *api_out = (void *)0x0;
-    int status = ras_handler_bind_request(
-        fwk_module_id_transport,
-        fwk_module_id_ras_handlers,
-        signal_api_id,
-        &api_out);
-
-    TEST_ASSERT_EQUAL(FWK_E_PARAM, status);
-}
-
 void test_bind_all_binds_success(void)
 {
     struct mod_ras_config cfg = {
         .ssu_sys_elem_id =
             FWK_ID_ELEMENT(FWK_MODULE_IDX_SSU, CONFIG_SSU_ELEMENT_IDX),
-        .timer_elem_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
-        .transport_elem_id = FWK_ID_ELEMENT_INIT(
-            FWK_MODULE_IDX_TRANSPORT, SI0_CFGD_MOD_TRANSPORT_EIDX_RAS),
     };
 
     ras_ctx.ras_config = &cfg;
 
     // Stub the type-check to always pass
     fwk_id_is_type_ExpectAnyArgsAndReturn(true);
-    fwk_id_is_type_ExpectAnyArgsAndReturn(true);
-    fwk_id_is_type_ExpectAnyArgsAndReturn(true);
-
-    fwk_module_bind_ExpectAnyArgsAndReturn(FWK_SUCCESS);
-
-    fwk_module_bind_ExpectAnyArgsAndReturn(FWK_SUCCESS);
 
     fwk_module_bind_ExpectAnyArgsAndReturn(FWK_SUCCESS);
 
@@ -133,8 +91,6 @@ int ras_handlers_test_main(void)
     RUN_TEST(test_ras_handlers_init);
     RUN_TEST(test_ras_handlers_failed_init);
     RUN_TEST(test_ras_handlers_search_by_intr_id);
-    RUN_TEST(test_ras_handlers_request_bind_success);
-    RUN_TEST(test_ras_handlers_request_bind_fail);
     RUN_TEST(test_bind_all_binds_success);
     /* TODO Request Bind and Bind functions need to be tested */
 

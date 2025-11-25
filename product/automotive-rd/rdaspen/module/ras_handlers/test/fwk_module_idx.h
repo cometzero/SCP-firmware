@@ -14,8 +14,6 @@ enum fwk_module_idx {
     FWK_MODULE_IDX_RAS_HANDLERS,
     FWK_MODULE_IDX_TEST_MODULE,
     FWK_MODULE_IDX_SSU,
-    FWK_MODULE_IDX_TRANSPORT,
-    FWK_MODULE_IDX_TIMER,
     FWK_MODULE_IDX_COUNT,
 };
 
@@ -24,12 +22,6 @@ static const fwk_id_t fwk_module_id_ras_handlers =
 
 static const fwk_id_t fwk_module_id_ssu =
     FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SSU);
-
-static const fwk_id_t fwk_module_id_transport =
-    FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TRANSPORT);
-
-static const fwk_id_t fwk_module_id_timer =
-    FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TIMER);
 
 static const fwk_id_t fwk_module_id_test_module =
     FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_MODULE);
