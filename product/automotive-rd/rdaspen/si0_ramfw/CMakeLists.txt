@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -46,6 +46,7 @@ target_sources(rdaspen-si0-bl2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/config_psu.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_scmi_perf.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_mock_psu.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_smcf.c"
     )
 
 if(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS)

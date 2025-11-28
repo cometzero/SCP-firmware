@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2024-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2024-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -20,10 +20,20 @@ typedef enum IRQn {
     CL0_MHU3_RSE2SI0_IRQ = 105,
     CL0_FMU_CRITICAL = 128,
     CL0_FMU_NON_CRITICAL = 129,
+    CL0_SMCF_SMD_MGI_IRQ_OUT = 288,
+    CL0_SMCF_SMD_MGI_TRIG_OUT = 289,
     CL0_AP_ERR_CLUSTER0_IRQ = 325,
     CL0_AP_ERR_CLUSTER1_IRQ = 327,
     CL0_AP_ERR_CLUSTER2_IRQ = 329,
     CL0_AP_ERR_CLUSTER3_IRQ = 331,
+    CL0_SMCF_AP_MGI_CLUSTER_0_TRIG_OUT = 359,
+    CL0_SMCF_AP_MGI_CLUSTER_0_IRQ_OUT = 360,
+    CL0_SMCF_AP_MGI_CLUSTER_1_TRIG_OUT = 361,
+    CL0_SMCF_AP_MGI_CLUSTER_1_IRQ_OUT = 362,
+    CL0_SMCF_AP_MGI_CLUSTER_2_TRIG_OUT = 363,
+    CL0_SMCF_AP_MGI_CLUSTER_2_IRQ_OUT = 364,
+    CL0_SMCF_AP_MGI_CLUSTER_3_TRIG_OUT = 365,
+    CL0_SMCF_AP_MGI_CLUSTER_3_IRQ_OUT = 366,
 
     /* Safety Island CL1 SPI */
     CL1_SYSTEM_TIMER_IRQ = 33,

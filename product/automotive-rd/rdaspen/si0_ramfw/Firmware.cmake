@@ -91,6 +91,7 @@ list(APPEND SCP_MODULES
     "mock-psu"
     "psu"
     "fch-polled"
+    "smcf"
 )
 
 if(SCP_ENABLE_DEBUGGER)

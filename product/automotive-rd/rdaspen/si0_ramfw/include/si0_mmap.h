@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -154,10 +154,26 @@
 
 #define SI0_ATW6_AP_PERIPHERAL_SRAM_BASE \
     (SI0_ATW_MEM_BASE + SI0_ATW5_CSS_COUNTERS_TIMERS_SIZE)
-#define SI0_ATW6_AP_PERIPHERAL_SRAM_SIZE (8 * FWK_KIB)
+#define SI0_ATW6_AP_PERIPHERAL_SRAM_SIZE (1 * FWK_MIB)
+
+#define SI0_ATW7_AP_PERIPHERAL_NS_SRAM_BASE \
+    (SI0_ATW6_AP_PERIPHERAL_SRAM_BASE + SI0_ATW6_AP_PERIPHERAL_SRAM_SIZE)
+#define SI0_ATW7_AP_PERIPHERAL_NS_SRAM_SIZE (1 * FWK_MIB)
+
+#define SI0_ATW16_SMCF_SMD_MGI_BASE \
+    (SI0_ATW7_AP_PERIPHERAL_NS_SRAM_BASE + SI0_ATW7_AP_PERIPHERAL_NS_SRAM_SIZE)
+#define SI0_ATW16_SMCF_SMD_MGI_SIZE (64 * FWK_KIB)
+
+#define SI0_ATW17_SMCF_SRAM_BASE \
+    (SI0_ATW16_SMCF_SMD_MGI_BASE + SI0_ATW16_SMCF_SMD_MGI_SIZE)
+#define SI0_ATW17_SMCF_SRAM_SIZE (16 * FWK_KIB)
+
+#define SI0_ATW18_SMCF_SMDEXP_SRAM_BASE \
+    (SI0_ATW17_SMCF_SRAM_BASE + SI0_ATW17_SMCF_SRAM_SIZE)
+#define SI0_ATW18_SMCF_SMDEXP_SRAM_SIZE (8 * FWK_KIB)
 
 #define SI0_ATW_MEM_LIMIT \
-    (SI0_ATW6_AP_PERIPHERAL_SRAM_BASE + SI0_ATW6_AP_PERIPHERAL_SRAM_SIZE)
+    (SI0_ATW18_SMCF_SMDEXP_SRAM_BASE + SI0_ATW18_SMCF_SMDEXP_SRAM_SIZE)
 
 #ifndef __ASSEMBLER__
 static_assert(
@@ -277,5 +293,12 @@ static_assert(
 
 #define SI0_AP_SCMI_FAST_CHANNEL_BASE \
     (SI0_AP_SCMI_PAYLOAD_NS_P2A_BASE + SI0_SCMI_PAYLOAD_SIZE)
+
+/*
+ * Base target address for AP Cluster (DSU) SMCF MGIs to dump data to SRAM.
+ * This is an address in AP address space. This address is not accessed by SI
+ * Cl0 software but needs to be written to MGI registers as write address.
+ */
+#define SI0_AP_CLUSTER_MGI_WRITE_BASE UINT64_C(0x40740000)
 
 #endif /* SI0_MMAP_H */
