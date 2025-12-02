@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2021-2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2021-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -302,8 +302,17 @@ cmake_dependent_option(
     "DEFINED SCP_ENABLE_FAST_CHANNELS_INIT"
     "${SCP_ENABLE_FAST_CHANNELS}")
 
+cmake_dependent_option(
+    SCP_ENABLE_IMAGE_INTEGRITY_VERIFY
+    "Enable image integrity check with crc during boot?"
+    "${SCP_ENABLE_IMAGE_INTEGRITY_VERIFICATION}"
+    "DEFINED SCP_ENABLE_IMAGE_INTEGRITY_VERIFICATION"
+    "${SCP_ENABLE_IMAGE_INTEGRITY_VERIFY}")
+
 # Include firmware specific build options
 include("${SCP_FIRMWARE_SOURCE_DIR}/Buildoptions.cmake" OPTIONAL)
+
+find_package(Python3 REQUIRED)
 
 #
 # Wrap `add_executable` in a way that allows us to do some extra processing on
@@ -345,6 +354,16 @@ macro(add_executable target)
                         "$<TARGET_FILE:${target}>"
                         "$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.bin"
                     COMMENT "Generating flat binary ${target}.bin")
+                # cmake-format: on
+            endif()
+            if(SCP_ENABLE_IMAGE_INTEGRITY_VERIFY)
+                # cmake-format: off
+                add_custom_command(
+                    TARGET ${target} POST_BUILD
+                    COMMAND ${Python3_EXECUTABLE}
+                            ${CMAKE_SOURCE_DIR}/tools/image_crc_patcher.py
+                            "$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.bin"
+                    COMMENT "Running CRC calculater script")
                 # cmake-format: on
             endif()
         endif()

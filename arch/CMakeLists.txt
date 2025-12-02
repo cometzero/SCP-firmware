@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2021-2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2021-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -117,6 +117,12 @@ target_compile_definitions(
     ${SCP_ARCHITECTURE_TARGET}
     PRIVATE
         $<TARGET_PROPERTY:${SCP_FIRMWARE_TARGET},INTERFACE_COMPILE_DEFINITIONS>)
+
+if(SCP_ENABLE_IMAGE_INTEGRITY_VERIFY)
+    target_compile_definitions(${SCP_ARCHITECTURE_TARGET}
+    PUBLIC
+        "BUILD_HAS_IMAGE_INTEGRITY_CHECK")
+endif()
 
 set(SCP_ARCHITECTURE_TARGET
     "${SCP_ARCHITECTURE_TARGET}"

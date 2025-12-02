@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2015-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -149,6 +149,14 @@ SECTIONS {
 
         *(.data .data.*)
     } > w AT> r
+
+#ifdef BUILD_HAS_IMAGE_INTEGRITY_CHECK
+    .image_crc : {
+        __imageCRC_start__ = .;
+        KEEP(*(.image_crc))
+        __imageCRC_end__ = .;
+    } > r
+#endif
 
     .bss (NOLOAD) : {
         __bss_start__ = ABSOLUTE(.);
