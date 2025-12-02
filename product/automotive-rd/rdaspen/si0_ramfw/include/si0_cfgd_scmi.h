@@ -21,6 +21,19 @@ enum si0_scmi_agent_idx {
     SI0_SCMI_AGENT_IDX_COUNT,
 };
 
+/* AP-facing SCMI agents (reset on AP warm reboot)
+ * NOTE: Any new AP-related SCMI agent must be added to this list for warm
+ * reset to work correctly.
+ */
+static const enum si0_scmi_agent_idx si0_ap_facing_scmi_agents[] = {
+    SI0_SCMI_AGENT_IDX_PSCI,
+    SI0_SCMI_AGENT_IDX_PFDI_MONITOR,
+    SI0_SCMI_AGENT_IDX_OSPM,
+};
+
+#define SI0_AP_FACING_SCMI_AGENT_COUNT \
+    (sizeof(si0_ap_facing_scmi_agents) / sizeof(si0_ap_facing_scmi_agents[0]))
+
 /* Module 'scmi' element indexes (SCMI services supported) */
 enum si0_cfgd_mod_scmi_element_idx {
     SI0_CFGD_MOD_SCMI_EIDX_RSE,

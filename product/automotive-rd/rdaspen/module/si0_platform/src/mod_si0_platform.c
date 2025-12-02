@@ -11,10 +11,13 @@
 #include "internal/si0_platform.h"
 #include "platform_core.h"
 #include "si0_cfgd_power_domain.h"
+#include "si0_cfgd_scmi.h"
 
 #include <mod_power_domain.h>
 #include <mod_ppu_v1.h>
+#include <mod_scmi.h>
 #include <mod_si0_platform.h>
+#include <mod_transport.h>
 
 #include <fwk_core.h>
 #include <fwk_id.h>
@@ -23,6 +26,13 @@
 #include <fwk_module_idx.h>
 #include <fwk_notification.h>
 #include <fwk_status.h>
+
+#ifdef BUILD_HAS_NOTIFICATION
+static const fwk_id_t mod_pd_notification_id_pre_warmreset =
+    FWK_ID_NOTIFICATION_INIT(
+        FWK_MODULE_IDX_POWER_DOMAIN,
+        MOD_PD_NOTIFICATION_IDX_PRE_WARM_RESET);
+#endif /* BUILD_HAS_NOTIFICATION */
 
 /* Module context */
 struct si0_platform_ctx {
@@ -94,6 +104,12 @@ static int si0_platform_mod_init(
         FWK_LOG_ERR("[SI0 PLATFORM] NULL config in mod_init");
         return FWK_E_PARAM;
     }
+
+    if (!fwk_id_type_is_valid(config->timer_id) ||
+        !fwk_id_type_is_valid(config->transport_id)) {
+        return FWK_E_DATA;
+    }
+
     status = validate_config_data(config);
     if (status != FWK_SUCCESS) {
         FWK_LOG_ERR("[SI0 PLATFORM] Configuration data is invalid");
@@ -111,6 +127,12 @@ static int si0_platform_bind(fwk_id_t id, unsigned int round)
 
     if (round > 0) {
         return FWK_SUCCESS;
+    }
+
+    /* Bind to modules required for handshaking with RSE */
+    status = platform_rse_bind(si0_platform_ctx.config);
+    if (status != FWK_SUCCESS) {
+        return status;
     }
 
     /* Bind to modules required for power management */
@@ -159,6 +181,11 @@ static int si0_platform_process_bind_request(
         status = FWK_SUCCESS;
         break;
 
+    case MOD_SCP_PLATFORM_API_IDX_TRANSPORT_SIGNAL:
+        *api = get_rse_platform_transport_signal_api();
+        status = FWK_SUCCESS;
+        break;
+
     default:
         status = FWK_E_PARAM;
     }
@@ -185,7 +212,7 @@ static int si0_platform_start(fwk_id_t id)
 #ifdef BUILD_HAS_NOTIFICATION
     /* Subscribe to warm reset notifications */
     status = fwk_notification_subscribe(
-        mod_pd_notification_id_pre_warm_reset,
+        mod_pd_notification_id_pre_warmreset,
         FWK_ID_MODULE(FWK_MODULE_IDX_POWER_DOMAIN),
         id);
     if (status != FWK_SUCCESS) {
@@ -267,6 +294,73 @@ static int check_power_off_all_cores(void)
     }
     return status;
 }
+
+static bool scmi_service_is_ap_facing(const struct mod_scmi_service_config *cfg)
+{
+    /* Reset only services whose remote agent is on the AP side */
+    for (size_t i = 0; i < SI0_AP_FACING_SCMI_AGENT_COUNT; i++) {
+        if (cfg->scmi_agent_id == si0_ap_facing_scmi_agents[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void reset_scmi_service_mailbox(
+    const struct mod_scmi_service_config *svc_cfg)
+{
+    const struct mod_transport_channel_config *chan_cfg =
+        fwk_module_get_data(svc_cfg->transport_id);
+    if (chan_cfg == NULL) {
+        FWK_LOG_ERR("[SI0_PLATFORM] transport channel cfg is NULL");
+        return;
+    }
+
+    if (chan_cfg->out_band_mailbox_address == 0U) {
+        /* Not an out-of-band mailbox service; nothing to reset */
+        return;
+    }
+
+    struct mod_transport_buffer *mbx =
+        (struct mod_transport_buffer *)chan_cfg->out_band_mailbox_address;
+
+    /*
+     * AP is rebooting; force mailbox state to FREE so AP won't observe BUSY
+     * on boot.
+     */
+    mbx->reserved0 = 0;
+    mbx->status = SCMI_SHMEM_CHAN_STAT_FREE;
+    mbx->reserved1 = 0;
+    mbx->flags = 0;
+    mbx->length = 0;
+    mbx->message_header = 0;
+}
+
+static void reset_scmi_mailboxes(void)
+{
+    size_t scmi_service_count;
+    fwk_id_t scmi_module_id = FWK_ID_MODULE(FWK_MODULE_IDX_SCMI);
+
+    fwk_module_get_element_count(scmi_module_id, &scmi_service_count);
+
+    for (unsigned int i = 0; i < scmi_service_count; i++) {
+        fwk_id_t scmi_eid = FWK_ID_ELEMENT(FWK_MODULE_IDX_SCMI, i);
+        const struct mod_scmi_service_config *svc_cfg =
+            fwk_module_get_data(scmi_eid);
+        if (svc_cfg == NULL) {
+            continue;
+        }
+
+        if (!scmi_service_is_ap_facing(svc_cfg)) {
+            continue;
+        }
+        reset_scmi_service_mailbox(svc_cfg);
+    }
+
+    FWK_LOG_INFO(
+        "[SI0_PLATFORM] AP-facing SCMI mailboxes reset for warm reboot");
+}
+
 static void boot_primary_core(void)
 {
     int status;
@@ -335,6 +429,15 @@ static int si0_platform_process_event(
             }
             fwk_assert(status == FWK_SUCCESS);
         } else {
+            /* Handshake with RSE via dedicated channel (DBCH[2]/FLAG 3) */
+            status = notify_rse_and_wait_for_response();
+            if (status != FWK_SUCCESS) {
+                FWK_LOG_ERR(MOD_NAME "Error! SCP-RSE handshake failed");
+                return FWK_E_PANIC;
+            }
+
+            reset_scmi_mailboxes();
+
             /*
              * All the CPU power domain are powered off. Start the process to
              * power on the first application core to complete the AP reboot
@@ -342,7 +445,6 @@ static int si0_platform_process_event(
              */
             boot_primary_core();
         }
-
         break; /* MOD_SI0_PLATFORM_CHECK_PD_OFF */
     default:
         FWK_LOG_WARN(
@@ -367,7 +469,7 @@ int si0_platform_process_notification(
     };
 
     fwk_assert(fwk_id_is_type(event->target_id, FWK_ID_TYPE_MODULE));
-    if (fwk_id_is_equal(event->id, mod_pd_notification_id_pre_warm_reset)) {
+    if (fwk_id_is_equal(event->id, mod_pd_notification_id_pre_warmreset)) {
         /* Requesting power off of all cores */
         power_off_all_cores();
 

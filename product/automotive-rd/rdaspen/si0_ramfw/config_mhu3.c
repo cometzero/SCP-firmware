@@ -33,6 +33,7 @@ struct mod_mhu3_channel_config si02rse_s_dbch_config[] = {
     /* PBX CH 0, FLAG 2, MBX CH 0, FLAG 2 for SCP P2A RSE */
     [1] = MOD_MHU3_INIT_DBCH(0, 2, 0, 2),
 #endif
+    [2] = MOD_MHU3_INIT_DBCH(0, 3, 0, 3),
 };
 
 /* SI0<->AP Secure MHUv3 doorbell channel configuration */

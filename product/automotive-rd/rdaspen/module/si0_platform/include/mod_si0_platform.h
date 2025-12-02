@@ -18,6 +18,11 @@
 
 #define WARM_RESET_MAX_RETRIES 10
 
+/* Bit0 is typically used as "channel free" in SCMI shmem layouts.
+ * TF-A css/scmi side is expecting that bit to be set when the channel is free.
+ */
+#define SCMI_SHMEM_CHAN_STAT_FREE (1U << 0)
+
 /*!
  * \addtogroup GroupPLATFORMModule PLATFORM Product Modules
  * @{
@@ -37,6 +42,10 @@ enum mod_si0_platform_api_idx {
     /*! API index for the driver interface of the SYSTEM POWER module */
     MOD_SI0_PLATFORM_API_IDX_SYSTEM_POWER_DRIVER,
     /*! Number of exposed interfaces */
+
+    /*! Interface for Transport module */
+    MOD_SCP_PLATFORM_API_IDX_TRANSPORT_SIGNAL,
+
     MOD_SI0_PLATFORM_API_COUNT
 };
 
@@ -106,6 +115,18 @@ struct mod_si0_platform_config {
 
     /*! List of isolated CPUs MPID. */
     struct mod_si0_platform_isolated_cpu_info isolated_cpu_info;
+
+    /*! Timer identifier */
+    fwk_id_t timer_id;
+
+    /*!
+     * Maximum amount of time, in microseconds, to wait for the RSE handshake
+     * event.
+     */
+    uint32_t rse_sync_wait_us;
+
+    /*! Transport channel identifier */
+    fwk_id_t transport_id;
 };
 
 /*!

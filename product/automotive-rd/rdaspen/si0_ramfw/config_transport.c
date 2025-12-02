@@ -453,8 +453,33 @@ static const struct fwk_element element_table[]  = {
                 MOD_FCH_POLLED_API_IDX_TRANSPORT),
         }),
     },
-
 #endif
+
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_RSE_WARM_SYNC] = {
+        .name = "SI0_RSE_WARM_SYNC",
+        .data = &((
+            struct mod_transport_channel_config) {
+                .transport_type = MOD_TRANSPORT_CHANNEL_TRANSPORT_TYPE_NONE,
+                .policies = MOD_TRANSPORT_POLICY_NONE,
+                .channel_type = MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER,
+
+                /* Use DBCH index 2: PBX FLAG 3 / MBX FLAG 3 */
+                .driver_id =
+                    FWK_ID_SUB_ELEMENT_INIT(
+                        FWK_MODULE_IDX_MHU3,
+                        SI0_CFGD_MOD_MHU3_EIDX_SI0_RSE,
+                        2),
+                .driver_api_id =
+                    FWK_ID_API_INIT(
+                        FWK_MODULE_IDX_MHU3,
+                        MOD_MHU3_API_IDX_TRANSPORT_DRIVER),
+
+                .signal_api_id =
+                    FWK_ID_API_INIT(
+                        FWK_MODULE_IDX_SI0_PLATFORM,
+                        MOD_SCP_PLATFORM_API_IDX_TRANSPORT_SIGNAL),
+        }),
+    },
 
     [SI0_CFGD_MOD_TRANSPORT_EIDX_COUNT] = { 0 },
 };

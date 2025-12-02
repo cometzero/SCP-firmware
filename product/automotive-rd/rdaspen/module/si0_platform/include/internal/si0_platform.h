@@ -51,4 +51,40 @@ const void *get_platform_system_power_driver_api(void);
  */
 const void *get_platform_scmi_power_down_api(void);
 
+/*
+ * RSE communication interface helper functions.
+ */
+
+/*!
+ * \brief Helper function to return platform system transport signal API.
+ *
+ * \param None.
+ *
+ * \return Pointer to the scp platform transport signal API.
+ */
+const void *get_rse_platform_transport_signal_api(void);
+
+/*!
+ * \brief Helper function to notify RSE and wait for response.
+ *
+ * \details Notify RSE that SYSTOP is powered up so it can enable GPC bypass in
+ * the system control block.
+ *
+ * \param None.
+ *
+ * \retval ::FWK_SUCCESS Operation succeeded.
+ * \return One of the standard error codes for implementation-defined errors.
+ */
+int notify_rse_and_wait_for_response(void);
+
+/*!
+ * \brief Helper function to bind to transport and timer module APIs.
+ *
+ * \param config Pointer to the module config data.
+ *
+ * \retval ::FWK_SUCCESS Operation succeeded.
+ * \return One of the standard error codes for implementation-defined errors.
+ */
+int platform_rse_bind(const struct mod_si0_platform_config *config);
+
 #endif /* SI0_PLATFORM_H */
