@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -15,6 +15,8 @@ set(SCP_GENERATE_FLAT_BINARY_INIT TRUE)
 set(SCP_ARCHITECTURE "aarch64")
 
 set(SCP_ENABLE_NOTIFICATIONS_INIT TRUE)
+
+set(SCP_ENABLE_IMAGE_INTEGRITY_VERIFICATION TRUE)
 
 set(SCP_ENABLE_OUTBAND_MSG_SUPPORT TRUE)
 
