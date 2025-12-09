@@ -10,12 +10,15 @@
 
 #include "si0_cfgd_transport.h"
 #include "si0_mmap.h"
+#include "si_scr_info.h"
 
 #include <mod_si0_platform.h>
 
 #include <fwk_id.h>
 #include <fwk_module.h>
 #include <fwk_module_idx.h>
+
+#include <arch_reg.h>
 
 #define RSE_SYNC_WAIT_TIMEOUT_US (800 * 1000)
 
@@ -28,6 +31,23 @@ struct mod_si0_platform_config system_config = {
     .transport_id = FWK_ID_ELEMENT_INIT(
         FWK_MODULE_IDX_TRANSPORT,
         SI0_CFGD_MOD_TRANSPORT_EIDX_RSE_WARM_SYNC),
+};
+
+/*!
+ * \brief This struct contains scr base address and expected values which is
+ * verified during boot.
+ */
+static const scr_config_t config_scr = {
+    .scr_base = SI_SCR_BASE,
+    .scr_expected = {
+        .cl0_config_0 = 0x01201717U,
+        .cl0_config_1 = 0x01100002U,
+        .cl0_config_2 = 0x00000034U,
+        .cl0_c0_config_0 = 0x01000001U,
+        .cl0_c0_config_1 = 0x01001000U,
+        .cl0_c0_config_2 = 0x01200000U,
+        .cl0_c0_config_3 = 0x00000000U,
+    },
 };
 
 #ifdef BUILD_HAS_IMAGE_INTEGRITY_CHECK
@@ -82,6 +102,23 @@ static int verify_image_crc(void)
 }
 #endif
 
+static int verify_scr_cfg_integrity(void)
+{
+    volatile const scr_t *const scr =
+        (volatile const scr_t *const)(config_scr.scr_base);
+
+    if ((scr->cl0_config_0 != config_scr.scr_expected.cl0_config_0) ||
+        (scr->cl0_config_1 != config_scr.scr_expected.cl0_config_1) ||
+        (scr->cl0_config_2 != config_scr.scr_expected.cl0_config_2) ||
+        (scr->cl0_c0_config_0 != config_scr.scr_expected.cl0_c0_config_0) ||
+        (scr->cl0_c0_config_1 != config_scr.scr_expected.cl0_c0_config_1) ||
+        (scr->cl0_c0_config_2 != config_scr.scr_expected.cl0_c0_config_2) ||
+        (scr->cl0_c0_config_3 != config_scr.scr_expected.cl0_c0_config_3)) {
+        return FWK_E_PANIC;
+    }
+    return FWK_SUCCESS;
+}
+
 int platform_init_hook(void *params)
 {
     int status = FWK_SUCCESS;
@@ -92,6 +129,21 @@ int platform_init_hook(void *params)
         status = FWK_E_PANIC;
     }
 #endif
+
+    /* Disable MPU for SCR access*/
+    WRITE_SYSREG(sctlr_el2, ((READ_SYSREG(sctlr_el2)) & ~SCTLR_EL2_M));
+    BARRIER_DSYNC_FENCE_FULL();
+    BARRIER_ISYNC_FENCE_FULL();
+
+    /* Verify SCR config integrity. */
+    if (FWK_SUCCESS != verify_scr_cfg_integrity()) {
+        status = FWK_E_PANIC;
+    }
+
+    /* Enable MPU */
+    WRITE_SYSREG(sctlr_el2, ((READ_SYSREG(sctlr_el2)) | SCTLR_EL2_M));
+    BARRIER_DSYNC_FENCE_FULL();
+    BARRIER_ISYNC_FENCE_FULL();
 
     return status;
 }
