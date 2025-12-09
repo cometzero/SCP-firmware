@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -32,6 +32,10 @@ static const fwk_id_t mod_pd_notification_id_pre_warmreset =
     FWK_ID_NOTIFICATION_INIT(
         FWK_MODULE_IDX_POWER_DOMAIN,
         MOD_PD_NOTIFICATION_IDX_PRE_WARM_RESET);
+
+static fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
+    FWK_MODULE_IDX_POWER_DOMAIN,
+    MOD_PD_NOTIFICATION_IDX_POWER_STATE_TRANSITION);
 #endif /* BUILD_HAS_NOTIFICATION */
 
 /* Module context */
@@ -198,6 +202,23 @@ static int si0_platform_start(fwk_id_t id)
     int status;
     struct fwk_event event = { 0 };
     unsigned int event_count = 0U;
+
+#ifdef BUILD_HAS_NOTIFICATION
+    fwk_id_t pd_transition_source_id =
+        fwk_id_build_element_id(fwk_module_id_power_domain, 0);
+
+    status = fwk_notification_subscribe(
+        pd_transition_notification_id, pd_transition_source_id, id);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR(
+            MOD_NAME "Failed to subscribe to Power Domain notification for %s",
+            fwk_module_get_element_name(pd_transition_source_id));
+    } else {
+        FWK_LOG_DEBUG(
+            MOD_NAME "Subscribed to Power Domain notifications for %s",
+            fwk_module_get_element_name(pd_transition_source_id));
+    }
+#endif /* BUILD_HAS_NOTIFICATION */
 
     /* SI0 subsystem initialization completion notification */
     event.id = mod_si0_platform_notification_subsys_init;
@@ -461,6 +482,7 @@ int si0_platform_process_notification(
     struct fwk_event *resp_event)
 {
     int status;
+    struct mod_pd_power_state_transition_notification_params *params;
 
     /* Event for checking power domain status */
     struct fwk_event_light check_pd_off_event = {
@@ -486,11 +508,17 @@ int si0_platform_process_notification(
                 status);
             fwk_assert(status == FWK_SUCCESS);
         }
+    } else if (fwk_id_is_equal(event->id, pd_transition_notification_id)) {
+        params = (struct mod_pd_power_state_transition_notification_params *)
+                     event->params;
+        return (pd_transition_ap_platform_hook(params->state));
+    } else {
+        return FWK_E_PARAM;
     }
 
     return FWK_SUCCESS;
 }
-#endif
+#endif /* BUILD_HAS_NOTIFICATION */
 
 const struct fwk_module module_si0_platform = {
     .type = FWK_MODULE_TYPE_DRIVER,

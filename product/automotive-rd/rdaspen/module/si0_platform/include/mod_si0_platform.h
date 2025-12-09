@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -134,6 +134,11 @@ struct mod_si0_platform_config {
  */
 static const fwk_id_t mod_platform_system_event_check_ppu_off =
     FWK_ID_EVENT(FWK_MODULE_IDX_SI0_PLATFORM, MOD_SI0_PLATFORM_CHECK_PD_OFF);
+
+/*!
+ * \brief Platform hook when power transition happen for AP domain.
+ */
+int pd_transition_ap_platform_hook(unsigned int pd_state);
 
 /*!
  * @}

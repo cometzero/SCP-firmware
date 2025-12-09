@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -125,6 +125,21 @@ void test_si0_platform_mod_start_success(void)
     fwk_id_get_element_idx_IgnoreAndReturn(0);
     fwk_module_get_element_name_IgnoreAndReturn("Test");
 
+    fwk_id_t pd_transition_source_id =
+        FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, 0);
+    fwk_id_build_element_id_ExpectAndReturn(
+        fwk_module_id_power_domain, 0, pd_transition_source_id);
+
+    fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
+        FWK_MODULE_IDX_POWER_DOMAIN,
+        MOD_PD_NOTIFICATION_IDX_POWER_STATE_TRANSITION);
+
+    fwk_notification_subscribe_ExpectAndReturn(
+        pd_transition_notification_id,
+        pd_transition_source_id,
+        fwk_module_id_si0_platform,
+        FWK_SUCCESS);
+
     fwk_id_t mod_pd_notification_id_pre_warmreset = FWK_ID_NOTIFICATION_INIT(
         FWK_MODULE_IDX_POWER_DOMAIN, MOD_PD_NOTIFICATION_IDX_PRE_WARM_RESET);
 
@@ -143,7 +158,7 @@ void test_si0_platform_mod_start_success(void)
  *
  *  \details Test failure starting the si0_platform module
  */
-void test_si0_platform_mod_start_fail_notification(void)
+void test_si0_platform_mod_start_pre_warmreset_fail_notification(void)
 {
     int status;
     struct fwk_event event = { 0 };
@@ -155,6 +170,56 @@ void test_si0_platform_mod_start_fail_notification(void)
 
     fwk_id_get_element_idx_IgnoreAndReturn(0);
     fwk_module_get_element_name_IgnoreAndReturn("Test");
+
+    fwk_id_t pd_transition_source_id =
+        FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, 0);
+    fwk_id_build_element_id_ExpectAndReturn(
+        fwk_module_id_power_domain, 0, pd_transition_source_id);
+
+    fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
+        FWK_MODULE_IDX_POWER_DOMAIN,
+        MOD_PD_NOTIFICATION_IDX_POWER_STATE_TRANSITION);
+    fwk_notification_subscribe_ExpectAndReturn(
+        pd_transition_notification_id,
+        pd_transition_source_id,
+        fwk_module_id_si0_platform,
+        FWK_E_DATA);
+
+    status = si0_platform_start(fwk_module_id_si0_platform);
+    TEST_ASSERT_EQUAL(status, FWK_E_PANIC);
+}
+
+/*!
+ * \brief SI0 Platform unit test: si0_platform_start(),
+ *
+ *  \details Test failure starting the si0_platform module
+ */
+void test_si0_platform_mod_start_pd_trans_fail_notification(void)
+{
+    int status;
+    struct fwk_event event = { 0 };
+    event.id = mod_si0_platform_notification_subsys_init;
+    event.source_id = fwk_module_id_si0_platform;
+    unsigned int count = 0U;
+
+    fwk_notification_notify_ExpectAndReturn(&event, &count, FWK_E_DATA);
+
+    fwk_id_get_element_idx_IgnoreAndReturn(0);
+    fwk_module_get_element_name_IgnoreAndReturn("Test");
+
+    fwk_id_t pd_transition_source_id =
+        FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, 0);
+    fwk_id_build_element_id_ExpectAndReturn(
+        fwk_module_id_power_domain, 0, pd_transition_source_id);
+
+    fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
+        FWK_MODULE_IDX_POWER_DOMAIN,
+        MOD_PD_NOTIFICATION_IDX_POWER_STATE_TRANSITION);
+    fwk_notification_subscribe_ExpectAndReturn(
+        pd_transition_notification_id,
+        pd_transition_source_id,
+        fwk_module_id_si0_platform,
+        FWK_SUCCESS);
 
     fwk_id_t mod_pd_notification_id_pre_warmreset = FWK_ID_NOTIFICATION_INIT(
         FWK_MODULE_IDX_POWER_DOMAIN, MOD_PD_NOTIFICATION_IDX_PRE_WARM_RESET);
@@ -177,9 +242,15 @@ int si0_platform_test_main(void)
     RUN_TEST(test_si0_platform_bind_success);
     RUN_TEST(test_si0_platform_bind_fail);
     RUN_TEST(test_si0_platform_mod_start_success);
-    RUN_TEST(test_si0_platform_mod_start_fail_notification);
+    RUN_TEST(test_si0_platform_mod_start_pre_warmreset_fail_notification);
+    RUN_TEST(test_si0_platform_mod_start_pd_trans_fail_notification);
 
     return UNITY_END();
+}
+
+int pd_transition_ap_platform_hook(unsigned int pd_state)
+{
+    return FWK_SUCCESS;
 }
 
 int main(void)

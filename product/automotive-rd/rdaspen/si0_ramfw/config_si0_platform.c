@@ -12,9 +12,11 @@
 #include "si0_mmap.h"
 #include "si_scr_info.h"
 
+#include <mod_power_domain.h>
 #include <mod_si0_platform.h>
 
 #include <fwk_id.h>
+#include <fwk_log.h>
 #include <fwk_module.h>
 #include <fwk_module_idx.h>
 
@@ -47,6 +49,62 @@ static const scr_config_t config_scr = {
         .cl0_c0_config_1 = 0x01001000U,
         .cl0_c0_config_2 = 0x01200000U,
         .cl0_c0_config_3 = 0x00000000U,
+    },
+};
+
+/* Structure for ATU region */
+typedef struct atu_region_type {
+    /* Region start address */
+    const uint32_t *region_start_addr;
+    /* Size of the ATU region */
+    uint32_t size;
+} atu_region_t;
+
+/* Indices for SI ATU regions */
+enum SI_ATU_REGIONS {
+    SI_ATU_REGION_IDX_CMN,
+    SI_ATU_REGION_IDX_CLUSTER_UTILITY,
+    SI_ATU_REGION_IDX_SMD_EXPANSION,
+    SI_ATU_REGION_IDX_SYSTOP_PIK,
+    SI_ATU_REGION_IDX_SYSTEM_ID,
+    SI_ATU_REGION_IDX_CSS_COUNTERS_TIMERS,
+    SI_ATU_REGION_IDX_SHARED_SRAM,
+    SI_ATU_REGION_IDX_SHARED_SRAM_NS,
+    SI_ATU_REGION_COUNT,
+};
+
+static const atu_region_t si_atu_regions[SI_ATU_REGION_COUNT] = {
+    [SI_ATU_REGION_IDX_CMN] = {
+        .region_start_addr = (const uint32_t*)0x80000000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_CLUSTER_UTILITY] = {
+        .region_start_addr = (const uint32_t*)0xC1000000UL,
+        .size = 0x800000UL,
+    },
+    [SI_ATU_REGION_IDX_SMD_EXPANSION] = {
+        .region_start_addr = (const uint32_t*)0xD0000000UL,
+        .size = 0x20000UL,
+    },
+    [SI_ATU_REGION_IDX_SYSTOP_PIK] = {
+        .region_start_addr = (const uint32_t*)0xD0020000UL,
+        .size = 0x2000UL,
+    },
+    [SI_ATU_REGION_IDX_SYSTEM_ID] = {
+        .region_start_addr = (const uint32_t*)0xD0030000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_CSS_COUNTERS_TIMERS] = {
+        .region_start_addr = (const uint32_t*)0xD0040000UL,
+        .size = 0x30000UL,
+    },
+    [SI_ATU_REGION_IDX_SHARED_SRAM] = {
+        .region_start_addr = (const uint32_t*)0xE0030000UL,
+        .size = 0x2000UL,
+    },
+    [SI_ATU_REGION_IDX_SHARED_SRAM_NS] = {
+        .region_start_addr = (const uint32_t*)0xE0130000UL,
+        .size = 0x6000UL,
     },
 };
 
@@ -116,6 +174,58 @@ static int verify_scr_cfg_integrity(void)
         (scr->cl0_c0_config_3 != config_scr.scr_expected.cl0_c0_config_3)) {
         return FWK_E_PANIC;
     }
+    return FWK_SUCCESS;
+}
+
+static void verify_atu_cfg(void)
+{
+    uint32_t value;
+
+    /*
+     * Read the start and end address of each regions.
+     * Expect an abort if the region configuration is not as expected.
+     */
+    for (uint32_t i = 0; i < SI_ATU_REGION_COUNT; ++i) {
+        const volatile uint32_t *region_start_address =
+            (volatile uint32_t *)si_atu_regions[i].region_start_addr;
+        const volatile uint32_t *region_end_address =
+            (volatile uint32_t
+                 *)(si_atu_regions[i].region_start_addr + ((si_atu_regions[i].size - 4) / 4U));
+
+        value = *(region_start_address);
+        value = *(region_end_address);
+        (void)value;
+    }
+}
+
+int pd_transition_ap_platform_hook(unsigned int pd_state)
+{
+    static bool is_atu_check_done = false;
+
+    switch (pd_state) {
+    case (unsigned int)MOD_PD_STATE_OFF:
+    case (unsigned int)MOD_PD_STATE_OFF_0:
+    case (unsigned int)MOD_PD_STATE_OFF_1:
+    case (unsigned int)MOD_PD_STATE_OFF_2:
+    case (unsigned int)MOD_PD_STATE_SLEEP:
+        /* do nothing */
+        break;
+    case (unsigned int)MOD_PD_STATE_ON:
+        /* Perform ATU cfg check once during boot */
+        if (is_atu_check_done == false) {
+            FWK_LOG_INFO(
+                "[SI0-PLATFORM] AP domain has been turned on, performing ATU "
+                "cfg check");
+            is_atu_check_done = true;
+            /* Verify ATU config integrity. Any mismatch will result in abort */
+            verify_atu_cfg();
+        }
+        break;
+    default:
+        /* Unsupported Power Domain state, do nothing */
+        break;
+    }
+
     return FWK_SUCCESS;
 }
 
