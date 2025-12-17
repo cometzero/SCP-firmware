@@ -391,12 +391,18 @@ static void fast_channel_callback(uintptr_t param)
 #ifdef BUILD_HAS_DEBUGGER
     if (false == is_cli_running()) {
 #endif
-        status = fwk_put_event(&event);
-        if (status != FWK_SUCCESS) {
-            FWK_LOG_DEBUG("[SCMI-PERF] Error creating FC process event.");
-            return;
+        /*
+         * Fast channels are polling-based.
+         * If a process event is already pending, do NOT queue another one.
+         */
+        if (perf_fch_ctx.pending_req_count == 0) {
+            status = fwk_put_event(&event);
+            if (status != FWK_SUCCESS) {
+                FWK_LOG_ERR("[SCMI-PERF] Error creating FC process event.");
+                return;
+            }
+            log_and_increment_pending_req_count();
         }
-        log_and_increment_pending_req_count();
 #ifdef BUILD_HAS_DEBUGGER
     }
 #endif
