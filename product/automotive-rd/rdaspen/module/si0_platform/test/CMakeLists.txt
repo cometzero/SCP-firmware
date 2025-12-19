@@ -23,6 +23,12 @@ list(APPEND MOCK_REPLACEMENTS fwk_id)
 list(APPEND MOCK_REPLACEMENTS fwk_module)
 list(APPEND MOCK_REPLACEMENTS fwk_notification)
 
+list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/power_domain/include)
+list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/ppu_v1/include)
+list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/system_power/include)
+list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/scmi/include)
+list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/transport/include)
+
 include(${SCP_ROOT}/unit_test/module_common.cmake)
 
 target_compile_definitions(${UNIT_TEST_TARGET} PUBLIC
@@ -42,9 +48,6 @@ set(UNIT_TEST_TARGET mod_si0_platform_platform_power_mgmt_unit_test)
 
 set(MODULE_SRC ${PRODUCT_ROOT}/${TEST_MODULE}/src)
 set(MODULE_INC ${PRODUCT_ROOT}/${TEST_MODULE}/include)
-list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/power_domain/include)
-list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/system_power/include)
-list(APPEND OTHER_MODULE_INC ${MODULE_ROOT}/scmi/include)
 
 set(MODULE_UT_SRC ${CMAKE_CURRENT_LIST_DIR})
 set(MODULE_UT_INC ${CMAKE_CURRENT_LIST_DIR})
