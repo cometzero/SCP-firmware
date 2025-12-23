@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2015-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2025, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -135,7 +135,7 @@ enum mod_scmi_sys_power_policy_status {
  */
 int scmi_sys_power_state_set_policy(
     enum mod_scmi_sys_power_policy_status *policy_status,
-    uint32_t *state,
+    const uint32_t *state,
     fwk_id_t service_id,
     bool graceful);
 

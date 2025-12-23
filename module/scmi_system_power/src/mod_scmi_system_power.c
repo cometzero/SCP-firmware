@@ -629,7 +629,7 @@ exit:
  */
 FWK_WEAK int scmi_sys_power_state_set_policy(
     enum mod_scmi_sys_power_policy_status *policy_status,
-    uint32_t *state,
+    const uint32_t *state,
     fwk_id_t service_id,
     bool graceful)
 {
