@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,6 +14,7 @@
 #define AP_NS_TIMER_IRQ         81
 #define AP_NS_WDOG_IRQ          82
 #define AP_NS_UART_IRQ          84
+#define AP_RAS_FFH_NOTIFY_IRQ   89
 #define AP_MHU3_AP2SI0_NS_IRQ   144
 #define AP_MHU3_SI02AP_NS_IRQ   145
 #define AP_CLUSTER0_DSU_PMU_IRQ 248
@@ -87,6 +88,7 @@ static const struct mod_gicx00_multiview_spi_map ap_spi_map[] = {
     { AP_NS_TIMER_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { AP_NS_WDOG_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { AP_NS_UART_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
+    { AP_RAS_FFH_NOTIFY_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { AP_MHU3_AP2SI0_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { AP_MHU3_SI02AP_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { AP_CLUSTER0_DSU_PMU_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
