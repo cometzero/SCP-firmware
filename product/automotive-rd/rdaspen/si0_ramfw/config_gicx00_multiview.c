@@ -18,6 +18,8 @@
 #define AP_SMMU_COMBINED_IRQ    97
 #define AP_MHU3_AP2SI0_NS_IRQ   144
 #define AP_MHU3_SI02AP_NS_IRQ   145
+#define AP_MHU3_AP2SI1_NS_IRQ   152
+#define AP_MHU3_SI12AP_NS_IRQ   153
 #define AP_CLUSTER0_DSU_PMU_IRQ 248
 #define AP_CLUSTER1_DSU_PMU_IRQ 249
 #define AP_CLUSTER2_DSU_PMU_IRQ 250
@@ -110,6 +112,8 @@ static const struct mod_gicx00_multiview_spi_map ap_spi_map[] = {
     { AP_VIRTIO_NET_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { AP_VIRTIO_RNG_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { AP_RTC_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
+    { AP_MHU3_AP2SI1_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
+    { AP_MHU3_SI12AP_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
 };
 
 const struct fwk_module_config config_gicx00_multiview = {
