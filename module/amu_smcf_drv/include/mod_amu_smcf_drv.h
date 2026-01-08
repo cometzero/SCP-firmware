@@ -31,6 +31,9 @@ struct amu_smcf_drv_element_config {
 
     /*! SMCF Tag buffer size */
     uint32_t amu_tag_buffer_size;
+
+    /*! Size of the counter in bytes */
+    uint8_t counter_size;
 };
 
 /*!

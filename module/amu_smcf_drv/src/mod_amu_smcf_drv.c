@@ -152,7 +152,8 @@ static int amu_smcf_drv_element_init(
      * COUNTER_OFFSET(I) >= COUNTER_OFFSET(I-1) + COUNTER_DATA_SZ
      */
     for (i = 1; i < counters_count; ++i) {
-        min_possible_offset = amu_counter_offsets[i - 1] + sizeof(uint64_t);
+        min_possible_offset =
+            amu_counter_offsets[i - 1] + core_counters_cfg->counter_size;
         if (amu_counter_offsets[i] < min_possible_offset) {
             return FWK_E_ALIGN;
         }
