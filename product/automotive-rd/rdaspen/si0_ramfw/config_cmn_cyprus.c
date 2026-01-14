@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -156,6 +156,16 @@ static const struct mod_cmn_cyprus_mem_region_map mmap[] = {
         .size = UINT64_C(1) * FWK_GIB,
         .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_IO,
         .node_id = NODE_ID_HND,
+    },
+    {
+        /*
+         * IO Block 0
+         * Map: 0x01_C000_0000 - 0x01_C7FF_FFFF (128 MB)
+         */
+        .base = UINT64_C(0x01C0000000),
+        .size = UINT64_C(128) * FWK_MIB,
+        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_IO,
+        .node_id = NODE_ID_HNP1,
     },
 };
 

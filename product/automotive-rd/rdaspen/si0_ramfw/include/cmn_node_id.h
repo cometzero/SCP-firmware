@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -16,6 +16,7 @@
  */
 #define NODE_ID_HNI1 28 /* System Management Block */
 #define NODE_ID_HND  4 /* System Control Block */
+#define NODE_ID_HNP1 348 /* IO Block 0 */
 
 #define NODE_ID_SBSX0 0
 #define NODE_ID_SBSX1 88
