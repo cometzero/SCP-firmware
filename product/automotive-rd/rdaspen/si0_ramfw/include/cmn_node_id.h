@@ -19,14 +19,14 @@
 #define NODE_ID_HNP1 348 /* IO Block 0 */
 
 #define NODE_ID_SBSX0 0
-#define NODE_ID_SBSX1 88
-#define NODE_ID_SBSX2 152
-#define NODE_ID_SBSX3 216
-#define NODE_ID_SBSX4 280
-#define NODE_ID_SBSX5 64
-#define NODE_ID_SBSX6 128
-#define NODE_ID_SBSX7 192
-#define NODE_ID_SBSX8 256
+#define NODE_ID_SBSX1 64
+#define NODE_ID_SBSX2 88
+#define NODE_ID_SBSX3 128
+#define NODE_ID_SBSX4 152
+#define NODE_ID_SBSX5 192
+#define NODE_ID_SBSX6 216
+#define NODE_ID_SBSX7 256
+#define NODE_ID_SBSX8 280
 
 #define MESH_SIZE_X 6
 #define MESH_SIZE_Y 4

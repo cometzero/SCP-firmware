@@ -72,62 +72,6 @@ static const struct mod_cmn_cyprus_mem_region_map mmap[] = {
         .node_id = NODE_ID_HNI1,
     },
     {
-        /* DRAM region 1 */
-        .base = UINT64_C(0x80000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX1,
-    },
-    {
-        /* DRAM region 2 */
-        .base = UINT64_C(0x90000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX2,
-    },
-    {
-        /* DRAM region 3 */
-        .base = UINT64_C(0xa0000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX3,
-    },
-    {
-        /* DRAM region 4 */
-        .base = UINT64_C(0xb0000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX4,
-    },
-    {
-        /* DRAM region 5 */
-        .base = UINT64_C(0xc0000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX5,
-    },
-    {
-        /* DRAM region 6 */
-        .base = UINT64_C(0xd0000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX6,
-    },
-    {
-        /* DRAM region 7 */
-        .base = UINT64_C(0xe0000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX7,
-    },
-    {
-        /* DRAM region 8 */
-        .base = UINT64_C(0xf0000000),
-        .size = UINT64_C(256) * FWK_MIB,
-        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_SYSCACHE_SUB,
-        .node_id = NODE_ID_SBSX8,
-    },
-    {
         /*
          * CMN-S3-AE GPV
          * Map: 0x01_0000_0000 - 0x01_3FFF_FFFF (1 GB)
@@ -180,6 +124,10 @@ static struct mod_cmn_cyprus_config cmn_config_table[1] = {
             .snf_table = snf_table,
             .snf_count = FWK_ARRAY_SIZE(snf_table),
             .hnf_sam_mode = MOD_CMN_CYPRUS_HNF_SAM_MODE_DIRECT_MAPPING,
+        },
+        .rnsam_scg_config = {
+            .scg_hashing_mode = MOD_CMN_CYPRUS_RNSAM_SCG_POWER_OF_TWO_HASHING,
+            .hash_addr_mask = 0x7,
         },
     },
 };
