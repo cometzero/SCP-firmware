@@ -14,8 +14,8 @@
 #include <fwk_macros.h>
 
 #define SI0_SRAM_BASE    0x120000000
-#define SI0_ITC_RAM_SIZE (256 * 1024)
-#define SI0_DTC_RAM_SIZE (256 * 1024)
+#define SI0_ITC_RAM_SIZE (512 * 1024)
+#define SI0_DTC_RAM_SIZE (512 * 1024)
 #define SI0_ITC_RAM_BASE SI0_SRAM_BASE
 #define SI0_DTC_RAM_BASE (SI0_SRAM_BASE + SI0_ITC_RAM_SIZE)
 

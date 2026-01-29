@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -29,6 +29,6 @@
 /*
  * Stack
  */
-#define FMW_STACK_SIZE (4 * FWK_KIB)
+#define FMW_STACK_SIZE (16 * FWK_KIB)
 
 #endif /* FMW_MEMORY_H */
