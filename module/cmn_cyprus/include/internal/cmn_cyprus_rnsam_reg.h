@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -224,6 +224,13 @@ void rnsam_set_htg_target_hn_count(
 void rnsam_enable_htg_cal_mode(
     struct cmn_cyprus_rnsam_reg *rnsam,
     uint8_t scg_idx);
+
+/*
+ * Set the hash address mask for the given RNSAM node.
+ */
+void rnsam_set_hash_addr_mask(
+    struct cmn_cyprus_rnsam_reg *rnsam,
+    uintptr_t hash_addr_mask);
 
 /*
  * Mark the hashed region as valid in RNSAM.

@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -324,6 +324,12 @@ struct mod_cmn_cyprus_rnsam_scg_config {
      * \note Used only when hierarchical hashing mode is selected.
      */
     struct mod_cmn_cyprus_scg_hier_hashing_cfg hier_hash_cfg;
+
+    /*!
+     * The address mask that is applied before hashing the address bits.
+     * A zero value means no mask is applied.
+     */
+    uintptr_t hash_addr_mask;
 };
 
 /*!

@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -46,6 +46,9 @@
 #define RNSAM_REGION_ENTRY_SIZE_POS        56
 #define RNSAM_REGION_ENTRY_BASE_POS        26
 #define RNSAM_ENCODED_REGION_SIZE_MASK     UINT64_C(0x7F)
+
+/* RNSAM hash address mask */
+#define RNSAM_HASH_ADDR_MASK_POS 6
 
 /* RNSAM Non-hashed region target node id */
 #define RNSAM_NON_HASH_TGT_NODEID_ENTRY_BITS_WIDTH  12
@@ -275,6 +278,16 @@ static void set_htg_region_target_type(
         rnsam->HASHED_TGT_GRP_CFG1_REGION[region_idx - RNSAM_HTG_REG_COUNT] |=
             (target_type << RNSAM_REGION_ENTRY_TARGET_TYPE_POS);
     }
+}
+
+void rnsam_set_hash_addr_mask(
+    struct cmn_cyprus_rnsam_reg *rnsam,
+    uintptr_t hash_addr_mask)
+{
+    if (hash_addr_mask == 0)
+        return;
+
+    rnsam->HASH_ADDR_MASK = hash_addr_mask << RNSAM_HASH_ADDR_MASK_POS;
 }
 
 /* Configure the target type for the secondary HTG region */

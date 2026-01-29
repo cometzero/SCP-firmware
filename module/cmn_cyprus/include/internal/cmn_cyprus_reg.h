@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -146,7 +146,8 @@ struct cmn_cyprus_rnsam_reg {
     FWK_RW  uint64_t  SYS_CACHE_GRP_REGION[RNSAM_HTG_REG_COUNT];
     FWK_RW  uint64_t  HASHED_TGT_GRP_CFG1_REGION[RNSAM_HTG_REG_GRP2_COUNT];
     FWK_RW  uint64_t  SYS_CACHE_GRP_SECONDARY_REG[8];
-            uint8_t   RESERVED5[0xEA0 - 0xE80];
+    FWK_RW  uint64_t  HASH_ADDR_MASK;
+            uint8_t   RESERVED5[0xEA0 - 0xE88];
     FWK_RW  uint64_t  SYS_CACHE_GROUP_HN_COUNT;
             uint8_t   RESERVED6[0xEB0 - 0xEA8];
     FWK_RW  uint64_t  SYS_CACHE_GRP_SN_ATTR[2];

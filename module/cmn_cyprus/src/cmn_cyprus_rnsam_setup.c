@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2023-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2023-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -881,6 +881,21 @@ static int setup_rnsam_remote_regions(void)
     return FWK_SUCCESS;
 }
 
+static void setup_rnsam_hash_addr_mask(void)
+{
+    unsigned int rnsam_idx;
+    struct cmn_cyprus_rnsam_reg *rnsam;
+
+    /* Iterate through each RNSAM node and configure the hash address mask */
+    for (rnsam_idx = 0; rnsam_idx < shared_ctx->rnsam_count; rnsam_idx++) {
+        rnsam = shared_ctx->rnsam_table[rnsam_idx];
+
+        /* Setup the hash address mask */
+        rnsam_set_hash_addr_mask(
+            rnsam, shared_ctx->config->rnsam_scg_config.hash_addr_mask);
+    }
+}
+
 void get_rnsam_memmap_api(const void **api)
 {
     *api = &memmap_rnsam_api;
@@ -941,6 +956,8 @@ int cmn_cyprus_setup_rnsam(struct cmn_cyprus_ctx *ctx)
             return status;
         }
     }
+
+    setup_rnsam_hash_addr_mask();
 
     unstall_rnsam_requests();
 
