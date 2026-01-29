@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2021-2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2021-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -16,7 +16,8 @@ foreach(language IN ITEMS ASM C CXX)
                "-mcpu=${SCP_AARCH64_PROCESSOR_TARGET} ")
         endif()
         string(APPEND CMAKE_${language}_FLAGS_INIT
-            "-mstrict-align -fno-builtin -DAARCH64 -D__ASSEMBLY__ ")
+            "-mstrict-align -fno-builtin -fno-omit-frame-pointer "
+            "-DAARCH64 -D__ASSEMBLY__ ")
     endif()
 
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "cortex-m(0|0plus|3|7|33|55|85)")

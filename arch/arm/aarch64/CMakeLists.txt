@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2024-2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2024-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -11,6 +11,15 @@ endif()
 
 add_library(arch-aarch64)
 
+if(SCP_ENABLE_EXCEPTION_SYMTAB)
+    target_compile_definitions(
+        arch-aarch64 PRIVATE
+        "AARCH64_EXCEPTION_SYMTAB_MAX_SIZE=${SCP_EXCEPTION_SYMTAB_MAX_SIZE}")
+    target_link_options(
+        arch-aarch64 INTERFACE
+        "LINKER:--undefined=aarch64_exception_symtab_blob")
+endif()
+
 target_include_directories(arch-aarch64
                            PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
                                   "${CMAKE_CURRENT_SOURCE_DIR}/../common/include")
@@ -19,6 +28,8 @@ target_sources(
     arch-aarch64
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/arch_crt0.S"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/arch_exceptions.S"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/arch_exceptions.c"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/arch_exception_symtab_blob.c"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/arch_gic.c"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/arch_main.c"
             "${CMAKE_CURRENT_SOURCE_DIR}/../common/src/arch_mm.c"

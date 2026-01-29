@@ -309,6 +309,33 @@ cmake_dependent_option(
     "DEFINED SCP_ENABLE_IMAGE_INTEGRITY_VERIFICATION"
     "${SCP_ENABLE_IMAGE_INTEGRITY_VERIFY}")
 
+set(SCP_ENABLE_EXCEPTION_SYMTAB_DEFAULT OFF)
+if(DEFINED SCP_ENABLE_EXCEPTION_SYMTAB)
+    set(SCP_ENABLE_EXCEPTION_SYMTAB_DEFAULT "${SCP_ENABLE_EXCEPTION_SYMTAB}")
+endif()
+
+option(
+    SCP_ENABLE_EXCEPTION_SYMTAB
+    "Generate AArch64 exception symbol table and inject into the ELF"
+    ${SCP_ENABLE_EXCEPTION_SYMTAB_DEFAULT})
+if(DEFINED SCP_ENABLE_EXCEPTION_SYMTAB AND
+   NOT DEFINED CACHE{SCP_ENABLE_EXCEPTION_SYMTAB})
+    set(
+        SCP_ENABLE_EXCEPTION_SYMTAB
+        "${SCP_ENABLE_EXCEPTION_SYMTAB_DEFAULT}"
+        CACHE BOOL
+        "Generate AArch64 exception symbol table and inject into the ELF")
+endif()
+
+if(NOT DEFINED SCP_EXCEPTION_SYMTAB_MAX_SIZE)
+    set(SCP_EXCEPTION_SYMTAB_MAX_SIZE "65536")
+endif()
+set(
+    SCP_EXCEPTION_SYMTAB_MAX_SIZE
+    "${SCP_EXCEPTION_SYMTAB_MAX_SIZE}"
+    CACHE STRING
+    "Max size in bytes reserved for the AArch64 exception symbol table")
+
 # Include firmware specific build options
 include("${SCP_FIRMWARE_SOURCE_DIR}/Buildoptions.cmake" OPTIONAL)
 
@@ -327,6 +354,32 @@ macro(add_executable target)
     _add_executable(${target} ${ARGN})
 
     if("${target}" STREQUAL "${SCP_FIRMWARE_TARGET}")
+        if(SCP_ENABLE_EXCEPTION_SYMTAB AND (SCP_ARCHITECTURE STREQUAL "aarch64"))
+            if(CMAKE_NM)
+                set(AARCH64_EXCEPTION_SYMTAB_NM "${CMAKE_NM}")
+            else()
+                set(AARCH64_EXCEPTION_SYMTAB_NM "nm")
+            endif()
+
+            add_custom_command(
+                TARGET ${target} POST_BUILD
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_SOURCE_DIR}/tools/gen_exception_symtab.py
+                        "$<TARGET_FILE:${target}>"
+                        "${CMAKE_BINARY_DIR}/arch/${SCP_ARCHITECTURE}/arch_exception_symtab.bin"
+                        --format bin
+                        --max-size ${SCP_EXCEPTION_SYMTAB_MAX_SIZE}
+                        --nm "${AARCH64_EXCEPTION_SYMTAB_NM}"
+                COMMAND ${CMAKE_OBJCOPY}
+                        --update-section
+                        ".exception_symtab=${CMAKE_BINARY_DIR}/arch/${SCP_ARCHITECTURE}/arch_exception_symtab.bin"
+                        --set-section-flags
+                        ".exception_symtab=alloc,load,readonly,data"
+                        "$<TARGET_FILE:${target}>"
+                COMMENT "Generating AArch64 exception symbol table"
+                VERBATIM)
+        endif()
+
         if(SCP_GENERATE_FLAT_BINARY)
             #
             # Invoke 'objcopy' or 'fromelf', which we use to generate a flat
