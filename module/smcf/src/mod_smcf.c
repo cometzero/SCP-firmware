@@ -22,6 +22,9 @@
 #ifdef BUILD_HAS_NOTIFICATION
 #    include <fwk_notification.h>
 #endif
+#ifdef BUILD_HAS_DEBUGGER
+#    include <cli.h>
+#endif
 
 /* SMCF module event indexes */
 enum pd_event_idx { SMCF_NEW_DATA_SAMPLE, SMCF_EVENT_COUNT };
@@ -188,10 +191,21 @@ static void sample_data_set_complete_handler(
         .id = smcf_event_id_new_data_sample,
     };
 
-    status = fwk_put_event(&req);
-    if (status != FWK_SUCCESS) {
-        FWK_LOG_LOCAL("[SMCF] Send data sample event failed!");
+    /*
+     * After entering the debug CLI, requests are not processed anymore.
+     * Due to this, the event queue fills up resulting in a crash.
+     * Hence, deactivate queueing while Debugger CLI is active.
+     */
+#ifdef BUILD_HAS_DEBUGGER
+    if (false == is_cli_running()) {
+#endif
+        status = fwk_put_event(&req);
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_LOCAL("[SMCF] Send data sample event failed!");
+        }
+#ifdef BUILD_HAS_DEBUGGER
     }
+#endif
 
     mgi_interrupt_source_clear(element_ctx->mgi, irq_source);
 }
