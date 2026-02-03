@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -54,15 +54,15 @@ static void check_tfp_error(uint64_t err_status)
 }
 
 /* Do a linear search to see if the RAS desc matches the arrived interrupt */
-static unsigned int find_descriptor_idx(unsigned int intr)
+static int find_descriptor_idx(unsigned int intr)
 {
     unsigned int idx = 0;
     for (; idx < ras_ctx.desc_count; idx++) {
-        if (ras_ctx.descriptors->interrupt_no == intr) {
+        if (ras_ctx.descriptors[idx].interrupt_no == intr) {
             return idx;
         }
     }
-    return -1;
+    return FWK_E_PARAM;
 }
 
 /* CPU RAS interrupt handler only deals with Outband Errors, Which only cover UE
@@ -73,17 +73,41 @@ static void cpu_ras_intr_handler()
     unsigned int cpu_idx = 0;
     uint64_t erx_status;
     struct ext_cpu_ras_cluster_regs *reg = NULL;
-    uint32_t desc_idx;
+    const struct mod_ras_isr_desc *desc;
+    int desc_idx;
 
     /* Retrieve  Interrupt Number */
     fwk_interrupt_get_current(&intr);
     /* Find the descriptor from the Interrupt number */
     desc_idx = find_descriptor_idx(intr);
 
-    for (; cpu_idx < ras_ctx.descriptors[desc_idx].err_record_count;
-         cpu_idx++) {
-        reg = (struct ext_cpu_ras_cluster_regs *)ras_ctx.descriptors[desc_idx]
-                  .err_records_base[cpu_idx];
+    if (desc_idx < 0) {
+        FWK_LOG_WARN(
+            "%s interrupt %u has no descriptor", CPU_HANDLE_MOD_NAME, intr);
+        fwk_interrupt_clear_pending(intr);
+        return;
+    }
+
+    desc = &ras_ctx.descriptors[desc_idx];
+
+    if ((desc->err_records_base == NULL) || (desc->err_record_count == 0U)) {
+        FWK_LOG_WARN(
+            "%s interrupt %u missing error records", CPU_HANDLE_MOD_NAME, intr);
+        fwk_interrupt_clear_pending(intr);
+        return;
+    }
+
+    for (; cpu_idx < desc->err_record_count; cpu_idx++) {
+        reg =
+            (struct ext_cpu_ras_cluster_regs *)desc->err_records_base[cpu_idx];
+
+        if (reg == NULL) {
+            FWK_LOG_WARN(
+                "%s Malformed Error record for CPU 0x%x",
+                CPU_HANDLE_MOD_NAME,
+                cpu_idx);
+            continue;
+        }
 
         /* The Faulty CPU has been found in the Cluster */
         if (reg->ERRXSTATUS & ERX_STATUS_V) {
@@ -92,14 +116,16 @@ static void cpu_ras_intr_handler()
     }
 
     /* Spurious Interrupt - Ignore */
-    if (cpu_idx >= ras_ctx.descriptors[desc_idx].err_record_count) {
+    if ((cpu_idx >= desc->err_record_count) || (reg == NULL)) {
         FWK_LOG_INFO(
             "%s spurious fwk_int number = %d", CPU_HANDLE_MOD_NAME, intr);
         fwk_interrupt_clear_pending(intr);
         return;
     }
 
-    FWK_LOG_INFO("Faulty CPU Identified: %x", cpu_idx);
+    FWK_LOG_INFO("%s Cluster: 0x%x", CPU_HANDLE_MOD_NAME, desc_idx);
+    FWK_LOG_INFO(
+        "%s Faulty CPU Identified: 0x%x", CPU_HANDLE_MOD_NAME, cpu_idx);
     /* Record the Erx status */
     erx_status = reg->ERRXSTATUS;
 
@@ -117,10 +143,6 @@ static void cpu_ras_intr_handler()
     erx_status = reg->ERRXSTATUS;
     reg->ERRXSTATUS = erx_status;
     reg->ERRXMISC0 = 0x0;
-
-    /* Clear these injection flags aswell for security purposes*/
-    reg->ERRXPFGCDN = 0x0;
-    reg->ERRXPFGCTL = 0x0;
 
     FWK_LOG_WARN("%s SI Clears Error record", CPU_HANDLE_MOD_NAME);
     FWK_LOG_WARN("%s ERXSTATUS = 0x%lx", CPU_HANDLE_MOD_NAME, reg->ERRXSTATUS);

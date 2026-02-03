@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -26,8 +26,10 @@
 /* Add priority for RAS interrupts */
 #define RAS_INTR_PRIORITY        (0x10)
 
-#define CPU_RAS_ERR_RECORD_REG_ADDR(core_idx) \
-    (SI0_ATW1_CLUSTER_UTILITY_BASE + (core_idx * SI0_CORE_REG_UTILITY_SIZE) + \
+#define CPU_RAS_ERR_RECORD_REG_ADDR(cluster_idx, core_idx) \
+    (SI0_ATW1_CLUSTER_UTILITY_BASE + \
+     ((cluster_idx)*SI0_CLUSTER_UTILITY_SIZE) + \
+     ((core_idx)*SI0_CORE_REG_UTILITY_SIZE) + \
      SI0_CLUSTER_UTILITY_CORE0_RAS_REG_OFFSET)
 
 /*
@@ -54,31 +56,31 @@ static const unsigned int cpu_cl2_pe_ids[] = { 8, 9, 10, 11 };
 static const unsigned int cpu_cl3_pe_ids[] = { 12, 13, 14, 15 };
 
 static const uintptr_t error_records_cl0[] = {
-    CPU_RAS_ERR_RECORD_REG_ADDR(0),
-    CPU_RAS_ERR_RECORD_REG_ADDR(1),
-    CPU_RAS_ERR_RECORD_REG_ADDR(2),
-    CPU_RAS_ERR_RECORD_REG_ADDR(3),
+    CPU_RAS_ERR_RECORD_REG_ADDR(0, 0),
+    CPU_RAS_ERR_RECORD_REG_ADDR(0, 1),
+    CPU_RAS_ERR_RECORD_REG_ADDR(0, 2),
+    CPU_RAS_ERR_RECORD_REG_ADDR(0, 3),
 };
 
 static const uintptr_t error_records_cl1[] = {
-    CPU_RAS_ERR_RECORD_REG_ADDR(4),
-    CPU_RAS_ERR_RECORD_REG_ADDR(5),
-    CPU_RAS_ERR_RECORD_REG_ADDR(6),
-    CPU_RAS_ERR_RECORD_REG_ADDR(7),
+    CPU_RAS_ERR_RECORD_REG_ADDR(1, 0),
+    CPU_RAS_ERR_RECORD_REG_ADDR(1, 1),
+    CPU_RAS_ERR_RECORD_REG_ADDR(1, 2),
+    CPU_RAS_ERR_RECORD_REG_ADDR(1, 3),
 };
 
 static const uintptr_t error_records_cl2[] = {
-    CPU_RAS_ERR_RECORD_REG_ADDR(8),
-    CPU_RAS_ERR_RECORD_REG_ADDR(9),
-    CPU_RAS_ERR_RECORD_REG_ADDR(10),
-    CPU_RAS_ERR_RECORD_REG_ADDR(11),
+    CPU_RAS_ERR_RECORD_REG_ADDR(2, 0),
+    CPU_RAS_ERR_RECORD_REG_ADDR(2, 1),
+    CPU_RAS_ERR_RECORD_REG_ADDR(2, 2),
+    CPU_RAS_ERR_RECORD_REG_ADDR(2, 3),
 };
 
 static const uintptr_t error_records_cl3[] = {
-    CPU_RAS_ERR_RECORD_REG_ADDR(12),
-    CPU_RAS_ERR_RECORD_REG_ADDR(13),
-    CPU_RAS_ERR_RECORD_REG_ADDR(14),
-    CPU_RAS_ERR_RECORD_REG_ADDR(15),
+    CPU_RAS_ERR_RECORD_REG_ADDR(3, 0),
+    CPU_RAS_ERR_RECORD_REG_ADDR(3, 1),
+    CPU_RAS_ERR_RECORD_REG_ADDR(3, 2),
+    CPU_RAS_ERR_RECORD_REG_ADDR(3, 3),
 };
 
 static const struct fwk_element ras_config_table[] = {
