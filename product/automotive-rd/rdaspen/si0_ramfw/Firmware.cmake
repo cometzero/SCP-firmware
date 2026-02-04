@@ -58,13 +58,15 @@ list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../module/safety_island_platform"
      "${CMAKE_CURRENT_LIST_DIR}/../module/platform_smcf"
      "${CMAKE_CURRENT_LIST_DIR}/../module/smcf_client"
-     "${CMAKE_CURRENT_LIST_DIR}/../../module/test_smcf")
+     "${CMAKE_CURRENT_LIST_DIR}/../../module/test_smcf"
+     "${CMAKE_CURRENT_LIST_DIR}/../module/clear_memory")
 
 list(APPEND SCP_MODULES
     "armv8r-mpu"
     "pl011"
     "ni-710ae"
     "cmn-cyprus"
+    "clear-memory"
     "ppu-v1"
     "gicx00-multiview"
     "gicx00"

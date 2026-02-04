@@ -51,6 +51,7 @@ target_sources(rdaspen-si0-bl2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/config_sensor_smcf_drv.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_sensor.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_smcf_client.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_clear_memory.c"
     )
 
 if(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS)

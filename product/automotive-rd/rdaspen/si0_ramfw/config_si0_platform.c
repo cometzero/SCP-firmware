@@ -100,11 +100,11 @@ static const atu_region_t si_atu_regions[SI_ATU_REGION_COUNT] = {
     },
     [SI_ATU_REGION_IDX_SHARED_SRAM] = {
         .region_start_addr = (const uint32_t*)0xE0030000UL,
-        .size = 0x2000UL,
+        .size = 0x100000UL,
     },
     [SI_ATU_REGION_IDX_SHARED_SRAM_NS] = {
         .region_start_addr = (const uint32_t*)0xE0130000UL,
-        .size = 0x6000UL,
+        .size = 0x100000UL,
     },
 };
 
