@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -25,17 +25,7 @@
     SI0_ATW1_CLUSTER_UTILITY_BASE + (cluster_idx * SI0_CLUSTER_UTILITY_SIZE) + \
         SI0_CLUSTER_UTILITY_CLUSTER_CONTROL_OFFSET
 
-static const uintptr_t cluster_control_regions[CLUSTER_CONTROL_REGION_COUNT] = {
-    CLUSTER_CONTROL_REGION_ADDR(0),
-    CLUSTER_CONTROL_REGION_ADDR(1),
-    CLUSTER_CONTROL_REGION_ADDR(2),
-    CLUSTER_CONTROL_REGION_ADDR(3),
-};
-
 static const struct mod_cluster_control_config cluster_control_config = {
-    .regions = cluster_control_regions,
-    .region_count = CLUSTER_CONTROL_REGION_COUNT,
-    .rvbar = RDASPEN_AP_RVBAR,
     .platform_notification = {
         .notification_id = FWK_ID_NOTIFICATION_INIT(
             FWK_MODULE_IDX_SI0_PLATFORM,
@@ -47,4 +37,47 @@ static const struct mod_cluster_control_config cluster_control_config = {
 
 struct fwk_module_config config_cluster_control = {
     .data = &cluster_control_config,
+    .elements = FWK_MODULE_STATIC_ELEMENTS({
+        [0] = {
+            .name = "AP Cluster 0",
+            .data =
+                &(struct mod_cluster_control_element_config){
+                    .region = CLUSTER_CONTROL_REGION_ADDR(0),
+                    .rvbar = RDASPEN_AP_RVBAR,
+                    .astart = { 0x1401, 0, 0, 0},
+                    .aend = { 0x1402, 0, 0, 0},
+                },
+        },
+        [1] = {
+            .name = "AP Cluster 1",
+            .data =
+                &(struct mod_cluster_control_element_config){
+                    .region = CLUSTER_CONTROL_REGION_ADDR(1),
+                    .rvbar = RDASPEN_AP_RVBAR,
+                    .astart = { 0x1441, 0, 0, 0},
+                    .aend = { 0x1442, 0, 0, 0},
+                },
+        },
+        [2] = {
+            .name = "AP Cluster 2",
+            .data =
+                &(struct mod_cluster_control_element_config){
+                    .region = CLUSTER_CONTROL_REGION_ADDR(2),
+                    .rvbar = RDASPEN_AP_RVBAR,
+                    .astart = { 0x1481, 0, 0, 0},
+                    .aend = { 0x1482, 0, 0, 0},
+                },
+        },
+        [3] = {
+            .name = "AP Cluster 3",
+            .data =
+                &(struct mod_cluster_control_element_config){
+                    .region = CLUSTER_CONTROL_REGION_ADDR(3),
+                    .rvbar = RDASPEN_AP_RVBAR,
+                    .astart = { 0x14C1, 0, 0, 0},
+                    .aend = { 0x14C2, 0, 0, 0},
+                },
+        },
+        [4] = { 0 },
+    }),
 };

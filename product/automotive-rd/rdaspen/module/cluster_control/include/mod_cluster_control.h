@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -11,6 +11,8 @@
 #include <fwk_id.h>
 
 #include <stdint.h>
+
+#define CLUSTER_CONTROL_PORT_REGION_COUNT 4
 
 /*!
  * \addtogroup GroupPLATFORMModule PLATFORM Product Modules
@@ -38,18 +40,26 @@ struct mod_cluster_control_platform_notification {
 };
 
 /*!
- * \brief Cluster control configuration.
+ * \brief Cluster control element configuration.
  */
-struct mod_cluster_control_config {
-    /*! Array of cluster control regions to program */
-    const uintptr_t *regions;
-
-    /*! The number of cluster control regions */
-    unsigned int region_count;
+struct mod_cluster_control_element_config {
+    /*! Cluster control region to program */
+    const uintptr_t region;
 
     /*! The value to write to the RVBAR register */
     uint64_t rvbar;
 
+    /*! The values to write to the ASTART registers */
+    uint32_t astart[CLUSTER_CONTROL_PORT_REGION_COUNT];
+
+    /*! The values to write to the AEND registers */
+    uint32_t aend[CLUSTER_CONTROL_PORT_REGION_COUNT];
+};
+
+/*!
+ * \brief Cluster control configuration.
+ */
+struct mod_cluster_control_config {
     /*! Platform notification source and notification id (optional) */
     struct mod_cluster_control_platform_notification platform_notification;
 };

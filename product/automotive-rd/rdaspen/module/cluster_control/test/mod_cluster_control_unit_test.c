@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -38,10 +38,35 @@ void tearDown(void)
 static void validate_rvbars(void)
 {
     unsigned int cluster_idx;
-    uint32_t rvbar;
+    uint32_t rvbar, astart, aend;
 
     for (cluster_idx = 0; cluster_idx < FWK_ARRAY_SIZE(cluster_control_reg);
          cluster_idx++) {
+        astart = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x34));
+        TEST_ASSERT_EQUAL(astart, 0);
+        aend = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x38));
+        TEST_ASSERT_EQUAL(aend, 1);
+        astart = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x3C));
+        TEST_ASSERT_EQUAL(astart, 2);
+        aend = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x40));
+        TEST_ASSERT_EQUAL(aend, 3);
+        astart = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x44));
+        TEST_ASSERT_EQUAL(astart, 4);
+        aend = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x48));
+        TEST_ASSERT_EQUAL(aend, 5);
+        astart = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x4C));
+        TEST_ASSERT_EQUAL(astart, 6);
+        aend = fwk_mmio_read_32(
+            (uintptr_t)(cluster_control_reg[cluster_idx] + 0x50));
+        TEST_ASSERT_EQUAL(aend, 7);
+
         rvbar = fwk_mmio_read_32(
             (uintptr_t)(cluster_control_reg[cluster_idx] + 0x100));
         TEST_ASSERT_EQUAL(rvbar, 0xABABABAB);
@@ -69,58 +94,99 @@ static void validate_rvbars(void)
     }
 }
 
+static const void *fwk_module_get_data_direct_stub(fwk_id_t id, int num_calls)
+{
+    if (id.common.type == FWK_ID_TYPE_MODULE)
+        return &cluster_control_config_direct;
+    else {
+        uint32_t element_idx = id.element.element_idx;
+        return &config_cluster_control_element[element_idx];
+    }
+}
+
 void test_cluster_control_direct(void)
 {
     int status;
+    fwk_id_t element_id;
 
-    fwk_module_get_data_ExpectAndReturn(
-        fwk_module_id_cluster_control, &cluster_control_config_direct);
+    fwk_id_is_type_IgnoreAndReturn(false);
+    fwk_module_get_data_StubWithCallback(fwk_module_get_data_direct_stub);
     fwk_id_type_is_valid_IgnoreAndReturn(false);
+    fwk_module_get_element_name_IgnoreAndReturn("Test");
 
-    status = cluster_control_start(fwk_module_id_cluster_control);
-    TEST_ASSERT_EQUAL(status, FWK_SUCCESS);
+    for (uint32_t idx = 0; idx < FWK_ARRAY_SIZE(cluster_control_reg); idx++) {
+        element_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_CLUSTER_CONTROL, idx);
+
+        status = cluster_control_start(element_id);
+        TEST_ASSERT_EQUAL(status, FWK_SUCCESS);
+    }
 
     validate_rvbars();
+}
+
+static const void *fwk_module_get_data_notification_stub(
+    fwk_id_t id,
+    int num_calls)
+{
+    if (id.common.type == FWK_ID_TYPE_MODULE)
+        return &cluster_control_config_notification;
+    else {
+        uint32_t element_idx = id.element.element_idx;
+        return &config_cluster_control_element[element_idx];
+    }
 }
 
 void test_cluster_control_notification(void)
 {
     int status;
-    struct fwk_event event;
+    fwk_id_t element_id;
 
-    fwk_module_get_data_ExpectAndReturn(
-        fwk_module_id_cluster_control, &cluster_control_config_notification);
-    fwk_id_type_is_valid_ExpectAndReturn(fwk_module_id_test_module, true);
-    fwk_id_is_equal_ExpectAndReturn(
-        fwk_module_id_test_module, FWK_ID_NONE, false);
+    fwk_module_get_data_StubWithCallback(fwk_module_get_data_notification_stub);
+    fwk_id_type_is_valid_IgnoreAndReturn(true);
+    fwk_module_get_element_name_IgnoreAndReturn("Test");
 
-    fwk_notification_subscribe_ExpectAndReturn(
-        test_module_notification_test,
-        fwk_module_id_test_module,
-        fwk_module_id_cluster_control,
-        FWK_SUCCESS);
+    for (uint32_t idx = 0; idx < FWK_ARRAY_SIZE(cluster_control_reg); idx++) {
+        element_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_CLUSTER_CONTROL, idx);
 
-    status = cluster_control_start(fwk_module_id_cluster_control);
-    TEST_ASSERT_EQUAL(status, FWK_SUCCESS);
+        fwk_id_is_type_ExpectAndReturn(element_id, FWK_ID_TYPE_MODULE, false);
 
-    event = (struct fwk_event){
-        .target_id = fwk_module_id_cluster_control,
-        .source_id = fwk_module_id_test_module,
-        .id = test_module_notification_test,
-    };
-    fwk_module_get_data_ExpectAndReturn(
-        fwk_module_id_cluster_control, &cluster_control_config_notification);
-    fwk_id_is_type_ExpectAndReturn(
-        fwk_module_id_cluster_control, FWK_ID_TYPE_MODULE, true);
-    fwk_id_is_equal_ExpectAndReturn(
-        test_module_notification_test, test_module_notification_test, true);
-    fwk_notification_unsubscribe_ExpectAndReturn(
-        test_module_notification_test,
-        fwk_module_id_test_module,
-        fwk_module_id_cluster_control,
-        FWK_SUCCESS);
-    status = cluster_control_process_notification(&event, NULL);
-    TEST_ASSERT_EQUAL(status, FWK_SUCCESS);
+        fwk_id_is_equal_ExpectAndReturn(
+            fwk_module_id_test_module, FWK_ID_NONE, false);
+
+        fwk_notification_subscribe_ExpectAndReturn(
+            test_module_notification_test,
+            fwk_module_id_test_module,
+            element_id,
+            FWK_SUCCESS);
+
+        status = cluster_control_start(element_id);
+
+        TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
+    }
+
+    for (uint32_t idx = 0; idx < FWK_ARRAY_SIZE(cluster_control_reg); idx++) {
+        element_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_CLUSTER_CONTROL, idx);
+        struct fwk_event event = {
+            .target_id = element_id,
+            .source_id = fwk_module_id_test_module,
+            .id = test_module_notification_test,
+        };
+
+        fwk_id_is_type_ExpectAndReturn(element_id, FWK_ID_TYPE_ELEMENT, true);
+
+        fwk_id_is_equal_ExpectAndReturn(
+            test_module_notification_test, test_module_notification_test, true);
+
+        fwk_notification_unsubscribe_ExpectAndReturn(
+            test_module_notification_test,
+            fwk_module_id_test_module,
+            element_id,
+            FWK_SUCCESS);
+
+        status = cluster_control_process_notification(&event, NULL);
+
+        TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
+    }
 
     validate_rvbars();
 }
