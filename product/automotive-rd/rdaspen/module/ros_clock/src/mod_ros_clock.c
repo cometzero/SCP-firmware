@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -100,8 +100,6 @@ static int clock_set_div(
     enum mod_ros_clock_clock_divider divider_type,
     uint32_t divider)
 {
-    uint32_t clkdiv, divider_msk, divider_pos;
-
     /* In case of REFCLK, there is no divider */
     if (divider_type == MOD_ROS_CLOCK_CLOCK_NO_DIVIDER)
         return FWK_SUCCESS;
@@ -113,22 +111,27 @@ static int clock_set_div(
     if (divider > module_ctx.divider_max)
         return FWK_E_PARAM;
 
-    /* The resulting divider is the programmed value plus one */
-    clkdiv = divider - 1;
+    /* Validate divider_type regardless of variant */
+    if ((divider_type != MOD_ROS_CLOCK_CLOCK_DIVIDER_0) &&
+        (divider_type != MOD_ROS_CLOCK_CLOCK_DIVIDER_1))
+        return FWK_E_PARAM;
+
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
+    uint32_t clkdiv = divider - 1;
+    uint32_t divider_msk, divider_pos;
 
     if (divider_type == MOD_ROS_CLOCK_CLOCK_DIVIDER_0) {
         divider_msk = CLK_CONTROL_CLKDIV0_MSK;
         divider_pos = CLK_CONTROL_CLKDIV0_POS;
-    } else if (divider_type == MOD_ROS_CLOCK_CLOCK_DIVIDER_1) {
+    } else {
         divider_msk = CLK_CONTROL_CLKDIV1_MSK;
         divider_pos = CLK_CONTROL_CLKDIV1_POS;
-    } else {
-        return FWK_E_PARAM;
     }
 
     /* Set */
     *ctx->config->control_reg =
         (*ctx->config->control_reg & ~divider_msk) | (clkdiv << divider_pos);
+#endif
 
     return FWK_SUCCESS;
 }
@@ -140,10 +143,12 @@ static int clock_set_source(struct ros_clock_dev_ctx *ctx, uint8_t source)
     if (source > (CLK_CONTROL_CLKSELECT_MSK >> CLK_CONTROL_CLKSELECT_POS))
         return FWK_E_PARAM;
 
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
     /* Set */
     *ctx->config->control_reg =
         (*ctx->config->control_reg & ~CLK_CONTROL_CLKSELECT_MSK) |
         (source << CLK_CONTROL_CLKSELECT_POS);
+#endif
 
     return FWK_SUCCESS;
 }

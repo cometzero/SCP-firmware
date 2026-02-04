@@ -64,7 +64,9 @@ typedef struct atu_region_type {
 enum SI_ATU_REGIONS {
     SI_ATU_REGION_IDX_CMN,
     SI_ATU_REGION_IDX_CLUSTER_UTILITY,
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
     SI_ATU_REGION_IDX_SMD_EXPANSION,
+#endif
     SI_ATU_REGION_IDX_SYSTOP_PIK,
     SI_ATU_REGION_IDX_SYSTEM_ID,
     SI_ATU_REGION_IDX_CSS_COUNTERS_TIMERS,
@@ -82,10 +84,12 @@ static const atu_region_t si_atu_regions[SI_ATU_REGION_COUNT] = {
         .region_start_addr = (const uint32_t*)0xC1000000UL,
         .size = 0x800000UL,
     },
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
     [SI_ATU_REGION_IDX_SMD_EXPANSION] = {
         .region_start_addr = (const uint32_t*)0xD0000000UL,
         .size = 0x20000UL,
     },
+#endif
     [SI_ATU_REGION_IDX_SYSTOP_PIK] = {
         .region_start_addr = (const uint32_t*)0xD0020000UL,
         .size = 0x2000UL,

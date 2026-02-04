@@ -33,6 +33,10 @@ set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS TRUE)
 set(SCP_ENABLE_EXCEPTION_SYMTAB TRUE)
 set(SCP_EXCEPTION_SYMTAB_MAX_SIZE 131072)
 
+if (NOT DEFINED SCP_PLATFORM_VARIANT)
+    set(SCP_PLATFORM_VARIANT "fvp")
+endif()
+
 if (NOT DEFINED SCP_PC_CONFIGURED_CORES_COUNT)
     set(SCP_PC_CONFIGURED_CORES_COUNT 4)
 endif()
@@ -70,7 +74,15 @@ list(APPEND SCP_MODULES
     "ppu-v1"
     "gicx00-multiview"
     "gicx00"
+)
+
+if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
+list(APPEND SCP_MODULES
     "system-pll"
+)
+endif()
+
+list(APPEND SCP_MODULES
     "ros-clock"
     "clock"
     "gtimer"
@@ -99,6 +111,10 @@ list(APPEND SCP_MODULES
     "mock-psu"
     "psu"
     "fch-polled"
+)
+
+if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
+list(APPEND SCP_MODULES
     "smcf"
     "amu-smcf-drv"
     "sensor-smcf-drv"
@@ -106,14 +122,18 @@ list(APPEND SCP_MODULES
     "platform-smcf"
     "smcf-client"
 )
+endif()
 
 if(SCP_ENABLE_DEBUGGER)
     list(APPEND SCP_MODULES "debugger-cli"
         "integration-test"
         "test-fmu"
         "test-ssu"
-        "test-sbistc"
-        "test-smcf")
+        "test-sbistc")
+    if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
+        list(APPEND SCP_MODULES
+            "test-smcf")
+    endif()
 endif()
 
 if(SCP_ENABLE_SCMI_PFDI_MONITOR)

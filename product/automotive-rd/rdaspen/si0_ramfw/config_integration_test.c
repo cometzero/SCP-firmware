@@ -41,6 +41,7 @@ static const struct fwk_element config_integration_test_elements[] = {
             .num_test_cases = 32,
         },
     },
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
     [TEST_SMCF] = {
         .name = "smcf",
         .data = &(struct mod_integration_test_config){
@@ -49,6 +50,7 @@ static const struct fwk_element config_integration_test_elements[] = {
             .num_test_cases = 1,
         },
     },
+#endif
 
     [TEST_COUNT] = {0},
 };

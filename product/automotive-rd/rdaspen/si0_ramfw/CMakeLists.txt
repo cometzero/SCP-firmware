@@ -46,13 +46,16 @@ target_sources(rdaspen-si0-bl2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/config_psu.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_scmi_perf.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_mock_psu.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_clear_memory.c")
+
+if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
+target_sources(rdaspen-si0-bl2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/config_smcf.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_amu_smcf_drv.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_sensor_smcf_drv.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/config_sensor.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/config_smcf_client.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/config_clear_memory.c"
-    )
+    "${CMAKE_CURRENT_SOURCE_DIR}/config_smcf_client.c")
+endif()
 
 if(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS)
     target_sources(rdaspen-si0-bl2 PRIVATE
@@ -77,3 +80,6 @@ if(SCP_ENABLE_SCMI_PFDI_MONITOR)
         "${CMAKE_CURRENT_SOURCE_DIR}/config_pfdi_monitor.c"
         )
 endif()
+
+include(${CMAKE_CURRENT_LIST_DIR}/../rdaspen_variant.cmake)
+rdaspen_apply_platform_variant(rdaspen-si0-bl2)

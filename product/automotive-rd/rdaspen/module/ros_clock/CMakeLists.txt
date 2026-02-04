@@ -1,6 +1,6 @@
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -17,3 +17,6 @@ target_sources(
 
 target_link_libraries(${SCP_MODULE_TARGET}
                         PRIVATE module-clock module-power-domain)
+
+include(${CMAKE_CURRENT_LIST_DIR}/../../rdaspen_variant.cmake)
+rdaspen_apply_platform_variant(${SCP_MODULE_TARGET})
