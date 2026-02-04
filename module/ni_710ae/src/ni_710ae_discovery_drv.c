@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -101,6 +101,10 @@ int ni710ae_discovery(
 
     /* Fetch number of children */
     if (ni710ae_type_is_domain(cfg_node->type)) {
+        /* TODO: Skip this check if debug mode is enabled */
+        if ((cfg_node->type == NI710AE_NODE_TYPE_CD) && (cfg_node->id == 0x1)) {
+            return FWK_SUCCESS;
+        }
         child_count =
             ((struct ni710ae_domain_cfg_hdr *)(hdr_base))->child_node_info;
     } else if (ni710ae_type_is_component(cfg_node->type)) {
