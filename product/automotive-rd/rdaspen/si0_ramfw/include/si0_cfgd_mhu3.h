@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -14,13 +14,18 @@
 /* MHUv3 device indices */
 enum scp_cfgd_mod_mhu3_device_idx {
     SI0_CFGD_MOD_MHU3_EIDX_SI0_RSE,
-    SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_S,
+    SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_DOMAIN1_S,
+    SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_DOMAIN3_S,
     SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_NS,
     SI0_CFGD_MOD_MHU3_EIDX_COUNT
 };
 
-enum scp_cfgd_mod_mhu3_device_ap_si0_idx {
+enum scp_cfgd_mod_mhu3_device_ap_si0_domain1_idx {
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PSCI,
+    SI0_CFGD_MOD_MHU3_SI0_AP_DOMAIN1_S_EIDX_COUNT,
+};
+
+enum scp_cfgd_mod_mhu3_device_ap_si0_domain3_idx {
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_0,
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_1,
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_2,
@@ -37,7 +42,7 @@ enum scp_cfgd_mod_mhu3_device_ap_si0_idx {
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_1,
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_2,
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_3_CORE_3,
-    SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_COUNT,
+    SI0_CFGD_MOD_MHU3_SI0_AP_DOMAIN3_S_EIDX_COUNT,
 };
 
 #endif /* SI0_CFGD_MHU3_H */

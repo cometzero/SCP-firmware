@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -50,7 +50,7 @@
             .out_band_mailbox_size = SI0_SCMI_PFDI_MONITOR_SIZE_CORE, \
             .driver_id = FWK_ID_SUB_ELEMENT_INIT( \
                 FWK_MODULE_IDX_MHU3, \
-                SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_S, \
+                SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_DOMAIN3_S, \
                 SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_##cluster##_CORE_##core), \
             .driver_api_id = FWK_ID_API_INIT( \
                 FWK_MODULE_IDX_MHU3, MOD_MHU3_API_IDX_TRANSPORT_DRIVER), \
@@ -97,7 +97,7 @@ static const struct fwk_element element_table[]  = {
                 .driver_id =
                     FWK_ID_SUB_ELEMENT_INIT(
                         FWK_MODULE_IDX_MHU3,
-                        SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_S,
+                        SI0_CFGD_MOD_MHU3_EIDX_SI0_AP_DOMAIN1_S,
                         0),
                 .driver_api_id =
                     FWK_ID_API_INIT(
