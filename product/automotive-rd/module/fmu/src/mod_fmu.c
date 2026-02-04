@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -505,6 +505,7 @@ static int fmu_start(fwk_id_t id)
         return status;
     }
 
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
     status = fwk_interrupt_enable(config->irq_critical);
     if (status != FWK_SUCCESS) {
         return status;
@@ -514,6 +515,11 @@ static int fmu_start(fwk_id_t id)
     if (status != FWK_SUCCESS) {
         return status;
     }
+#else
+    FWK_LOG_WARN(MOD_NAME
+                 "FMU interrupts are disabled due to limitations in the RTL "
+                 "implementation!");
+#endif
 
     return FWK_SUCCESS;
 }
