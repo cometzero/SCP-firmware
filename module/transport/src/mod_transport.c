@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2022-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2022-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -306,6 +306,10 @@ static int transport_respond(
 
     channel_ctx->locked = false;
     buffer->length = (volatile uint32_t)(sizeof(buffer->message_header) + size);
+
+    /* Ensure length/payload is visible before releasing the mailbox */
+    __sync_synchronize();
+
     /* The mailbox status is relevant for out-band transport only */
     buffer->status |= MOD_TRANSPORT_MAILBOX_STATUS_FREE_MASK;
 
@@ -419,6 +423,9 @@ static int transport_transmit(
     }
 
     buffer->length = (volatile uint32_t)(sizeof(buffer->message_header) + size);
+
+    /* Ensure length/payload is visible before taking mailbox ownership */
+    __sync_synchronize();
     /* The mailbox status is relevant for out-band transport only */
     buffer->status &= ~MOD_TRANSPORT_MAILBOX_STATUS_FREE_MASK;
 
