@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -65,7 +65,7 @@ static const struct mod_dvfs_domain_config cpu_cluster0 = {
         FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_CLOCK, CFGD_MOD_CLOCK_EIDX_CORE),
     .alarm_id = FWK_ID_SUB_ELEMENT_INIT(
         FWK_MODULE_IDX_TIMER,
-        1,
+        SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
         SI0_CFGD_DVFS_ALARM_IDX_CLUSTER0),
     .retry_us = 1000,
     .latency = 1200,
@@ -79,7 +79,7 @@ static const struct mod_dvfs_domain_config cpu_cluster1 = {
         FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_CLOCK, CFGD_MOD_CLOCK_EIDX_CORE),
     .alarm_id = FWK_ID_SUB_ELEMENT_INIT(
         FWK_MODULE_IDX_TIMER,
-        1,
+        SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
         SI0_CFGD_DVFS_ALARM_IDX_CLUSTER1),
     .retry_us = 1000,
     .latency = 1200,
@@ -93,7 +93,7 @@ static const struct mod_dvfs_domain_config cpu_cluster2 = {
         FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_CLOCK, CFGD_MOD_CLOCK_EIDX_CORE),
     .alarm_id = FWK_ID_SUB_ELEMENT_INIT(
         FWK_MODULE_IDX_TIMER,
-        1,
+        SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
         SI0_CFGD_DVFS_ALARM_IDX_CLUSTER2),
     .retry_us = 1000,
     .latency = 1200,
@@ -107,7 +107,7 @@ static const struct mod_dvfs_domain_config cpu_cluster3 = {
         FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_CLOCK, CFGD_MOD_CLOCK_EIDX_CORE),
     .alarm_id = FWK_ID_SUB_ELEMENT_INIT(
         FWK_MODULE_IDX_TIMER,
-        1,
+        SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
         SI0_CFGD_DVFS_ALARM_IDX_CLUSTER3),
     .retry_us = 1000,
     .latency = 1200,

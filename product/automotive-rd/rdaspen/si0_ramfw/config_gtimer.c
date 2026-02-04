@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -49,25 +49,17 @@ static struct mod_gtimer_syscounter_impdef_config syscnt_impdef_cfg[] = {
 
 /* Generic timer driver config */
 static const struct fwk_element gtimer_dev_table[] = {
-    [0] = { .name = "REFCLK",
+    [0] = { .name = "SI0_TIMER",
             .data = &((struct mod_gtimer_dev_config){
-                .hw_timer = SI0_REFCLK_CNT_BASE,
-                .hw_counter = SI0_REFCLK_CNTCTL_BASE,
+                .hw_timer = SI0_TIMER_CNT_BASE_CL0,
+                .hw_counter = SI0_TIMER_CNTCTL_BASE,
                 .control = SI0_REFCLK_CNTCONTROL_BASE,
                 .frequency = CLOCK_RATE_REFCLK,
                 .clock_id = FWK_ID_NONE_INIT,
                 .syscnt_impdef_cfg = syscnt_impdef_cfg,
                 .syscnt_impdef_cfg_cnt = FWK_ARRAY_SIZE(syscnt_impdef_cfg),
             }) },
-    [1] = { .name = "SI0_TIMER",
-            .data = &((struct mod_gtimer_dev_config){
-                .hw_timer = SI0_TIMER_HW_TIMER,
-                .hw_counter = SI0_TIMER_HW_COUNTER,
-                .skip_cntcontrol_init = true,
-                .frequency = CLOCK_RATE_REFCLK,
-                .clock_id = FWK_ID_NONE_INIT,
-            }) },
-    [2] = { 0 },
+    [1] = { 0 },
 };
 
 const struct fwk_module_config config_gtimer = {

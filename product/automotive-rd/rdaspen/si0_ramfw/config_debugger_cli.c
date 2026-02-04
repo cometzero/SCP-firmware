@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -17,7 +17,7 @@
 static const struct mod_debugger_cli_module_config debugger_cli_data = {
     .alarm_id = FWK_ID_SUB_ELEMENT_INIT(
         FWK_MODULE_IDX_TIMER,
-        1,
+        SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
         SI0_CFGD_DEBUGGER_CLI_IDX),
     .poll_period = 100000
 };

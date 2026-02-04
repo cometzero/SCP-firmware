@@ -103,7 +103,7 @@
 static struct mod_fch_polled_config module_config = {
     .fch_alarm_id = FWK_ID_SUB_ELEMENT_INIT(
         FWK_MODULE_IDX_TIMER,
-        1,
+        SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
         SI0_CFGD_FAST_CHANNEL_TIMER_IDX),
     .fch_poll_rate = RDASPEN_FCH_RATE,
     .rate_limit = RDASPEN_FCH_RATE,
