@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -90,7 +90,7 @@ const struct fwk_module_config config_scmi_perf = {
         .domains = &domains,
         .perf_doms_count = FWK_ARRAY_SIZE(domains),
 #ifdef BUILD_HAS_SCMI_PERF_FAST_CHANNELS
-        .fast_channels_rate_limit = SCMI_PERF_FC_MIN_RATE_LIMIT
+        .fast_channels_rate_limit = RDASPEN_FCH_RATE,
 #endif
     }),
 };

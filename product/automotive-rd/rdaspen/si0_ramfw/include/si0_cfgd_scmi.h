@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -10,6 +10,8 @@
 
 #ifndef SI0_CFGD_SCMI_H
 #define SI0_CFGD_SCMI_H
+
+#define RDASPEN_FCH_RATE 40000
 
 /* SCMI agent identifier indexes in the SCMI agent table */
 enum si0_scmi_agent_idx {

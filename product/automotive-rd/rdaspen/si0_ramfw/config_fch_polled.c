@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -105,8 +105,8 @@ static struct mod_fch_polled_config module_config = {
         FWK_MODULE_IDX_TIMER,
         1,
         SI0_CFGD_FAST_CHANNEL_TIMER_IDX),
-    .fch_poll_rate = FCH_MIN_POLL_RATE_US,
-    .rate_limit = (4 * 1000),
+    .fch_poll_rate = RDASPEN_FCH_RATE,
+    .rate_limit = RDASPEN_FCH_RATE,
     .attributes = 0,
 };
 
