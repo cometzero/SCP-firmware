@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # Arm SCP/MCP Software
-# Copyright (c) 2021-2025, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2021-2026, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -125,7 +125,6 @@ class Product:
     name: str
     toolchains: List[Parameter] = field(default_factory=lambda: [
         Parameter('GNU'),
-        Parameter('ArmClang'),
         Parameter('Clang', ('-DSCP_LLVM_SYSROOT_CC=arm-none-eabi-gcc',)),
         ])
     build_types: List[Parameter] = field(default_factory=lambda: [
