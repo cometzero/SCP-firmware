@@ -111,6 +111,24 @@ struct mod_mhu3_channel_config si02ap_ns_dbch_config[] = {
 #endif
 };
 
+#if !RD_ASPEN_VARIANT_CFG1
+struct mod_mhu3_channel_config
+    si0_cl12cl0_dbch_config[SI0_CFGD_MOD_MHU3_SI0_CL1_EIDX_COUNT] = {
+        /* PBX CH 2, FLAG 0, MBX CH 2, FLAG 0 */
+        [SI0_CFGD_MOD_MHU3_SI0_CL1_EIDX_PFDI_MONITOR_SI_CL1_CORE0] =
+            MOD_MHU3_INIT_DBCH(2, 0, 2, 0),
+        /* PBX CH 3, FLAG 0, MBX CH 3, FLAG 0 */
+        [SI0_CFGD_MOD_MHU3_SI0_CL1_EIDX_PFDI_MONITOR_SI_CL1_CORE1] =
+            MOD_MHU3_INIT_DBCH(3, 0, 3, 0),
+        /* PBX CH 4, FLAG 0, MBX CH 4, FLAG 0 */
+        [SI0_CFGD_MOD_MHU3_SI0_CL1_EIDX_PFDI_MONITOR_SI_CL1_CORE2] =
+            MOD_MHU3_INIT_DBCH(4, 0, 4, 0),
+        /* PBX CH 5, FLAG 0, MBX CH 5, FLAG 0 */
+        [SI0_CFGD_MOD_MHU3_SI0_CL1_EIDX_PFDI_MONITOR_SI_CL1_CORE3] =
+            MOD_MHU3_INIT_DBCH(5, 0, 5, 0),
+    };
+#endif /* RD_ASPEN_VARIANT_CFG1 */
+
 /* Module element table */
 static const struct fwk_element mhu_element_table[]  = {
     [SI0_CFGD_MOD_MHU3_EIDX_SI0_RSE] = {
@@ -161,6 +179,20 @@ static const struct fwk_element mhu_element_table[]  = {
             .resp_wait_timeout_us = RESP_WAIT_TIMEOUT_US,
         },
     },
+#if !RD_ASPEN_VARIANT_CFG1
+    [SI0_CFGD_MOD_MHU3_EIDX_CL1_CL0] = {
+        .name = "SI0_CL1_CL0_MHU_DBCH",
+        .sub_element_count = FWK_ARRAY_SIZE(si0_cl12cl0_dbch_config),
+        .data = &(struct mod_mhu3_device_config) {
+            .irq = (unsigned int) CL0_MHU3_CL12CL0_IRQ,
+            .in = SI0_CL12CL0_MHUV3_RCV_BASE,
+            .out = SI0_CL02CL1_MHUV3_SEND_BASE,
+            .channels = si0_cl12cl0_dbch_config,
+            .timer_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
+            .resp_wait_timeout_us = RESP_WAIT_TIMEOUT_US,
+        },
+    },
+#endif /* RD_ASPEN_VARIANT_CFG1 */
     [SI0_CFGD_MOD_MHU3_EIDX_COUNT] = { 0 },
 };
 

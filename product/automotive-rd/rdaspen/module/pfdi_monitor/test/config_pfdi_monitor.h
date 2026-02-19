@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -36,6 +36,9 @@ enum si0_mod_pfdi_monitor_element_idx {
                 FWK_MODULE_IDX_TIMER, \
                 SI0_SI0_TIMER_ALARM_ELEMENT_IDX, \
                 SI0_PFDI_MONITOR_ALARM_IDX_CORE##core), \
+            .pd_source_id = FWK_ID_ELEMENT_INIT( \
+                FWK_MODULE_IDX_POWER_DOMAIN, \
+                SI0_MOD_PFDI_MONITOR_EIDX_CORE_##core), \
             .oor_pfdi_period_us = PFDI_OOR_PERIOD_US, \
             .onl_pfdi_period_us = PFDI_ONL_PERIOD_US, \
             .boot_timeout_us = PFDI_BOOT_PERIOD_US, \

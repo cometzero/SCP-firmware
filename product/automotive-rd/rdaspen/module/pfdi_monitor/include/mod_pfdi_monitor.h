@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -63,6 +63,8 @@ struct mod_pfdi_monitor_api {
 struct mod_pfdi_monitor_core_config {
     /*! Alarm identifier */
     fwk_id_t alarm_id;
+    /*! Power domain id to subscribe to for power state change notifications */
+    fwk_id_t pd_source_id;
     /*! The out-of-reset PFDI alarm interval in microseconds */
     unsigned int oor_pfdi_period_us;
     /*! The timeout for the first online PFDI in microseconds */

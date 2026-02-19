@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -37,6 +37,26 @@
             .scmi_p2a_id = FWK_ID_NONE_INIT, \
         }), \
     }
+
+#if !RD_ASPEN_VARIANT_CFG1
+#    define SCMI_PFDI_MONITOR_SI_CL1(core) \
+        { \
+            .name = "SCMI_PFDI_MONITOR_SI_CLUSTER1_CORE_" #core, \
+            .data = &((struct mod_scmi_service_config){ \
+                .transport_id = FWK_ID_ELEMENT_INIT( \
+                    FWK_MODULE_IDX_TRANSPORT, \
+                    SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_##core), \
+                .transport_api_id = FWK_ID_API_INIT( \
+                    FWK_MODULE_IDX_TRANSPORT, \
+                    MOD_TRANSPORT_API_IDX_SCMI_TO_TRANSPORT), \
+                .transport_notification_init_id = FWK_ID_NOTIFICATION_INIT( \
+                    FWK_MODULE_IDX_TRANSPORT, \
+                    MOD_TRANSPORT_NOTIFICATION_IDX_INITIALIZED), \
+                .scmi_agent_id = SI0_SCMI_AGENT_IDX_PFDI_MONITOR, \
+                .scmi_p2a_id = FWK_ID_NONE_INIT, \
+            }), \
+        }
+#endif /* RD_ASPEN_VARIANT_CFG1 */
 
 static const struct fwk_element service_table[SI0_CFGD_MOD_SCMI_EIDX_COUNT + 1] = {
     [SI0_CFGD_MOD_SCMI_EIDX_RSE] = {
@@ -94,6 +114,12 @@ static const struct fwk_element service_table[SI0_CFGD_MOD_SCMI_EIDX_COUNT + 1] 
         }),
     },
 #endif
+#if !RD_ASPEN_VARIANT_CFG1
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_0] = SCMI_PFDI_MONITOR_SI_CL1(0),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_1] = SCMI_PFDI_MONITOR_SI_CL1(1),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_2] = SCMI_PFDI_MONITOR_SI_CL1(2),
+    [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_3] = SCMI_PFDI_MONITOR_SI_CL1(3),
+#endif /* RD_ASPEN_VARIANT_CFG1 */
     [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_0] = SCMI_PFDI_MONITOR_AP(0, 0),
     [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_1] = SCMI_PFDI_MONITOR_AP(0, 1),
     [SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_2] = SCMI_PFDI_MONITOR_AP(0, 2),

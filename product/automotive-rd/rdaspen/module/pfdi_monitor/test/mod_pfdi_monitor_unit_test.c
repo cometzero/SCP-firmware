@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -92,7 +92,11 @@ void pfdi_monitor_state_machine(void)
     TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
 
     for (uint32_t idx = 0; idx < SI0_MOD_PFDI_MONITOR_EIDX_COUNT; idx++) {
+        const struct mod_pfdi_monitor_core_config *core_cfg =
+            (const struct mod_pfdi_monitor_core_config *)element_table[idx]
+                .data;
         fwk_id_t element_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_PFDI_MONITOR, idx);
+        fwk_id_t pd_transition_source_id = core_cfg->pd_source_id;
 
         fwk_id_get_element_idx_ExpectAndReturn(element_id, idx);
 
@@ -124,11 +128,6 @@ void pfdi_monitor_state_machine(void)
         fwk_id_is_type_ExpectAndReturn(element_id, FWK_ID_TYPE_MODULE, false);
         fwk_id_get_element_idx_IgnoreAndReturn(idx);
         fwk_module_get_element_name_IgnoreAndReturn("Test");
-
-        fwk_id_t pd_transition_source_id =
-            FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, idx);
-        fwk_id_build_element_id_ExpectAndReturn(
-            fwk_module_id_power_domain, idx, pd_transition_source_id);
 
         fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
             FWK_MODULE_IDX_POWER_DOMAIN,

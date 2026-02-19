@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -30,7 +30,28 @@
         }), \
     }
 
+#if !RD_ASPEN_VARIANT_CFG1
+#    define SCMI_PFDI_MONITOR_SI_CL1(core) \
+        { \
+            .name = "SI cluster 1 core " #core, \
+            .data = &((const struct mod_scmi_pfdi_monitor_core_config){ \
+                .scmi_service_id = FWK_ID_ELEMENT_INIT( \
+                    FWK_MODULE_IDX_SCMI, \
+                    SI0_CFGD_MOD_SCMI_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_##core), \
+                .pfdi_monitor_id = FWK_ID_ELEMENT_INIT( \
+                    FWK_MODULE_IDX_PFDI_MONITOR, \
+                    SI0_CFGD_MOD_PFDI_MONITOR_EIDX_SI_CLUSTER1_CORE_##core), \
+            }), \
+        }
+#endif /* RD_ASPEN_VARIANT_CFG1 */
+
 static const struct fwk_element element_table[] = {
+#if !RD_ASPEN_VARIANT_CFG1
+    SCMI_PFDI_MONITOR_SI_CL1(0),
+    SCMI_PFDI_MONITOR_SI_CL1(1),
+    SCMI_PFDI_MONITOR_SI_CL1(2),
+    SCMI_PFDI_MONITOR_SI_CL1(3),
+#endif /* RD_ASPEN_VARIANT_CFG1 */
     SCMI_PFDI_MONITOR_AP(0, 0),
     SCMI_PFDI_MONITOR_AP(0, 1),
     SCMI_PFDI_MONITOR_AP(0, 2),

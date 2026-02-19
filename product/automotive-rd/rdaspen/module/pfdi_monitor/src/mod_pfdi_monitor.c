@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -205,7 +205,6 @@ static int pfdi_monitor_start(fwk_id_t id)
     struct pfdi_monitor_core_context *core_ctx;
     const struct mod_pfdi_monitor_core_config *core_cfg;
     unsigned int element_idx;
-    fwk_id_t pd_transition_source_id;
 
     if (fwk_id_is_type(id, FWK_ID_TYPE_MODULE)) {
         return FWK_SUCCESS;
@@ -213,11 +212,15 @@ static int pfdi_monitor_start(fwk_id_t id)
 
     element_idx = fwk_id_get_element_idx(id);
 
-    pd_transition_source_id =
-        fwk_id_build_element_id(fwk_module_id_power_domain, element_idx);
+    if (element_idx >= ctx.core_count) {
+        return FWK_E_PARAM;
+    }
+
+    core_ctx = &ctx.core_ctx_table[element_idx];
+    core_cfg = core_ctx->core_cfg;
 
     status = fwk_notification_subscribe(
-        pd_transition_notification_id, pd_transition_source_id, id);
+        pd_transition_notification_id, core_cfg->pd_source_id, id);
     if (status != FWK_SUCCESS) {
         FWK_LOG_ERR(
             MOD_NAME "Failed to subscribe to Power Domain notification for %s",
@@ -228,12 +231,6 @@ static int pfdi_monitor_start(fwk_id_t id)
             fwk_module_get_element_name(id));
     }
 
-    if (element_idx >= ctx.core_count) {
-        return FWK_E_PARAM;
-    }
-
-    core_ctx = &ctx.core_ctx_table[element_idx];
-    core_cfg = core_ctx->core_cfg;
     status = core_ctx->alarm_api->start(
         core_cfg->alarm_id,
         core_cfg->oor_pfdi_period_us,

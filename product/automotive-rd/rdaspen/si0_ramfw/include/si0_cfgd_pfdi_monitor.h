@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -12,6 +12,12 @@
 #define SI0_CFGD_PFDI_MONITOR_H
 
 enum si0_cfgd_mod_pfdi_monitor_element_idx {
+#if !RD_ASPEN_VARIANT_CFG1
+    SI0_CFGD_MOD_PFDI_MONITOR_EIDX_SI_CLUSTER1_CORE_0,
+    SI0_CFGD_MOD_PFDI_MONITOR_EIDX_SI_CLUSTER1_CORE_1,
+    SI0_CFGD_MOD_PFDI_MONITOR_EIDX_SI_CLUSTER1_CORE_2,
+    SI0_CFGD_MOD_PFDI_MONITOR_EIDX_SI_CLUSTER1_CORE_3,
+#endif /* RD_ASPEN_VARIANT_CFG1 */
     SI0_CFGD_MOD_PFDI_MONITOR_EIDX_AP_CLUSTER_0_CORE_0,
     SI0_CFGD_MOD_PFDI_MONITOR_EIDX_AP_CLUSTER_0_CORE_1,
     SI0_CFGD_MOD_PFDI_MONITOR_EIDX_AP_CLUSTER_0_CORE_2,

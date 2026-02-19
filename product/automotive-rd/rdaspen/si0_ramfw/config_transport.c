@@ -56,6 +56,28 @@
                 FWK_MODULE_IDX_MHU3, MOD_MHU3_API_IDX_TRANSPORT_DRIVER), \
         }), \
     }
+#if !RD_ASPEN_VARIANT_CFG1
+#    define TRANSPORT_PFDI_MONITOR_SI_CL1(core) \
+        { \
+            .name = "TRANSPORT_PFDI_MONITOR_SI_CLUSTER1_CORE_" #core, \
+            .data = &((struct mod_transport_channel_config){ \
+                .transport_type = \
+                    MOD_TRANSPORT_CHANNEL_TRANSPORT_TYPE_OUT_BAND, \
+                .policies = TRANSPORT_CH_SEC_MBX_INIT, \
+                .channel_type = MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER, \
+                .out_band_mailbox_address = \
+                    (uintptr_t)SI0_SCMI_PFDI_MONITOR_CL1_2_CL0_BASE + \
+                    ((core)*SI0_SCMI_PFDI_MONITOR_SIZE_CORE), \
+                .out_band_mailbox_size = SI0_SCMI_PFDI_MONITOR_SIZE_CORE, \
+                .driver_id = FWK_ID_SUB_ELEMENT_INIT( \
+                    FWK_MODULE_IDX_MHU3, \
+                    SI0_CFGD_MOD_MHU3_EIDX_CL1_CL0, \
+                    SI0_CFGD_MOD_MHU3_SI0_CL1_EIDX_PFDI_MONITOR_SI_CL1_CORE##core), \
+                .driver_api_id = FWK_ID_API_INIT( \
+                    FWK_MODULE_IDX_MHU3, MOD_MHU3_API_IDX_TRANSPORT_DRIVER), \
+            }), \
+        }
+#endif /* RD_ASPEN_VARIANT_CFG1 */
 
 /* Module 'transport' element configuration table */
 static const struct fwk_element element_table[]  = {
@@ -133,6 +155,12 @@ static const struct fwk_element element_table[]  = {
         }),
     },
 #endif
+#if !RD_ASPEN_VARIANT_CFG1
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_0] = TRANSPORT_PFDI_MONITOR_SI_CL1(0),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_1] = TRANSPORT_PFDI_MONITOR_SI_CL1(1),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_2] = TRANSPORT_PFDI_MONITOR_SI_CL1(2),
+    [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_SI_CLUSTER1_CORE_3] = TRANSPORT_PFDI_MONITOR_SI_CL1(3),
+#endif /* RD_ASPEN_VARIANT_CFG1 */
     [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_0] = TRANSPORT_PFDI_MONITOR_AP(0, 0),
     [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_1] = TRANSPORT_PFDI_MONITOR_AP(0, 1),
     [SI0_CFGD_MOD_TRANSPORT_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_2] = TRANSPORT_PFDI_MONITOR_AP(0, 2),
