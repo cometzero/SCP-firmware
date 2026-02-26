@@ -22,8 +22,24 @@ function(rdaspen_apply_platform_variant target)
         target_compile_definitions(${target}
             PUBLIC PLATFORM_VARIANT=RD_ASPEN_VARIANT_FVP)
     elseif(SCP_PLATFORM_VARIANT STREQUAL "rtl")
-        target_compile_definitions(${target}
-            PUBLIC PLATFORM_VARIANT=RD_ASPEN_VARIANT_RTL)
+        if(SCP_RTL_VARIANT STREQUAL "fpga")
+            target_compile_definitions(${target}
+                PUBLIC
+                    PLATFORM_VARIANT=RD_ASPEN_VARIANT_RTL
+                    RD_ASPEN_RTL_VARIANT_FPGA=0
+                    RD_ASPEN_RTL_VARIANT_EMU=1
+                    RD_ASPEN_RTL_VARIANT=RD_ASPEN_RTL_VARIANT_FPGA)
+        elseif(SCP_RTL_VARIANT STREQUAL "emu")
+            target_compile_definitions(${target}
+                PUBLIC
+                    PLATFORM_VARIANT=RD_ASPEN_VARIANT_RTL
+                    RD_ASPEN_RTL_VARIANT_FPGA=0
+                    RD_ASPEN_RTL_VARIANT_EMU=1
+                    RD_ASPEN_RTL_VARIANT=RD_ASPEN_RTL_VARIANT_EMU)
+        else()
+            message(FATAL_ERROR
+                "Unknown SCP_RTL_VARIANT='${SCP_RTL_VARIANT}'.Expected 'emu' or 'fpga'.")
+        endif()
     else()
         message(FATAL_ERROR
             "Unknown SCP_PLATFORM_VARIANT='${SCP_PLATFORM_VARIANT}'.Expected 'fvp' or 'rtl'.")
