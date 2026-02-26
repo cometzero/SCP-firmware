@@ -18,14 +18,26 @@
 #include <fwk_module.h>
 #include <fwk_time.h>
 
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_RTL) && \
+    (RD_ASPEN_RTL_VARIANT == RD_ASPEN_RTL_VARIANT_FPGA)
 /* REF_CLK input clock speed */
-#define CLOCK_RATE_REFCLK (125UL * FWK_MHZ)
+#    define CLOCK_RATE_REFCLK (10UL * FWK_MHZ)
+
+/*
+ * System Counter per-tick increment value required for 1GHz clock speed
+ * (1GHz / CLOCK_RATE_REFCLK) = 100.
+ */
+#    define SYSCNT_INCR 100
+#else
+/* REF_CLK input clock speed */
+#    define CLOCK_RATE_REFCLK (125UL * FWK_MHZ)
 
 /*
  * System Counter per-tick increment value required for 1GHz clock speed
  * (1GHz / CLOCK_RATE_REFCLK) = 8.
  */
-#define SYSCNT_INCR 8
+#    define SYSCNT_INCR       8
+#endif
 
 /*
  * Offsets of the system counter implementation defined registers.
