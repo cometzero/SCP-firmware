@@ -68,6 +68,8 @@ static const struct mod_gicx00_multiview_spi_map si_spi_map[] = {
     { CL1_SYSTEM_TIMER_IRQ, MOD_GICX00_MULTIVIEW_VIEW_2 },
     { CL1_SYSTEM_WDT_IRQ, MOD_GICX00_MULTIVIEW_VIEW_2 },
     { CL1_UART_IRQ, MOD_GICX00_MULTIVIEW_VIEW_2 },
+    { CL1_MHU3_CL1_PC_TX_IRQ, MOD_GICX00_MULTIVIEW_VIEW_2 },
+    { CL1_MHU3_PC_CL1_RX_IRQ, MOD_GICX00_MULTIVIEW_VIEW_2 },
 };
 
 /* Application Processor redistributor to view mapping table */

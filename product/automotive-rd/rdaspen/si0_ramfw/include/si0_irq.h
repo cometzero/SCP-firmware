@@ -40,6 +40,8 @@ typedef enum IRQn {
     CL1_SYSTEM_TIMER_IRQ = 33,
     CL1_SYSTEM_WDT_IRQ = 36,
     CL1_UART_IRQ = 39,
+    CL1_MHU3_CL1_PC_TX_IRQ = 72,
+    CL1_MHU3_PC_CL1_RX_IRQ = 73,
 
     IRQn_MAX = INT16_MAX,
 } IRQn_Type;
