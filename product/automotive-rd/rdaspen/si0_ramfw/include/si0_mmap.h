@@ -226,7 +226,7 @@ static_assert(
 #define SI0_AP_PERIPHERAL_SRAM_SHARED_SECURE_SIZE (8 * FWK_KIB)
 
 /* Non-secure Shared memory offset between AP and SI0 for SCMI */
-#define SI0_AP_PERIPHERAL_SRAM_SHARED_NONSECURE_OFFSET (0x104000UL)
+#define SI0_AP_PERIPHERAL_SRAM_SHARED_NONSECURE_OFFSET (0x180000UL)
 
 /* Non secure shared memory between AP and SI0 */
 #define SI0_AP_PERIPHERAL_SRAM_SHARED_NONSECURE_BASE \
