@@ -24,9 +24,33 @@
 #include "Mocksi0_platform.h"
 #include "config_si0_platform.h"
 
+static int mock_sds_struct_write_status = FWK_SUCCESS;
+static uint32_t mock_sds_struct_write_structure_id;
+static unsigned int mock_sds_struct_write_offset;
+static uint32_t mock_sds_struct_write_data;
+static size_t mock_sds_struct_write_size;
+
+static int mock_sds_struct_write(
+    uint32_t structure_id,
+    unsigned int offset,
+    const void *data,
+    size_t size)
+{
+    mock_sds_struct_write_structure_id = structure_id;
+    mock_sds_struct_write_offset = offset;
+    mock_sds_struct_write_data = *(const uint32_t *)data;
+    mock_sds_struct_write_size = size;
+
+    return mock_sds_struct_write_status;
+}
+
 void setUp(void)
 {
-    /* Do Nothing */
+    mock_sds_struct_write_status = FWK_SUCCESS;
+    mock_sds_struct_write_structure_id = 0U;
+    mock_sds_struct_write_offset = 0U;
+    mock_sds_struct_write_data = 0U;
+    mock_sds_struct_write_size = 0U;
 }
 
 void tearDown(void)
@@ -234,6 +258,84 @@ void test_si0_platform_mod_start_pd_trans_fail_notification(void)
     TEST_ASSERT_EQUAL(status, FWK_E_PANIC);
 }
 
+/*!
+ * \brief SI0 Platform unit test: update_sds_reset_syndrome(),
+ *
+ *  \details Test successful reset syndrome write to SDS
+ */
+void test_update_sds_reset_syndrome_success(void)
+{
+    int status;
+    const uint32_t reset_syndrome = 0x8U;
+    const struct mod_sds_structure_desc sds_structure_desc = {
+        .id = SDS_RESET_SYNDROME_STRUCT_ID,
+        .size = sizeof(reset_syndrome),
+    };
+    static const struct mod_sds_api sds_api = {
+        .struct_write = mock_sds_struct_write,
+    };
+
+    si0_platform_ctx.sds_api = &sds_api;
+    fwk_module_get_data_ExpectAndReturn(
+        sds_reset_syndrome_id, &sds_structure_desc);
+
+    status = update_sds_reset_syndrome(reset_syndrome);
+
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
+    TEST_ASSERT_EQUAL(
+        sds_structure_desc.id, mock_sds_struct_write_structure_id);
+    TEST_ASSERT_EQUAL(0U, mock_sds_struct_write_offset);
+    TEST_ASSERT_EQUAL(reset_syndrome, mock_sds_struct_write_data);
+    TEST_ASSERT_EQUAL(sizeof(reset_syndrome), mock_sds_struct_write_size);
+}
+
+/*!
+ * \brief SI0 Platform unit test: update_sds_reset_syndrome(),
+ *
+ *  \details Test failure when SDS structure descriptor is unavailable
+ */
+void test_update_sds_reset_syndrome_fail_null_sds_desc(void)
+{
+    int status;
+    static const struct mod_sds_api sds_api = {
+        .struct_write = mock_sds_struct_write,
+    };
+
+    si0_platform_ctx.sds_api = &sds_api;
+    fwk_module_get_data_ExpectAndReturn(sds_reset_syndrome_id, NULL);
+
+    status = update_sds_reset_syndrome(0x8U);
+
+    TEST_ASSERT_EQUAL(FWK_E_DATA, status);
+}
+
+/*!
+ * \brief SI0 Platform unit test: update_sds_reset_syndrome(),
+ *
+ *  \details Test failure when SDS write operation fails
+ */
+void test_update_sds_reset_syndrome_fail_struct_write(void)
+{
+    int status;
+    const uint32_t reset_syndrome = 0x8U;
+    const struct mod_sds_structure_desc sds_structure_desc = {
+        .id = SDS_RESET_SYNDROME_STRUCT_ID,
+        .size = sizeof(reset_syndrome),
+    };
+    static const struct mod_sds_api sds_api = {
+        .struct_write = mock_sds_struct_write,
+    };
+
+    mock_sds_struct_write_status = FWK_E_DEVICE;
+    si0_platform_ctx.sds_api = &sds_api;
+    fwk_module_get_data_ExpectAndReturn(
+        sds_reset_syndrome_id, &sds_structure_desc);
+
+    status = update_sds_reset_syndrome(reset_syndrome);
+
+    TEST_ASSERT_EQUAL(FWK_E_DEVICE, status);
+}
+
 int si0_platform_test_main(void)
 {
     UNITY_BEGIN();
@@ -244,6 +346,9 @@ int si0_platform_test_main(void)
     RUN_TEST(test_si0_platform_mod_start_success);
     RUN_TEST(test_si0_platform_mod_start_pre_warmreset_fail_notification);
     RUN_TEST(test_si0_platform_mod_start_pd_trans_fail_notification);
+    RUN_TEST(test_update_sds_reset_syndrome_success);
+    RUN_TEST(test_update_sds_reset_syndrome_fail_null_sds_desc);
+    RUN_TEST(test_update_sds_reset_syndrome_fail_struct_write);
 
     return UNITY_END();
 }

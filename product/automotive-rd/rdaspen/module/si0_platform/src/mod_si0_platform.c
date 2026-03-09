@@ -12,10 +12,12 @@
 #include "platform_core.h"
 #include "si0_cfgd_power_domain.h"
 #include "si0_cfgd_scmi.h"
+#include "si0_cfgd_sds.h"
 
 #include <mod_power_domain.h>
 #include <mod_ppu_v1.h>
 #include <mod_scmi.h>
+#include <mod_sds.h>
 #include <mod_si0_platform.h>
 #include <mod_transport.h>
 
@@ -38,6 +40,12 @@ static fwk_id_t pd_transition_notification_id = FWK_ID_NOTIFICATION_INIT(
     MOD_PD_NOTIFICATION_IDX_POWER_STATE_TRANSITION);
 #endif /* BUILD_HAS_NOTIFICATION */
 
+#define SI0_WARM_RESET_SYNDROME_VALUE (0x8U)
+
+static const fwk_id_t sds_reset_syndrome_id = FWK_ID_ELEMENT_INIT(
+    FWK_MODULE_IDX_SDS,
+    SI0_CFGD_MOD_SDS_EIDX_RESET_SYNDROME);
+
 /* Module context */
 struct si0_platform_ctx {
     /* Pointer to the Interrupt Service Routine API of the PPU_V1 module */
@@ -45,6 +53,9 @@ struct si0_platform_ctx {
 
     /* Power domain module restricted API pointer */
     struct mod_pd_restricted_api *mod_pd_restricted_api;
+
+    /* SDS API pointer */
+    const struct mod_sds_api *sds_api;
 
     /* Config containig data required for platform initialization */
     const struct mod_si0_platform_config *config;
@@ -125,6 +136,30 @@ static int si0_platform_mod_init(
     return FWK_SUCCESS;
 }
 
+static int update_sds_reset_syndrome(uint32_t reset_syndrome)
+{
+    int status;
+    const struct mod_sds_structure_desc *sds_structure_desc =
+        fwk_module_get_data(sds_reset_syndrome_id);
+
+    if (sds_structure_desc == NULL) {
+        return FWK_E_DATA;
+    }
+
+    status = si0_platform_ctx.sds_api->struct_write(
+        sds_structure_desc->id, 0, &reset_syndrome, sizeof(reset_syndrome));
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR(
+            "[SI0 PLATFORM] SDS reset syndrome write failed, status=%d",
+            status);
+        return status;
+    }
+
+    FWK_LOG_INFO("[SI0 PLATFORM] SDS reset syndrome updated successfully");
+
+    return FWK_SUCCESS;
+}
+
 static int si0_platform_bind(fwk_id_t id, unsigned int round)
 {
     int status;
@@ -156,6 +191,14 @@ static int si0_platform_bind(fwk_id_t id, unsigned int round)
         FWK_ID_MODULE(FWK_MODULE_IDX_PPU_V1),
         FWK_ID_API(FWK_MODULE_IDX_PPU_V1, MOD_PPU_V1_API_IDX_ISR),
         &si0_platform_ctx.ppu_v1_isr_api);
+    if (status != FWK_SUCCESS) {
+        return status;
+    }
+
+    status = fwk_module_bind(
+        FWK_ID_MODULE(FWK_MODULE_IDX_SDS),
+        FWK_ID_API(FWK_MODULE_IDX_SDS, 0),
+        &si0_platform_ctx.sds_api);
     if (status != FWK_SUCCESS) {
         return status;
     }
@@ -458,6 +501,15 @@ static int si0_platform_process_event(
             }
 
             reset_scmi_mailboxes();
+
+            status = update_sds_reset_syndrome(SI0_WARM_RESET_SYNDROME_VALUE);
+            if (status != FWK_SUCCESS) {
+                FWK_LOG_ERR(
+                    "[SI0 PLATFORM] Failed to update SDS reset syndrome, "
+                    "returned %d",
+                    status);
+                return status;
+            }
 
             /*
              * All the CPU power domain are powered off. Start the process to

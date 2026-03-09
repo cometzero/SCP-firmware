@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,6 +10,7 @@
 
 enum fwk_module_idx {
     FWK_MODULE_IDX_SI0_PLATFORM,
+    FWK_MODULE_IDX_SDS,
     FWK_MODULE_IDX_TRANSPORT,
     FWK_MODULE_IDX_TIMER,
     FWK_MODULE_IDX_PPU_V1,
@@ -20,6 +21,9 @@ enum fwk_module_idx {
 
 static const fwk_id_t fwk_module_id_si0_platform =
     FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM);
+
+static const fwk_id_t fwk_module_id_sds =
+    FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SDS);
 
 static const fwk_id_t fwk_module_id_transport =
     FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TRANSPORT);
