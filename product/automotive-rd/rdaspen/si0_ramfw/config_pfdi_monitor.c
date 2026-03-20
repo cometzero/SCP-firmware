@@ -42,7 +42,7 @@ static struct mod_pfdi_monitor_core_config
                 [SI0_CFGD_MOD_PFDI_MONITOR_EIDX_AP_CLUSTER_##cluster##_CORE_##core], \
     }
 
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
 #    define PFDI_MONITOR_SICL1_CORE(core) \
         { \
             .name = "SI cluster 1 core " #core, \
@@ -53,7 +53,7 @@ static struct mod_pfdi_monitor_core_config
 #endif /* RD_ASPEN_VARIANT_CFG1 */
 
 static struct fwk_element element_table[] = {
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
     [SI0_CFGD_MOD_PFDI_MONITOR_EIDX_SI_CLUSTER1_CORE_0] =
         PFDI_MONITOR_SICL1_CORE(0),
     [SI0_CFGD_MOD_PFDI_MONITOR_EIDX_SI_CLUSTER1_CORE_1] =
@@ -104,7 +104,7 @@ static const struct fwk_element *get_pfdi_monitor_element_table(fwk_id_t unused)
     unsigned int cluster;
     unsigned int ap_core_idx;
     unsigned int element_idx;
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
     unsigned int si_pd_base_idx;
 
     /*
@@ -159,7 +159,7 @@ static const struct fwk_element *get_pfdi_monitor_element_table(fwk_id_t unused)
         }
     }
 
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
     element_table[PC_CONFIGURED_CORES_COUNT + SI1_CORE_COUNT].name = NULL;
 #else
     element_table[PC_CONFIGURED_CORES_COUNT].name = NULL;

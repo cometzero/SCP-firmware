@@ -30,7 +30,7 @@
         }), \
     }
 
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
 #    define SCMI_PFDI_MONITOR_SI_CL1(core) \
         { \
             .name = "SI cluster 1 core " #core, \
@@ -46,7 +46,7 @@
 #endif /* RD_ASPEN_VARIANT_CFG1 */
 
 static const struct fwk_element element_table[] = {
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
     SCMI_PFDI_MONITOR_SI_CL1(0),
     SCMI_PFDI_MONITOR_SI_CL1(1),
     SCMI_PFDI_MONITOR_SI_CL1(2),

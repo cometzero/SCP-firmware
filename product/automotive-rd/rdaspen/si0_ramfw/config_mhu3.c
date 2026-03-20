@@ -111,7 +111,7 @@ struct mod_mhu3_channel_config si02ap_ns_dbch_config[] = {
 #endif
 };
 
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
 struct mod_mhu3_channel_config
     si0_cl12cl0_dbch_config[SI0_CFGD_MOD_MHU3_SI0_CL1_EIDX_COUNT] = {
         /* PBX CH 2, FLAG 0, MBX CH 2, FLAG 0 */
@@ -179,7 +179,7 @@ static const struct fwk_element mhu_element_table[]  = {
             .resp_wait_timeout_us = RESP_WAIT_TIMEOUT_US,
         },
     },
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
     [SI0_CFGD_MOD_MHU3_EIDX_CL1_CL0] = {
         .name = "SI0_CL1_CL0_MHU_DBCH",
         .sub_element_count = FWK_ARRAY_SIZE(si0_cl12cl0_dbch_config),

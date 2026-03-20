@@ -112,7 +112,7 @@ static struct mod_armv8r_mpu_region mem_regions[] = {
           PRLAR_NS_SECURE,
           MPU_ATTR_2,
           PRLAR_EN_ENABLED) },
-#if !RD_ASPEN_VARIANT_CFG1
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP) && (!RD_ASPEN_VARIANT_CFG1)
     { .prbar = PRBAR_VALUE(
           SI0_SHARED_SRAM_BANK1_BASE,
           PRBAR_SH_OUTER_SHAREABLE,
