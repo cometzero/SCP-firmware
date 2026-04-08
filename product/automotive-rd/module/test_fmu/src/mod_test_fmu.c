@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -90,12 +90,12 @@ static int test_inject(unsigned int step_idx, const struct fwk_event *event)
     switch (step_idx) {
     case STEP_START:
         fault.device_idx = fwk_id_get_element_idx(root_fmu);
-        fault.node_idx = 0;
+        fault.node_idx = 1;
         fault.sm_idx = MOD_FMU_SM_ALL;
         status = fmu_api->set_enabled(&fault, true);
         TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
 
-        /* Inject a critical fault */
+        /* Inject a non critical fault */
         fault.sm_idx = MOD_FMU_SM_SYSTEM_INPUT_ERROR;
         status = fmu_api->inject(&fault);
         fmu_inject_flag = true;
@@ -108,13 +108,13 @@ static int test_inject(unsigned int step_idx, const struct fwk_event *event)
                      event_params->fmu_params;
         TEST_ASSERT_EQUAL(
             fwk_id_get_element_idx(root_fmu), params->fault.device_idx);
-        TEST_ASSERT_EQUAL(0, params->fault.node_idx);
+        TEST_ASSERT_EQUAL(1, params->fault.node_idx);
         TEST_ASSERT_EQUAL(MOD_FMU_SM_SYSTEM_INPUT_ERROR, params->fault.sm_idx);
-        TEST_ASSERT_TRUE(params->critical);
+        TEST_ASSERT_FALSE(params->critical);
 
-        /* Inject a non-critical fault */
+        /* Inject a critical fault */
         fault.device_idx = 0;
-        fault.node_idx = 1;
+        fault.node_idx = 0;
         fault.sm_idx = MOD_FMU_SM_ALL;
         status = fmu_api->set_enabled(&fault, true);
         TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
@@ -130,9 +130,9 @@ static int test_inject(unsigned int step_idx, const struct fwk_event *event)
                      event_params->fmu_params;
         TEST_ASSERT_EQUAL(
             fwk_id_get_element_idx(root_fmu), params->fault.device_idx);
-        TEST_ASSERT_EQUAL(1, params->fault.node_idx);
+        TEST_ASSERT_EQUAL(0, params->fault.node_idx);
         TEST_ASSERT_EQUAL(MOD_FMU_SM_SYSTEM_INPUT_ERROR, params->fault.sm_idx);
-        TEST_ASSERT_FALSE(params->critical);
+        TEST_ASSERT_TRUE(params->critical);
 
         /* Inject a non-critical fault to an upstream FMU */
         fault.device_idx = fwk_id_get_element_idx(fmu1);
