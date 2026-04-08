@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -29,12 +29,12 @@ enum fmu_device {
     SI0_CL0_PC2_MHU_FMU,
     SI0_PC3_CL0_MHU_FMU,
     SI0_CL0_PC3_MHU_FMU,
-    SI0_CL0_NI710AE_FMU,
-    SI0_CL1_NI710AE_FMU,
-    SI0_CL2_NI710AE_FMU,
-    SI0_CL3_NI710AE_FMU,
-    SI0_SYS_CTL_NI710AE_FMU,
-    SI0_SMB_NI710AE_FMU,
+    AP_CL0_NI710AE_FMU,
+    AP_CL1_NI710AE_FMU,
+    AP_CL2_NI710AE_FMU,
+    AP_CL3_NI710AE_FMU,
+    INT_SYS_CTL_NI710AE_FMU,
+    SMB_NI710AE_FMU,
     SI0_FMU_COUNT,
 };
 
@@ -198,8 +198,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
         }),
     },
 
-    [SI0_CL0_NI710AE_FMU] = {
-        .name = "SI0_CL0_NI710AE_FMU",
+    [AP_CL0_NI710AE_FMU] = {
+        .name = "AP_CL0_NI710AE_FMU",
         .data = &((struct mod_fmu_dev_config) {
             .base = SI0_ATW6_NI710AE_CLUSTER0_BASE,
             .parent = SI0_FMU_1,
@@ -209,8 +209,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
         }),
     },
 
-    [SI0_CL1_NI710AE_FMU] = {
-        .name = "SI0_CL1_NI710AE_FMU",
+    [AP_CL1_NI710AE_FMU] = {
+        .name = "AP_CL1_NI710AE_FMU",
         .data = &((struct mod_fmu_dev_config) {
             .base = SI0_ATW7_NI710AE_CLUSTER1_BASE,
             .parent = SI0_FMU_1,
@@ -219,8 +219,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .implementation = MOD_FMU_NI710AE_IMPL,
         }),
     },
-    [SI0_CL2_NI710AE_FMU] = {
-        .name = "SI0_CL2_NI710AE_FMU",
+    [AP_CL2_NI710AE_FMU] = {
+        .name = "AP_CL2_NI710AE_FMU",
         .data = &((struct mod_fmu_dev_config) {
             .base = SI0_ATW8_NI710AE_CLUSTER2_BASE,
             .parent = SI0_FMU_1,
@@ -229,8 +229,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .implementation = MOD_FMU_NI710AE_IMPL,
         }),
     },
-    [SI0_CL3_NI710AE_FMU] = {
-        .name = "SI0_CL3_NI710AE_FMU",
+    [AP_CL3_NI710AE_FMU] = {
+        .name = "AP_CL3_NI710AE_FMU",
         .data = &((struct mod_fmu_dev_config) {
             .base = SI0_ATW9_NI710AE_CLUSTER3_BASE,
             .parent = SI0_FMU_1,
@@ -239,8 +239,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .implementation = MOD_FMU_NI710AE_IMPL,
         }),
     },
-    [SI0_SYS_CTL_NI710AE_FMU] = {
-        .name = "SI0_SYS_CTL_NI710AE_FMU",
+    [INT_SYS_CTL_NI710AE_FMU] = {
+        .name = "INT_SYS_CTL_NI710AE_FMU",
         .data = &((struct mod_fmu_dev_config) {
             .base = SI0_ATW10_NI710AE_SYS_CTL_BASE,
             .parent = SI0_FMU_1,
@@ -249,8 +249,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .implementation = MOD_FMU_NI710AE_IMPL,
         }),
     },
-    [SI0_SMB_NI710AE_FMU] = {
-        .name = "SI0_SMB_NI710AE_FMU",
+    [SMB_NI710AE_FMU] = {
+        .name = "SMB_NI710AE_FMU",
         .data = &((struct mod_fmu_dev_config) {
             .base = SI0_ATW12_NI710AE_SMB_BASE,
             .parent = SI0_FMU_1,
