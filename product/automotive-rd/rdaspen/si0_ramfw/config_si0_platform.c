@@ -70,11 +70,23 @@ enum SI_ATU_REGIONS {
     SI_ATU_REGION_IDX_SYSTOP_PIK,
     SI_ATU_REGION_IDX_SYSTEM_ID,
     SI_ATU_REGION_IDX_CSS_COUNTERS_TIMERS,
+    SI_ATU_REGION_IDX_NI710AE_CLUSTER0_FMU,
+    SI_ATU_REGION_IDX_NI710AE_CLUSTER1_FMU,
+    SI_ATU_REGION_IDX_NI710AE_CLUSTER2_FMU,
+    SI_ATU_REGION_IDX_NI710AE_CLUSTER3_FMU,
+    SI_ATU_REGION_IDX_NI710AE_SYS_CTRL,
+    SI_ATU_REGION_IDX_NI710AE_SMD,
+    SI_ATU_REGION_IDX_AP_GIC,
     SI_ATU_REGION_IDX_SHARED_SRAM,
     SI_ATU_REGION_IDX_SHARED_SRAM_NS,
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
+    SI_ATU_REGION_IDX_SMD_SMCF_MGI,
+#endif
+    SI_ATU_REGION_IDX_SMD_SRAM,
     SI_ATU_REGION_COUNT,
 };
 
+/* These sizes are the accessible ranges checked by the ATU self-check. */
 static const atu_region_t si_atu_regions[SI_ATU_REGION_COUNT] = {
     [SI_ATU_REGION_IDX_CMN] = {
         .region_start_addr = (const uint32_t*)0x80000000UL,
@@ -102,12 +114,50 @@ static const atu_region_t si_atu_regions[SI_ATU_REGION_COUNT] = {
         .region_start_addr = (const uint32_t*)0xD0040000UL,
         .size = 0x30000UL,
     },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER0_FMU] = {
+        .region_start_addr = (const uint32_t*)0xD0070000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER1_FMU] = {
+        .region_start_addr = (const uint32_t*)0xD0170000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER2_FMU] = {
+        .region_start_addr = (const uint32_t*)0xD0270000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER3_FMU] = {
+        .region_start_addr = (const uint32_t*)0xD0370000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_SYS_CTRL] = {
+        .region_start_addr = (const uint32_t*)0xD0470000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_SMD] = {
+        .region_start_addr = (const uint32_t*)0xD0670000UL,
+        .size = 0x10000UL,
+    },
+    [SI_ATU_REGION_IDX_AP_GIC] = {
+        .region_start_addr = (const uint32_t*)0xD0770000UL,
+        .size = 0x80000UL,
+    },
     [SI_ATU_REGION_IDX_SHARED_SRAM] = {
         .region_start_addr = (const uint32_t*)0xE0030000UL,
         .size = 0x100000UL,
     },
     [SI_ATU_REGION_IDX_SHARED_SRAM_NS] = {
         .region_start_addr = (const uint32_t*)0xE0130000UL,
+        .size = 0x100000UL,
+    },
+#if (PLATFORM_VARIANT == RD_ASPEN_VARIANT_FVP)
+    [SI_ATU_REGION_IDX_SMD_SMCF_MGI] = {
+        .region_start_addr = (const uint32_t*)0xE0230000UL,
+        .size = 0x10000UL,
+    },
+#endif
+    [SI_ATU_REGION_IDX_SMD_SRAM] = {
+        .region_start_addr = (const uint32_t*)0xE0240000UL,
         .size = 0x100000UL,
     },
 };
