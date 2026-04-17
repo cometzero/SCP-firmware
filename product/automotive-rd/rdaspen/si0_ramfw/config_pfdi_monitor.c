@@ -26,7 +26,7 @@
 
 /* Constant values for SICL1 */
 #define SICL1_OOR_PFDI_PERIOD_US 1000000UL /* 1 second */
-#define SICL1_BOOT_TIMEOUT_US    2000000UL /* 2 seconds */
+#define SICL1_BOOT_TIMEOUT_US    10000000UL /* 10 seconds */
 
 /* Power domain table has a single static element (SYSTOP) for this product. */
 #define PD_STATIC_ELEMENT_COUNT (1U)
