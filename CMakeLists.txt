@@ -135,20 +135,24 @@ endif()
 # cross compiling.
 #
 
-include(CheckIPOSupported)
 include(CMakeDependentOption)
-
-check_ipo_supported(RESULT SCP_IPO_SUPPORTED)
 
 cmake_dependent_option(
     SCP_ENABLE_IPO
     "Enable the interprocedural optimization (IPO) if supported?"
     "${SCP_ENABLE_IPO_INIT}" "DEFINED SCP_ENABLE_IPO_INIT" "${SCP_ENABLE_IPO}")
 
-if(CMAKE_CROSSCOMPILING
-   AND (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-   AND SCP_ENABLE_IPO)
-    set(SCP_IPO_SUPPORTED TRUE)
+if(CMAKE_CROSSCOMPILING)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        set(SCP_IPO_SUPPORTED TRUE)
+    else()
+        set(SCP_IPO_SUPPORTED FALSE)
+    endif()
+elseif(SCP_ENABLE_IPO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT SCP_IPO_SUPPORTED)
+else()
+    set(SCP_IPO_SUPPORTED FALSE)
 endif()
 
 cmake_dependent_option(
