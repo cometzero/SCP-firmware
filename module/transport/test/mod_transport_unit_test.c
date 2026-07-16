@@ -15,6 +15,7 @@
 
 #    include <Mockfwk_id.h>
 #    include <Mockfwk_module.h>
+#    include <Mockfwk_notification.h>
 #endif
 
 #include <internal/transport.h>
@@ -117,6 +118,74 @@ void test_transport_payload_size(void)
     TEST_ASSERT_EQUAL(
         TEST_MAILBOX_SIZE - sizeof(struct mod_transport_buffer),
         channel_ctx->max_payload_size);
+}
+
+void test_transport_mailbox_init_preserves_valid_pending_request(void)
+{
+    int status;
+    struct transport_channel_ctx *channel_ctx =
+        &transport_ctx
+             .channel_ctx_table[FAKE_SERVICE_IDX_OUT_BAND_TEST_CHANNEL];
+    struct mod_transport_buffer *buffer =
+        (struct mod_transport_buffer *)
+            channel_ctx->config->out_band_mailbox_address;
+
+    channel_ctx->config->channel_type =
+        MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER;
+    channel_ctx->config->policies =
+        MOD_TRANSPORT_POLICY_INIT_MAILBOX |
+        MOD_TRANSPORT_POLICY_PRESERVE_PENDING_MAILBOX;
+    channel_ctx->out_band_mailbox_ready = false;
+    *buffer = (struct mod_transport_buffer){
+        .status = 0,
+        .length = sizeof(buffer->message_header),
+        .message_header = UINT32_C(0x12345678),
+    };
+
+    fwk_notification_notify_IgnoreAndReturn(FWK_SUCCESS);
+
+    status = transport_mailbox_init(channel_ctx);
+
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
+    TEST_ASSERT_TRUE(channel_ctx->out_band_mailbox_ready);
+    TEST_ASSERT_EQUAL_UINT32(0, buffer->status);
+    TEST_ASSERT_EQUAL_UINT32(
+        sizeof(buffer->message_header), buffer->length);
+    TEST_ASSERT_EQUAL_HEX32(UINT32_C(0x12345678), buffer->message_header);
+}
+
+void test_transport_mailbox_init_reinitializes_invalid_pending_request(void)
+{
+    int status;
+    struct transport_channel_ctx *channel_ctx =
+        &transport_ctx
+             .channel_ctx_table[FAKE_SERVICE_IDX_OUT_BAND_TEST_CHANNEL];
+    struct mod_transport_buffer *buffer =
+        (struct mod_transport_buffer *)
+            channel_ctx->config->out_band_mailbox_address;
+
+    channel_ctx->config->channel_type =
+        MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER;
+    channel_ctx->config->policies =
+        MOD_TRANSPORT_POLICY_INIT_MAILBOX |
+        MOD_TRANSPORT_POLICY_PRESERVE_PENDING_MAILBOX;
+    channel_ctx->out_band_mailbox_ready = false;
+    *buffer = (struct mod_transport_buffer){
+        .status = 0,
+        .length = 0,
+        .message_header = UINT32_C(0x12345678),
+    };
+
+    fwk_notification_notify_IgnoreAndReturn(FWK_SUCCESS);
+
+    status = transport_mailbox_init(channel_ctx);
+
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
+    TEST_ASSERT_TRUE(channel_ctx->out_band_mailbox_ready);
+    TEST_ASSERT_EQUAL_UINT32(
+        MOD_TRANSPORT_MAILBOX_STATUS_FREE_MASK, buffer->status);
+    TEST_ASSERT_EQUAL_UINT32(0, buffer->length);
+    TEST_ASSERT_EQUAL_UINT32(0, buffer->message_header);
 }
 
 void test_transport_write_payload_invalid_state_unlocked(void)
@@ -649,6 +718,8 @@ int scmi_test_main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_transport_payload_size);
+    RUN_TEST(test_transport_mailbox_init_preserves_valid_pending_request);
+    RUN_TEST(test_transport_mailbox_init_reinitializes_invalid_pending_request);
 
     RUN_TEST(test_transport_write_payload_invalid_state_unlocked);
     RUN_TEST(test_transport_write_payload_invalid_param_null_payload);

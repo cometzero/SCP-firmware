@@ -98,8 +98,6 @@ list(APPEND SCP_MODULES
     "sid"
     "system-info"
     "pcid"
-    "mhu3"
-    "transport"
     "system-power"
     "power-domain"
     "fmu"
@@ -149,3 +147,10 @@ if(SCP_ENABLE_SCMI_PFDI_MONITOR)
         "pfdi-monitor"
         "scmi-pfdi-monitor")
 endif()
+
+# Start the transport after its service consumers, then enable pending MHU
+# interrupts only after the transport is ready.
+list(APPEND SCP_MODULES
+    "transport"
+    "mhu3"
+)
