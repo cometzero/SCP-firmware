@@ -18,9 +18,11 @@
  * \note inline is necessary as this call can be used in performance sensitive
  *     path
  */
-inline static void arch_interrupts_enable(unsigned int not_used)
+inline static void arch_interrupts_enable(unsigned int flags)
 {
-    __asm__ volatile("msr DAIFClr, %0" ::"i"(DAIF_FIQ) : "memory");
+    if ((flags & DAIF_FIQ_MASK) == 0U) {
+        __asm__ volatile("msr DAIFClr, %0" ::"i"(DAIF_FIQ) : "memory");
+    }
 }
 
 /*!
@@ -31,9 +33,12 @@ inline static void arch_interrupts_enable(unsigned int not_used)
  */
 inline static unsigned int arch_interrupts_disable()
 {
+    unsigned long daif;
+
+    __asm__ volatile("mrs %0, DAIF" : "=r"(daif) : : "memory");
     __asm__ volatile("msr DAIFSet, %0" ::"i"(DAIF_FIQ) : "memory");
 
-    return 0;
+    return (unsigned int)daif;
 }
 
 /*!

@@ -126,7 +126,8 @@
 /*
  * DAIF bits
  */
-#define DAIF_FIQ FWK_BIT(0)
+#define DAIF_FIQ      FWK_BIT(0)
+#define DAIF_FIQ_MASK FWK_BIT(6)
 
 /*
  * GIC registers
