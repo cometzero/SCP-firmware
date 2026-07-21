@@ -28,8 +28,7 @@
 
 /* Secure transport channel with mailbox initialization policy */
 #define TRANSPORT_CH_SEC_MBX_INIT \
-    (MOD_TRANSPORT_POLICY_INIT_MAILBOX | MOD_TRANSPORT_POLICY_SECURE | \
-     MOD_TRANSPORT_POLICY_PRESERVE_PENDING_MAILBOX)
+    (MOD_TRANSPORT_POLICY_INIT_MAILBOX | MOD_TRANSPORT_POLICY_SECURE)
 
 /* Subsystem initialized notification id (platform notification) */
 #define PLATFORM_SI0_NOTIFICATION_ID \
@@ -127,8 +126,9 @@ static const struct fwk_element element_table[]  = {
                         FWK_MODULE_IDX_MHU3,
                         MOD_MHU3_API_IDX_TRANSPORT_DRIVER),
                 .platform_notification = {
-                    .notification_id = FWK_ID_NONE,
-                    .source_id = FWK_ID_NONE,
+                    .notification_id = PLATFORM_SI0_NOTIFICATION_ID,
+                    .source_id = FWK_ID_MODULE_INIT(
+                        FWK_MODULE_IDX_SI0_PLATFORM),
                 },
         }),
     },

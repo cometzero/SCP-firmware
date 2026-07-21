@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2022-2026, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2022-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -84,13 +84,6 @@ struct mod_transport_buffer {
  * out-band type transport channels.
  */
 #define MOD_TRANSPORT_POLICY_INIT_MAILBOX ((uint32_t)(1U << 1))
-
-/*!
- * Preserve a valid request that is already present when a completer mailbox
- * is initialized. This policy is only relevant when
- * MOD_TRANSPORT_POLICY_INIT_MAILBOX is also enabled.
- */
-#define MOD_TRANSPORT_POLICY_PRESERVE_PENDING_MAILBOX ((uint32_t)(1U << 2))
 
 /*!
  * @}

@@ -827,25 +827,6 @@ static const struct mod_transport_driver_input_api driver_input_api = {
     .signal_message = transport_signal_message,
 };
 
-static bool transport_mailbox_has_pending_message(
-    const struct transport_channel_ctx *channel_ctx,
-    const struct mod_transport_buffer *mailbox)
-{
-    uint32_t length;
-
-    if ((mailbox->status & MOD_TRANSPORT_MAILBOX_STATUS_FREE_MASK) != 0U) {
-        return false;
-    }
-
-    length = mailbox->length;
-    if (length < sizeof(mailbox->message_header)) {
-        return false;
-    }
-
-    return (length - sizeof(mailbox->message_header)) <=
-        channel_ctx->max_payload_size;
-}
-
 static int transport_mailbox_init(struct transport_channel_ctx *channel_ctx)
 {
     int status = FWK_SUCCESS;
@@ -857,19 +838,12 @@ static int transport_mailbox_init(struct transport_channel_ctx *channel_ctx)
         /* Only the completer channel should initialize the shared mailbox */
         if (channel_ctx->config->channel_type ==
             MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER) {
-            struct mod_transport_buffer *mailbox =
-                (struct mod_transport_buffer *)
-                    channel_ctx->config->out_band_mailbox_address;
-            bool preserve_pending =
-                ((channel_ctx->config->policies &
-                  MOD_TRANSPORT_POLICY_PRESERVE_PENDING_MAILBOX) != 0U) &&
-                transport_mailbox_has_pending_message(channel_ctx, mailbox);
-
-            if (!preserve_pending) {
-                *mailbox = (struct mod_transport_buffer){
+            /* Initialize mailbox such that the requester has ownership */
+            *((struct mod_transport_buffer *)
+                  channel_ctx->config->out_band_mailbox_address) =
+                (struct mod_transport_buffer){
                     .status = (1U << MOD_TRANSPORT_MAILBOX_STATUS_FREE_POS)
                 };
-            }
         }
         /* Notify that this mailbox is initialized */
         struct fwk_event transport_channel_initialized_notification = {
