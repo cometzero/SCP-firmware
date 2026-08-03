@@ -53,6 +53,10 @@ if (NOT DEFINED SCP_SICL1_PFDI_ONLINE_TIMEOUT_US)
     set(SCP_SICL1_PFDI_ONLINE_TIMEOUT_US 100000UL)
 endif()
 
+if (NOT DEFINED SCP_ENABLE_GIC_POWER_TEST)
+    set(SCP_ENABLE_GIC_POWER_TEST FALSE)
+endif()
+
 list(PREPEND SCP_MODULE_PATHS
      "${CMAKE_CURRENT_LIST_DIR}/../module/si0_platform"
      "${CMAKE_CURRENT_LIST_DIR}/../module/ros_clock"
@@ -142,6 +146,14 @@ if(SCP_ENABLE_DEBUGGER)
         list(APPEND SCP_MODULES
             "test-smcf")
     endif()
+    if(SCP_ENABLE_GIC_POWER_TEST)
+        list(APPEND SCP_MODULE_PATHS
+            "${CMAKE_CURRENT_LIST_DIR}/../../module/test_gic_power")
+        list(APPEND SCP_MODULES "test-gic-power")
+    endif()
+elseif(SCP_ENABLE_GIC_POWER_TEST)
+    message(FATAL_ERROR
+        "SCP_ENABLE_GIC_POWER_TEST requires SCP_ENABLE_DEBUGGER")
 endif()
 
 if(SCP_ENABLE_SCMI_PFDI_MONITOR)

@@ -13,6 +13,9 @@ enum integration_test {
     TEST_SSU,
     TEST_SBISTC,
     TEST_SMCF,
+#ifdef BUILD_HAS_MOD_TEST_GIC_POWER
+    TEST_GIC_POWER,
+#endif
     TEST_COUNT,
 };
 
@@ -48,6 +51,16 @@ static const struct fwk_element config_integration_test_elements[] = {
             .test_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_SMCF),
             .run_at_start = false,
             .num_test_cases = 1,
+        },
+    },
+#endif
+#ifdef BUILD_HAS_MOD_TEST_GIC_POWER
+    [TEST_GIC_POWER] = {
+        .name = "gic_power",
+        .data = &(struct mod_integration_test_config){
+            .test_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_GIC_POWER),
+            .run_at_start = false,
+            .num_test_cases = 10,
         },
     },
 #endif
