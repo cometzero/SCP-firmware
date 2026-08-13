@@ -21,7 +21,7 @@
 #include <fwk_module_idx.h>
 
 /* Constant values for AP */
-#define OOR_PFDI_PERIOD_US 5000000UL /* 5 seconds */
+#define OOR_PFDI_PERIOD_US 10000000UL /* 10 seconds */
 #define BOOT_TIMEOUT_US    50000000UL /* 50 seconds */
 
 /* Constant values for SICL1 */
