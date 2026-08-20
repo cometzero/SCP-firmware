@@ -22,7 +22,9 @@
 
 /* Constant values for AP */
 #define OOR_PFDI_PERIOD_US 10000000UL /* 10 seconds */
-#define BOOT_TIMEOUT_US    50000000UL /* 50 seconds */
+#ifndef PFDI_BOOT_TIMEOUT_US
+#    define PFDI_BOOT_TIMEOUT_US 50000000UL /* 50 seconds */
+#endif
 
 /* Constant values for SICL1 */
 #define SICL1_OOR_PFDI_PERIOD_US 1000000UL /* 1 second */
@@ -154,7 +156,7 @@ static const struct fwk_element *get_pfdi_monitor_element_table(fwk_id_t unused)
                     FWK_MODULE_IDX_POWER_DOMAIN, ap_core_idx),
                 .oor_pfdi_period_us = OOR_PFDI_PERIOD_US,
                 .onl_pfdi_period_us = PFDI_ONLINE_TIMEOUT_US,
-                .boot_timeout_us = BOOT_TIMEOUT_US,
+                .boot_timeout_us = PFDI_BOOT_TIMEOUT_US,
             };
         }
     }
