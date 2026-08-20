@@ -77,8 +77,11 @@ target_compile_definitions(apollo-qvp-si0-bl2 PUBLIC
 
 if(SCP_ENABLE_SCMI_PFDI_MONITOR)
     target_compile_definitions(apollo-qvp-si0-bl2 PUBLIC
+        -DOOR_PFDI_PERIOD_US=${SCP_PFDI_OOR_PERIOD_US}
         -DPFDI_BOOT_TIMEOUT_US=${SCP_PFDI_BOOT_TIMEOUT_US}
         -DPFDI_ONLINE_TIMEOUT_US=${SCP_PFDI_ONLINE_TIMEOUT_US}
+        -DSICL1_OOR_PFDI_PERIOD_US=${SCP_SICL1_PFDI_OOR_PERIOD_US}
+        -DSICL1_BOOT_TIMEOUT_US=${SCP_SICL1_PFDI_BOOT_TIMEOUT_US}
         -DSICL1_PFDI_ONLINE_TIMEOUT_US=${SCP_SICL1_PFDI_ONLINE_TIMEOUT_US})
     target_sources(apollo-qvp-si0-bl2 PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/config_scmi_pfdi_monitor.c"

@@ -21,14 +21,20 @@
 #include <fwk_module_idx.h>
 
 /* Constant values for AP */
-#define OOR_PFDI_PERIOD_US 10000000UL /* 10 seconds */
+#ifndef OOR_PFDI_PERIOD_US
+#    define OOR_PFDI_PERIOD_US 5000000UL /* 5 seconds */
+#endif
 #ifndef PFDI_BOOT_TIMEOUT_US
 #    define PFDI_BOOT_TIMEOUT_US 50000000UL /* 50 seconds */
 #endif
 
 /* Constant values for SICL1 */
-#define SICL1_OOR_PFDI_PERIOD_US 1000000UL /* 1 second */
-#define SICL1_BOOT_TIMEOUT_US    10000000UL /* 10 seconds */
+#ifndef SICL1_OOR_PFDI_PERIOD_US
+#    define SICL1_OOR_PFDI_PERIOD_US 1000000UL /* 1 second */
+#endif
+#ifndef SICL1_BOOT_TIMEOUT_US
+#    define SICL1_BOOT_TIMEOUT_US 10000000UL /* 10 seconds */
+#endif
 
 /* Power domain table has a single static element (SYSTOP) for this product. */
 #define PD_STATIC_ELEMENT_COUNT (1U)
