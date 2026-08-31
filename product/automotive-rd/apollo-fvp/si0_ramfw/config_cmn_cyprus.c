@@ -111,6 +111,24 @@ static const struct mod_cmn_cyprus_mem_region_map mmap[] = {
         .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_IO,
         .node_id = NODE_ID_HNP1,
     },
+    {
+        .base = UINT64_C(0x10040000000),
+        .size = UINT64_C(256) * FWK_MIB,
+        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_IO,
+        .node_id = NODE_ID_HNP1,
+    },
+    {
+        .base = UINT64_C(0x60000000),
+        .size = UINT64_C(512) * FWK_MIB,
+        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_IO,
+        .node_id = NODE_ID_HNP1,
+    },
+    {
+        .base = UINT64_C(0x10160000000),
+        .size = UINT64_C(512) * FWK_MIB,
+        .type = MOD_CMN_CYPRUS_MEM_REGION_TYPE_IO,
+        .node_id = NODE_ID_HNP1,
+    },
 };
 
 static struct mod_cmn_cyprus_config cmn_config_table[1] = {

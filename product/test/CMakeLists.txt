@@ -141,6 +141,21 @@ add_test(
     COMMAND ${CMAKE_COMMAND} -DSCP_ROOT=${SCP_ROOT} -P
             ${CMAKE_CURRENT_SOURCE_DIR}/check_automotive_rd_pcie_module_paths.cmake)
 
+add_executable(apollo_fvp_pcie_cmn_routes_test
+    ${SCP_ROOT}/product/automotive-rd/apollo-fvp/si0_ramfw/test/test_pcie_cmn_routes.c)
+target_include_directories(apollo_fvp_pcie_cmn_routes_test PRIVATE
+    ${SCP_ROOT}/framework/include
+    ${SCP_ROOT}/framework/test/include
+    ${SCP_ROOT}/module/cmn_cyprus/include
+    ${SCP_ROOT}/product/automotive-rd/apollo-fvp/si0_ramfw/include
+    ${SCP_ROOT}/product/automotive-rd/apollo-fvp/si0_ramfw/test)
+target_compile_options(apollo_fvp_pcie_cmn_routes_test PRIVATE
+    ${EXTRA_COMPILE_FLAGS})
+target_link_options(apollo_fvp_pcie_cmn_routes_test PRIVATE --coverage)
+add_test(
+    NAME apollo_fvp_pcie_cmn_routes_test
+    COMMAND apollo_fvp_pcie_cmn_routes_test)
+
 # cmake-lint: disable=E1120
 foreach(idx RANGE ${UNIT_PRODUCT_MAX})
     if(idx EQUAL UNIT_PRODUCT_MAX)
