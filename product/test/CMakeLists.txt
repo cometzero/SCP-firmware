@@ -119,6 +119,8 @@ list(APPEND UNIT_PRODUCT automotive-rd/module/gicx00_multiview)
 list(APPEND UNIT_PRODUCT automotive-rd/module/test_gic_power)
 list(APPEND UNIT_PRODUCT automotive-rd/module/sbistc)
 list(APPEND UNIT_PRODUCT automotive-rd/module/ssu)
+list(APPEND UNIT_PRODUCT automotive-rd/module/pcie_discovery)
+list(APPEND UNIT_PRODUCT automotive-rd/module/pcie_setup)
 list(APPEND UNIT_PRODUCT automotive-rd/rd1ae/module/safety_island_platform)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/cluster_control)
 list(APPEND UNIT_PRODUCT automotive-rd/rdaspen/module/pfdi_monitor)
@@ -133,6 +135,11 @@ list(LENGTH UNIT_PRODUCT UNIT_PRODUCT_MAX)
 
 enable_testing()
 include(CTest)
+
+add_test(
+    NAME automotive_rd_pcie_module_paths
+    COMMAND ${CMAKE_COMMAND} -DSCP_ROOT=${SCP_ROOT} -P
+            ${CMAKE_CURRENT_SOURCE_DIR}/check_automotive_rd_pcie_module_paths.cmake)
 
 # cmake-lint: disable=E1120
 foreach(idx RANGE ${UNIT_PRODUCT_MAX})

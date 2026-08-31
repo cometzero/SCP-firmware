@@ -16,7 +16,7 @@ i.e. It abstracts the knowledge of the API user from the implementation,
     respective module `CMakeLists.txt` file.
     ``` CMAKE
     target_include_directories(${SCP_MODULE_TARGET} PUBLIC
-            "${CMAKE_SOURCE_DIR}/product/automotive-rd/rd1ae/interface/io_block/")
+            "${CMAKE_SOURCE_DIR}/product/automotive-rd/interface/io_block/")
     ```
     Then simply include `interface_io_block.h` file to use all IO Block
     interface definitions.
