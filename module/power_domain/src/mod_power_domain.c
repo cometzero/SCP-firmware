@@ -85,6 +85,45 @@ static inline bool notify_system_shutdown_wrapper(
  * Utility functions
  */
 
+static bool is_system_suspend_domain(const struct pd_ctx *pd)
+{
+    unsigned int depth;
+
+    if (!mod_pd_ctx.config->scope_system_suspend_to_system_domain)
+        return true;
+
+    for (depth = 0; pd != NULL && depth < mod_pd_ctx.pd_count; depth++) {
+        if (pd == mod_pd_ctx.system_pd_ctx)
+            return true;
+        pd = pd->parent;
+    }
+    return false;
+}
+
+static int select_system_suspend_root(void)
+{
+    struct pd_ctx *root = NULL;
+    struct pd_ctx *pd;
+    unsigned int i;
+
+    if (!mod_pd_ctx.config->scope_system_suspend_to_system_domain)
+        return FWK_SUCCESS;
+
+    for (i = 0; i < mod_pd_ctx.pd_count; i++) {
+        pd = &mod_pd_ctx.pd_ctx_table[i];
+        if (pd->config->attributes.pd_type != MOD_PD_TYPE_SYSTEM)
+            continue;
+        if (root != NULL || pd->parent != NULL)
+            return FWK_E_PARAM;
+        root = pd;
+    }
+    if (root == NULL)
+        return FWK_E_PARAM;
+
+    mod_pd_ctx.system_pd_ctx = root;
+    return FWK_SUCCESS;
+}
+
 /* Sub-routine of 'pd_post_init()', to build the power domain tree */
 static int connect_pd_tree(void)
 {
@@ -219,8 +258,9 @@ static void process_set_state_request(
     pd_in_charge_of_response = NULL;
     first_power_state_transition_initiated = false;
 
-    /* A set state request cancels the completion of system suspend. */
-    mod_pd_ctx.system_suspend.last_core_off_ongoing = false;
+    /* An unrelated root must not cancel the completion of system suspend. */
+    if (is_system_suspend_domain(lowest_pd))
+        mod_pd_ctx.system_suspend.last_core_off_ongoing = false;
 
     composite_state = req_params->composite_state;
     up = is_upwards_transition_propagation(lowest_pd, composite_state);
@@ -428,11 +468,21 @@ static int complete_system_suspend(struct pd_ctx *target_pd)
 
     process_set_state_request(target_pd, &event, &resp_event);
 
-    for (struct pd_ctx *pd_node = target_pd; pd_node != NULL;
-         pd_node = pd_node->parent) {
-        pd_node->current_state = pd_node->requested_state;
-        pd_node->state_requested_to_driver = pd_node->requested_state;
+    if (!mod_pd_ctx.config->scope_system_suspend_to_system_domain) {
+        /* Preserve the legacy single-tree suspend bookkeeping. */
+        for (struct pd_ctx *pd_node = target_pd; pd_node != NULL;
+             pd_node = pd_node->parent) {
+            pd_node->current_state = pd_node->requested_state;
+            pd_node->state_requested_to_driver = pd_node->requested_state;
+        }
     }
+
+    /*
+     * Scoped suspend keeps the normal asynchronous state machine: only the
+     * driver report advances current_state, and only a dispatched request
+     * advances state_requested_to_driver. Marking deferred parents complete
+     * here prevents a later cluster OFF report from ever invoking SYSTOP.
+     */
 
     return resp_params->status;
 }
@@ -673,7 +723,7 @@ static void process_power_state_transition_report(
         return;
     }
 
-    if (pd->parent == NULL) {
+    if ((pd->parent == NULL) && is_system_suspend_domain(pd)) {
         /* this is the top pd (SYSTOP) */
         if (mod_pd_ctx.system_suspend.state != MOD_PD_STATE_ON) {
             /* has gone down, invalidate the system suspend ongoing */
@@ -733,6 +783,8 @@ static void process_system_suspend_request(
      */
     for (pd_idx = 0; pd_idx < mod_pd_ctx.pd_count; pd_idx++) {
         pd = &mod_pd_ctx.pd_ctx_table[pd_idx];
+        if (!is_system_suspend_domain(pd))
+            continue;
         if ((pd->requested_state == MOD_PD_STATE_OFF) &&
             (pd->current_state == MOD_PD_STATE_OFF)) {
             continue;
@@ -1017,10 +1069,23 @@ static int pd_system_suspend(unsigned int state)
     struct pd_system_suspend_request *req_params =
         (struct pd_system_suspend_request *)(&req.params);
 
+    /*
+     * Validate before acknowledging an asynchronous request. In scoped mode
+     * a platform may deliberately keep its system root ON-only until wake
+     * and context restoration are implemented. Do not report acceptance in
+     * that case and leave the PSCI caller waiting for a transition.
+     */
+    if (mod_pd_ctx.config->scope_system_suspend_to_system_domain &&
+        !is_valid_state(mod_pd_ctx.system_pd_ctx, state))
+        return FWK_E_STATE;
+
     /* System suspend is only supported if exactly one core remains active */
     active_cores = 0u;
     for (i = 0; i < mod_pd_ctx.pd_count; i++) {
         pd = &mod_pd_ctx.pd_ctx_table[i];
+
+        if (!is_system_suspend_domain(pd))
+            continue;
 
         if (pd->config->attributes.pd_type == MOD_PD_TYPE_CORE &&
             is_state_in_transition(pd, (unsigned int)MOD_PD_STATE_OFF)) {
@@ -1245,7 +1310,7 @@ static int pd_post_init(fwk_id_t module_id)
         return status;
     }
 
-    return FWK_SUCCESS;
+    return select_system_suspend_root();
 }
 
 static int pd_bind(fwk_id_t id, unsigned int round)

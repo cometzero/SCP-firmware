@@ -109,6 +109,14 @@ struct mod_power_domain_config {
      *  off or doing complete system suspend by the power domain
      */
     bool enable_system_suspend_notification;
+
+    /*!
+     * Restrict system suspend to the unique root of type MOD_PD_TYPE_SYSTEM
+     * and its descendants. Independent roots (for example a Safety Island)
+     * remain operational and cannot cancel this root's suspend bookkeeping.
+     * The default false preserves the legacy single-tree behaviour.
+     */
+    bool scope_system_suspend_to_system_domain;
 };
 
 /*!

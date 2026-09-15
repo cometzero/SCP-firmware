@@ -91,6 +91,8 @@ static void construct_pd_relations(void)
 
 void setUp(void)
 {
+    mod_pd_config.scope_system_suspend_to_system_domain = false;
+    memset(&mod_pd_ctx.system_suspend, 0, sizeof(mod_pd_ctx.system_suspend));
     memset(pd_ctx, 0, sizeof(pd_ctx));
     init_module_ctx();
     evaluate_valid_state_mask();
@@ -1019,10 +1021,230 @@ void test_system_suspend_single_active_core(void)
     TEST_ASSERT_EQUAL(status, FWK_SUCCESS);
 }
 
+static void enable_independent_cluster(void)
+{
+    mod_pd_config.scope_system_suspend_to_system_domain = true;
+    /* Model the SI cluster as a separate root, outside AP SYSTOP. */
+    pd_ctx[PD_IDX_CLUSTER1].parent = NULL;
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, select_system_suspend_root());
+}
+
+void test_scoped_suspend_selects_system_not_last_pointer(void)
+{
+    mod_pd_config.scope_system_suspend_to_system_domain = true;
+    mod_pd_ctx.system_pd_ctx = &pd_ctx[PD_IDX_CLUSTER1];
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, select_system_suspend_root());
+    TEST_ASSERT_EQUAL_PTR(&pd_ctx[PD_IDX_SYSTOP], mod_pd_ctx.system_pd_ctx);
+}
+
+void test_scoped_suspend_requires_unique_system_root(void)
+{
+    struct mod_power_domain_element_config config =
+        *pd_ctx[PD_IDX_SYSTOP].config;
+
+    mod_pd_config.scope_system_suspend_to_system_domain = true;
+    config.attributes.pd_type = MOD_PD_TYPE_CLUSTER;
+    pd_ctx[PD_IDX_SYSTOP].config = &config;
+    TEST_ASSERT_EQUAL(FWK_E_PARAM, select_system_suspend_root());
+
+    config.attributes.pd_type = MOD_PD_TYPE_SYSTEM;
+    pd_ctx[PD_IDX_CLUSTER1].config = &config;
+    pd_ctx[PD_IDX_CLUSTER1].parent = NULL;
+    TEST_ASSERT_EQUAL(FWK_E_PARAM, select_system_suspend_root());
+}
+
+void test_scoped_suspend_rejects_nonroot_system(void)
+{
+    mod_pd_config.scope_system_suspend_to_system_domain = true;
+    pd_ctx[PD_IDX_SYSTOP].parent = &pd_ctx[PD_IDX_CLUSTER1];
+    TEST_ASSERT_EQUAL(FWK_E_PARAM, select_system_suspend_root());
+}
+
+void test_scoped_suspend_membership(void)
+{
+    enable_independent_cluster();
+    TEST_ASSERT_TRUE(is_system_suspend_domain(&pd_ctx[PD_IDX_SYSTOP]));
+    TEST_ASSERT_TRUE(is_system_suspend_domain(&pd_ctx[PD_IDX_CLUS0CORE0]));
+    TEST_ASSERT_FALSE(is_system_suspend_domain(&pd_ctx[PD_IDX_CLUSTER1]));
+    TEST_ASSERT_FALSE(is_system_suspend_domain(&pd_ctx[PD_IDX_CLUS1CORE0]));
+}
+
+void test_scoped_suspend_ignores_independent_active_core(void)
+{
+    enable_independent_cluster();
+    is_valid_state_ExpectAndReturn(
+        &pd_ctx[PD_IDX_SYSTOP], MOD_PD_STATE_OFF, true);
+    pd_ctx[PD_IDX_CLUS0CORE0].current_state = MOD_PD_STATE_ON;
+    pd_ctx[PD_IDX_CLUS1CORE0].current_state = MOD_PD_STATE_ON;
+    is_state_in_transition_StubWithCallback(is_in_transiton_mock);
+    __fwk_put_event_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, pd_system_suspend(MOD_PD_STATE_OFF));
+}
+
+void test_scoped_suspend_still_rejects_two_ap_cores(void)
+{
+    enable_independent_cluster();
+    is_valid_state_ExpectAndReturn(
+        &pd_ctx[PD_IDX_SYSTOP], MOD_PD_STATE_OFF, true);
+    pd_ctx[PD_IDX_CLUS0CORE0].current_state = MOD_PD_STATE_ON;
+    pd_ctx[PD_IDX_CLUS0CORE1].current_state = MOD_PD_STATE_ON;
+    is_state_in_transition_StubWithCallback(is_in_transiton_mock);
+    TEST_ASSERT_EQUAL(FWK_E_STATE, pd_system_suspend(MOD_PD_STATE_OFF));
+}
+
+void test_scoped_suspend_rejects_unsupported_state_before_queueing(void)
+{
+    enable_independent_cluster();
+    is_valid_state_ExpectAndReturn(
+        &pd_ctx[PD_IDX_SYSTOP], MOD_PD_STATE_OFF, false);
+    /* No event enqueue or CPU transition is permitted on rejection. */
+    TEST_ASSERT_EQUAL(FWK_E_STATE, pd_system_suspend(MOD_PD_STATE_OFF));
+}
+
+static int prepare_scoped_core(fwk_id_t id)
+{
+    (void)id;
+    return FWK_SUCCESS;
+}
+
+void test_scoped_suspend_event_ignores_independent_core_and_cluster(void)
+{
+    const struct pd_system_suspend_request request = { .state = MOD_PD_STATE_OFF };
+    struct pd_response response = { 0 };
+    struct mod_pd_driver_api driver = pd_driver;
+
+    enable_independent_cluster();
+    driver.prepare_core_for_system_suspend = prepare_scoped_core;
+    pd_ctx[PD_IDX_CLUS0CORE0].driver_api = &driver;
+    pd_ctx[PD_IDX_CLUS0CORE0].current_state = MOD_PD_STATE_ON;
+    pd_ctx[PD_IDX_CLUSTER0].current_state = MOD_PD_STATE_ON;
+    pd_ctx[PD_IDX_CLUS1CORE0].current_state = MOD_PD_STATE_ON;
+    pd_ctx[PD_IDX_CLUSTER1].current_state = MOD_PD_STATE_ON;
+    process_system_suspend_request(&request, &response);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, response.status);
+    TEST_ASSERT_EQUAL_PTR(
+        &pd_ctx[PD_IDX_CLUS0CORE0], mod_pd_ctx.system_suspend.last_core_pd);
+    TEST_ASSERT_TRUE(mod_pd_ctx.system_suspend.last_core_off_ongoing);
+}
+
+void test_independent_set_state_does_not_cancel_system_suspend(void)
+{
+    struct fwk_event event = { 0 }, response = { 0 };
+    struct pd_ctx *pd = &pd_ctx[PD_IDX_CLUSTER1];
+
+    enable_independent_cluster();
+    pd->cs_support = false;
+    pd->requested_state = MOD_PD_STATE_OFF;
+    mod_pd_ctx.system_suspend.last_core_off_ongoing = true;
+    is_upwards_transition_propagation_ExpectAnyArgsAndReturn(true);
+    get_highest_level_from_composite_state_ExpectAnyArgsAndReturn(0);
+    process_set_state_request(pd, &event, &response);
+    TEST_ASSERT_TRUE(mod_pd_ctx.system_suspend.last_core_off_ongoing);
+}
+
+void test_independent_root_report_does_not_clear_system_suspend(void)
+{
+    const struct pd_power_state_transition_report report = {
+        .state = MOD_PD_STATE_OFF,
+    };
+
+    enable_independent_cluster();
+    mod_pd_ctx.system_suspend.last_core_off_ongoing = false;
+    mod_pd_ctx.system_suspend.suspend_ongoing = true;
+    mod_pd_ctx.system_suspend.state = MOD_PD_STATE_OFF;
+    is_deeper_state_ExpectAnyArgsAndReturn(false);
+    is_shallower_state_ExpectAnyArgsAndReturn(false);
+    process_power_state_transition_report(&pd_ctx[PD_IDX_CLUSTER1], &report);
+    TEST_ASSERT_TRUE(mod_pd_ctx.system_suspend.suspend_ongoing);
+}
+
+static unsigned int suspend_sequence_calls;
+static unsigned int suspend_sequence_states[2];
+
+static int record_suspend_driver_request(fwk_id_t id, unsigned int state)
+{
+    (void)id;
+    TEST_ASSERT_LESS_THAN(2, suspend_sequence_calls);
+    suspend_sequence_states[suspend_sequence_calls++] = state;
+    return FWK_SUCCESS;
+}
+
+void test_scoped_suspend_waits_for_cluster_report_before_root_request(void)
+{
+    struct pd_ctx *core = &pd_ctx[PD_IDX_CLUS0CORE0];
+    struct pd_ctx *cluster = &pd_ctx[PD_IDX_CLUSTER0];
+    struct pd_ctx *root = &pd_ctx[PD_IDX_SYSTOP];
+    struct mod_pd_driver_api driver = {
+        .set_state = record_suspend_driver_request,
+    };
+    struct pd_power_state_transition_report report = { .state = MOD_PD_STATE_OFF };
+    unsigned int sleep = MOD_SYSTEM_POWER_POWER_STATE_SLEEP0;
+
+    mod_pd_config.scope_system_suspend_to_system_domain = true;
+    mod_pd_ctx.system_suspend.state = sleep;
+    mod_pd_ctx.system_suspend.last_core_off_ongoing = false;
+    core->cs_support = true;
+    cluster->current_state = cluster->requested_state =
+        cluster->state_requested_to_driver = MOD_PD_STATE_ON;
+    root->current_state = root->requested_state =
+        root->state_requested_to_driver = MOD_PD_STATE_ON;
+    cluster->driver_api = root->driver_api = &driver;
+    suspend_sequence_calls = 0;
+
+    number_of_bits_to_shift_ExpectAnyArgsAndReturn(0);
+    number_of_bits_to_shift_ExpectAnyArgsAndReturn(4);
+    number_of_bits_to_shift_ExpectAnyArgsAndReturn(8);
+    is_upwards_transition_propagation_ExpectAnyArgsAndReturn(true);
+    get_highest_level_from_composite_state_ExpectAnyArgsAndReturn(2);
+    get_level_state_from_composite_state_ExpectAnyArgsAndReturn(MOD_PD_STATE_OFF);
+    get_level_state_from_composite_state_ExpectAnyArgsAndReturn(MOD_PD_STATE_OFF);
+    get_level_state_from_composite_state_ExpectAnyArgsAndReturn(sleep);
+    is_allowed_by_child_ExpectAnyArgsAndReturn(true);
+    is_allowed_by_children_ExpectAnyArgsAndReturn(true);
+    is_allowed_by_children_ExpectAnyArgsAndReturn(true);
+    is_allowed_by_parent_and_children_ExpectAnyArgsAndReturn(true);
+    retrieve_mapped_state_ExpectAndReturn(cluster, MOD_PD_STATE_OFF, MOD_PD_STATE_OFF);
+    fwk_module_get_element_name_IgnoreAndReturn("test-domain");
+    get_state_name_IgnoreAndReturn("test-state");
+
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, complete_system_suspend(core));
+    TEST_ASSERT_EQUAL(1, suspend_sequence_calls);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, suspend_sequence_states[0]);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, cluster->current_state);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, root->current_state);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, root->state_requested_to_driver);
+    TEST_ASSERT_EQUAL(sleep, root->requested_state);
+
+    is_deeper_state_ExpectAndReturn(MOD_PD_STATE_OFF, MOD_PD_STATE_ON, true);
+    is_allowed_by_parent_and_children_ExpectAndReturn(root, sleep, true);
+    retrieve_mapped_state_ExpectAndReturn(root, sleep, sleep);
+    process_power_state_transition_report(cluster, &report);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, cluster->current_state);
+    TEST_ASSERT_EQUAL(2, suspend_sequence_calls);
+    TEST_ASSERT_EQUAL(sleep, suspend_sequence_states[1]);
+    TEST_ASSERT_EQUAL(sleep, root->state_requested_to_driver);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, root->current_state);
+
+    report.state = sleep;
+    is_deeper_state_ExpectAndReturn(sleep, MOD_PD_STATE_ON, true);
+    process_power_state_transition_report(root, &report);
+    TEST_ASSERT_EQUAL(sleep, root->current_state);
+}
+
 int power_domain_test_main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_scoped_suspend_selects_system_not_last_pointer);
+    RUN_TEST(test_scoped_suspend_requires_unique_system_root);
+    RUN_TEST(test_scoped_suspend_rejects_nonroot_system);
+    RUN_TEST(test_scoped_suspend_membership);
+    RUN_TEST(test_scoped_suspend_ignores_independent_active_core);
+    RUN_TEST(test_scoped_suspend_still_rejects_two_ap_cores);
+    RUN_TEST(test_scoped_suspend_rejects_unsupported_state_before_queueing);
+    RUN_TEST(test_scoped_suspend_event_ignores_independent_core_and_cluster);
+    RUN_TEST(test_independent_set_state_does_not_cancel_system_suspend);
 #ifndef BUILD_HAS_NOTIFICATION
+    RUN_TEST(test_scoped_suspend_waits_for_cluster_report_before_root_request);
     RUN_TEST(test_set_state_cluster_on_expect_transition_init);
     RUN_TEST(test_set_state_core_on_while_cluster_off_expect_error_in_resp);
     RUN_TEST(test_set_state_error_in_initiating_transition);
@@ -1050,6 +1272,7 @@ int power_domain_test_main(void)
     RUN_TEST(test_complete_system_suspend);
     RUN_TEST(test_system_suspend_multiple_active_cores);
     RUN_TEST(test_system_suspend_single_active_core);
+    RUN_TEST(test_independent_root_report_does_not_clear_system_suspend);
 #else
     RUN_TEST(test_system_suspend_notification_on_last_core_off);
     RUN_TEST(test_system_suspend_no_notification_on_last_core_off);
