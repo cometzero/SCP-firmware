@@ -63,6 +63,37 @@ static int init_si_cluster_cores(fwk_id_t safety_island_cluster_id)
     start_id = platform_get_core_count() + cluster_offset +
         platform_get_cluster_count();
 
+    if (safety_island_cluster_ctx->config->skip_boot) {
+        fwk_id_t cluster_id;
+        unsigned int state;
+
+        /* RSE has already loaded CL1 before releasing CL0, leaving the
+         * cluster ON for LLRAM access. Never boot its cores; request the
+         * parent OFF through normal PD sequencing only after checking all
+         * cores are OFF. Success means queued, not physical OFF proof.
+         */
+        for (core = 0; core < num_cores; core++) {
+            pd_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, start_id + core);
+            status = safety_island_cluster_ctx->pd_restricted_api->get_state(
+                pd_id, &state);
+            if (status != FWK_SUCCESS)
+                return status;
+            /* get_state returns the core's composite state, including
+             * its still-ON parent and the highest-level field.
+             */
+            if ((state & MOD_PD_CS_STATE_MASK) != MOD_PD_STATE_OFF)
+                return FWK_E_STATE;
+        }
+        pd_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, start_id);
+        status = safety_island_cluster_ctx->pd_restricted_api->get_domain_parent_id(
+            pd_id, &cluster_id);
+        if (status != FWK_SUCCESS)
+            return status;
+        FWK_LOG_INFO(MOD_NAME "Diagnostic isolation: CL1 cores OFF; requesting cluster OFF");
+        return safety_island_cluster_ctx->pd_restricted_api->set_state(
+            cluster_id, false, MOD_PD_STATE_OFF);
+    }
+
     /* Composite Power Domain state to be set for the Safety Island */
     pd_state = MOD_PD_COMPOSITE_STATE(
         MOD_PD_LEVEL_1, 0, 0, MOD_PD_STATE_ON, MOD_PD_STATE_ON);

@@ -231,6 +231,13 @@ static int pfdi_monitor_start(fwk_id_t id)
             fwk_module_get_element_name(id));
     }
 
+    if (core_cfg->start_suspended) {
+        FWK_LOG_INFO(
+            MOD_NAME "%s initial OFF isolation: awaiting power ON notification",
+            fwk_module_get_element_name(id));
+        return status;
+    }
+
     status = core_ctx->alarm_api->start(
         core_cfg->alarm_id,
         core_cfg->oor_pfdi_period_us,

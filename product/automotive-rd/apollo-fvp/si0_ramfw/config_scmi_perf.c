@@ -8,6 +8,8 @@
 #include "si0_cfgd_dvfs.h"
 #include "si0_cfgd_scmi.h"
 #include "si0_cfgd_timer.h"
+#include "platform_core.h"
+#include "si0_cfgd_power_domain.h"
 #include "si0_cfgd_transport.h"
 
 #include <internal/scmi_perf.h>
@@ -85,10 +87,25 @@ static const struct mod_scmi_perf_domain_config
         },
     };
 
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+static fwk_id_t fast_channel_power_domain_id(void)
+{
+    return FWK_ID_ELEMENT(
+        FWK_MODULE_IDX_POWER_DOMAIN,
+        platform_get_core_count() + platform_get_cluster_count() +
+            PD_STATIC_DEV_IDX_SYSTOP);
+}
+#endif
+
 const struct fwk_module_config config_scmi_perf = {
     .data = &((struct mod_scmi_perf_config){
         .domains = &domains,
         .perf_doms_count = FWK_ARRAY_SIZE(domains),
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+        .fast_channel_power_domain_id = fast_channel_power_domain_id,
+        /* Content retention does not permit accessing SRAM while SYS0 is OFF. */
+        .fast_channel_memory_retained = APOLLO_FVP_AP_SRAM_RETAINED,
+#endif
 #ifdef BUILD_HAS_SCMI_PERF_FAST_CHANNELS
         .fast_channels_rate_limit = APOLLO_FVP_FCH_RATE,
 #endif

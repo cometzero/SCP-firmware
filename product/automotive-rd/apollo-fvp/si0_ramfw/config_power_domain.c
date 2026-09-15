@@ -11,6 +11,7 @@
 #include "platform_core.h"
 #include "si0_cfgd_power_domain.h"
 #include "si_scr_info.h"
+#include "si0_cfgd_timer.h"
 
 #include <power_domain_utils.h>
 
@@ -37,6 +38,9 @@
 /* Mask of the allowed states for the systop power domain */
 static const uint32_t systop_allowed_state_mask_table[] = {
     [0] = MOD_PD_STATE_ON_MASK
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+        | (1U << MOD_SYSTEM_POWER_POWER_STATE_SLEEP0)
+#endif
 };
 
 /*
@@ -46,6 +50,9 @@ static const uint32_t systop_allowed_state_mask_table[] = {
 static const uint32_t cluster_pd_allowed_state_mask_table[] = {
     [MOD_PD_STATE_OFF] = MOD_PD_STATE_OFF_MASK,
     [MOD_PD_STATE_ON] = CLUSTER_VALID_STATE_MASK,
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+    [MOD_SYSTEM_POWER_POWER_STATE_SLEEP0] = MOD_PD_STATE_OFF_MASK,
+#endif
 };
 
 /* Mask of the allowed states for a core depending on the cluster states. */
@@ -54,9 +61,9 @@ static const uint32_t core_pd_allowed_state_mask_table[] = {
     [MOD_PD_STATE_ON] = CORE_VALID_STATE_MASK,
 };
 
-/* Power module specific configuration data (none) */
+/* AP system suspend must not include the independent SI Cluster1 root. */
 static const struct mod_power_domain_config platform_power_domain_config = {
-    0
+    .scope_system_suspend_to_system_domain = true,
 };
 
 /* Create SI Cluster1 power domain elements */

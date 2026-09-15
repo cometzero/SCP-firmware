@@ -14,6 +14,7 @@
 #include <fwk_id.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*!
  * \brief API indices
@@ -71,6 +72,8 @@ struct mod_pfdi_monitor_core_config {
     unsigned int boot_timeout_us;
     /*! The online PFDI alarm interval in microseconds */
     unsigned int onl_pfdi_period_us;
+    /*! Core is deliberately held at initial OFF; await ON notification. */
+    bool start_suspended;
 };
 
 #endif /* MOD_PFDI_MONITOR_H */

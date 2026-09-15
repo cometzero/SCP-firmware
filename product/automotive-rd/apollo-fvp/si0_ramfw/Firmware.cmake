@@ -33,6 +33,24 @@ set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS TRUE)
 set(SCP_ENABLE_EXCEPTION_SYMTAB TRUE)
 set(SCP_EXCEPTION_SYMTAB_MAX_SIZE 131072)
 
+# Destructive, opt-in AP suspend experiments. Production defaults stay disabled.
+option(SCP_APOLLO_FVP_ISOLATE_CL1 "Keep CL1 at its initial powered-off state" OFF)
+option(APOLLO_FVP_AP_SRAM_RETAINED
+    "AP secure/nonsecure SRAM content is retained across SYS0 OFF" ON)
+option(APOLLO_FVP_SUSPEND_KEEP_SYSTOP_ON
+    "Keep SYS0 powered during experimental AP core/cluster suspend" ON)
+set(APOLLO_FVP_TEST_SUSPEND_WAKE_US "0" CACHE STRING
+    "Experimental AP domain-off wake alarm delay in microseconds (0 disables)")
+if(NOT APOLLO_FVP_TEST_SUSPEND_WAKE_US MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "APOLLO_FVP_TEST_SUSPEND_WAKE_US must be an unsigned integer")
+endif()
+if(APOLLO_FVP_TEST_SUSPEND_WAKE_US GREATER 60000000)
+    message(FATAL_ERROR "Experimental suspend wake delay must not exceed 60 seconds")
+endif()
+if(APOLLO_FVP_TEST_SUSPEND_WAKE_US GREATER 0 AND NOT SCP_APOLLO_FVP_ISOLATE_CL1)
+    message(FATAL_ERROR "Experimental AP suspend requires CL1 isolation")
+endif()
+
 if (NOT DEFINED SCP_PLATFORM_VARIANT)
     set(SCP_PLATFORM_VARIANT "fvp")
 endif()

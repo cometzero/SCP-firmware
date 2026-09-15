@@ -132,6 +132,9 @@ static const struct fwk_element *get_pfdi_monitor_element_table(fwk_id_t unused)
             .oor_pfdi_period_us = SICL1_OOR_PFDI_PERIOD_US,
             .onl_pfdi_period_us = SICL1_PFDI_ONLINE_TIMEOUT_US,
             .boot_timeout_us = SICL1_BOOT_TIMEOUT_US,
+#if defined(SCP_APOLLO_FVP_ISOLATE_CL1) && SCP_APOLLO_FVP_ISOLATE_CL1
+            .start_suspended = true,
+#endif
         };
     }
 #endif /* APOLLO_FVP_VARIANT_CFG1 */

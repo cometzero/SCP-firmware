@@ -12,6 +12,7 @@
 #include "si0_cfgd_power_domain.h"
 #include "si0_mmap.h"
 #include "si_scr_info.h"
+#include "si0_cfgd_timer.h"
 
 #include <mod_power_domain.h>
 #include <mod_ppu_v1.h>
@@ -35,6 +36,13 @@
 #define SI1_CORE_BASE_OFFSET (0x40000)
 #define SI1_CORE_STRIDE      (0x100000)
 
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0 || SCP_APOLLO_FVP_ISOLATE_CL1
+static struct mod_ppu_v1_timer_config test_ppu_timeout = {
+    .timer_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
+    .set_state_timeout_us = 1000000,
+};
+#endif
+
 /* Module configuration data */
 static struct mod_ppu_v1_config ppu_v1_config_data = {
     .pd_notification_id = FWK_ID_NOTIFICATION_INIT(
@@ -52,6 +60,9 @@ static struct fwk_element ppu_element_table[] = {
             .ppu.reg_base = SI0_PPU_SYS0_BASE,
             .default_power_on = true,
             .observer_id = FWK_ID_NONE_INIT,
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+            .timer_config = &test_ppu_timeout,
+#endif
         }),
     },
 };
@@ -154,6 +165,10 @@ static int setup_si_cluster1_elements(
     pd_config->observer_id = FWK_ID_NONE;
     pd_config->observer_api = FWK_ID_NONE;
     pd_config->opmode = PPU_V1_OPMODE_07;
+#if SCP_APOLLO_FVP_ISOLATE_CL1
+    /* Keep the opt-in cluster isolation request bounded on missing ACK. */
+    pd_config->timer_config = &test_ppu_timeout;
+#endif
 
     element->name = "CLUS1";
     element->data = pd_config;
@@ -227,6 +242,15 @@ static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
             pd_config->ppu.reg_base =
                 cluster_utility_core_ppu_base(cluster_idx, core_idx);
             pd_config->ppu.irq = FWK_INTERRUPT_NONE;
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+            pd_config->timer_config = &test_ppu_timeout;
+            /* Alarm sub-elements permit only one bound consumer each. */
+            pd_config->suspend_poll_alarm_id = FWK_ID_SUB_ELEMENT(
+                FWK_MODULE_IDX_TIMER, SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
+                SI0_CFGD_TEST_AP_SUSPEND_POLL_ALARM_IDX + core_element_count);
+            pd_config->suspend_poll_interval_us = 1000;
+            pd_config->suspend_poll_attempts = 1000;
+#endif
             pd_config->cluster_id = FWK_ID_ELEMENT(
                 FWK_MODULE_IDX_PPU_V1, (core_count + cluster_idx));
             pd_config->observer_id = FWK_ID_NONE;
@@ -251,6 +275,9 @@ static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
 
         pd_config->pd_type = MOD_PD_TYPE_CLUSTER;
         pd_config->ppu.irq = FWK_INTERRUPT_NONE;
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+        pd_config->timer_config = &test_ppu_timeout;
+#endif
         pd_config->observer_id = FWK_ID_NONE;
         pd_config->observer_api = FWK_ID_NONE;
         pd_config->ppu.reg_base = cluster_utility_cluster_ppu_base(cluster_idx);

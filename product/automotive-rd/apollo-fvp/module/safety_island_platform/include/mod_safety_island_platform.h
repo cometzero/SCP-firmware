@@ -16,6 +16,7 @@
 #include <fwk_id.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*!
  * \brief Safety Island cluster layout.
@@ -35,6 +36,8 @@ struct safety_island_platform_cluster_layout {
 struct safety_island_cluster_config {
     /* Safety Island cluster layout */
     const struct safety_island_platform_cluster_layout cluster_layout;
+    /*! Opt-in diagnostic isolation: do not boot cores; request cluster OFF. */
+    bool skip_boot;
 };
 
 /*!

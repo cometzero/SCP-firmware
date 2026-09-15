@@ -13,6 +13,10 @@
 
 #define SI0_SI0_TIMER_ALARM_ELEMENT_IDX 0
 
+#ifndef APOLLO_FVP_TEST_SUSPEND_WAKE_US
+#define APOLLO_FVP_TEST_SUSPEND_WAKE_US 0
+#endif
+
 /* Sub-element indexes (alarms) for SI0 timer device */
 enum si0_cfgd_mod_timer_si0_timer_alarm_idx {
 #ifdef BUILD_HAS_SCMI_NOTIFICATIONS
@@ -47,6 +51,12 @@ enum si0_cfgd_mod_timer_si0_timer_alarm_idx {
     SI0_CFGD_DVFS_ALARM_IDX_CLUSTER3,
 #ifdef BUILD_HAS_SCMI_PERF_FAST_CHANNELS
     SI0_CFGD_FAST_CHANNEL_TIMER_IDX,
+#endif
+#if APOLLO_FVP_TEST_SUSPEND_WAKE_US > 0
+    SI0_CFGD_TEST_AP_SUSPEND_POLL_ALARM_IDX,
+    /* Each of the maximum 16 AP cores binds its own alarm sub-element. */
+    SI0_CFGD_TEST_AP_SUSPEND_WAKE_ALARM_IDX =
+        SI0_CFGD_TEST_AP_SUSPEND_POLL_ALARM_IDX + 16,
 #endif
     SI0_CFGD_MOD_TIMER_SI0_TIMER_ALARM_IDX_COUNT,
 };

@@ -28,6 +28,9 @@ static struct fwk_element
         .name = "Safety Island Cluster 1",
         .data = &((struct safety_island_cluster_config) {
             .cluster_layout = {SI_CL1_ID, SI1_CORE_COUNT, SI_CL1_CORE_OFS},
+#if defined(SCP_APOLLO_FVP_ISOLATE_CL1) && SCP_APOLLO_FVP_ISOLATE_CL1
+            .skip_boot = true,
+#endif
         }),
     },
     [SI_CL_COUNT] = { 0 },
