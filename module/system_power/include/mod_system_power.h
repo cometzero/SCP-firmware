@@ -17,6 +17,7 @@
 #include <fwk_module_idx.h>
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 /*!
@@ -61,6 +62,19 @@ struct mod_system_power_dev_config {
 struct mod_system_power_config {
     /*! SoC wakeup IRQ number */
     unsigned int soc_wakeup_irq;
+
+    /*! Test-only timer wake source; zero delay leaves this backend disabled. */
+    fwk_id_t test_wake_alarm_id;
+    uint32_t test_wake_delay_us;
+    /*! Test logical SLEEP0 with physical SYSTOP remaining ON. */
+    bool test_keep_systop_on;
+    /*! Mandatory physical child-OFF readback for the SYSTOP-ON experiment. */
+    int (*test_children_off_check)(void);
+    /*! Optional test-only SRAM fingerprint: true before OFF, false after ON.
+     * A failure prevents the transition/ON report and therefore CPU release.
+     * NULL preserves the normal platform behavior.
+     */
+    int (*test_retention_check)(bool before_power_off);
 
     /*! Number of extended PPUs */
     size_t ext_ppus_count;

@@ -14,3 +14,7 @@ target_sources(${SCP_MODULE_TARGET}
                PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/mod_system_power.c")
 
 target_link_libraries(${SCP_MODULE_TARGET} PUBLIC module-power-domain)
+
+if("timer" IN_LIST SCP_MODULES)
+    target_link_libraries(${SCP_MODULE_TARGET} PRIVATE module-timer)
+endif()

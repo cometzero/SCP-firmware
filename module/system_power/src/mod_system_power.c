@@ -10,6 +10,9 @@
 
 #include <mod_power_domain.h>
 #include <mod_system_power.h>
+#ifdef BUILD_HAS_MOD_TIMER
+#    include <mod_timer.h>
+#endif
 
 #include <fwk_assert.h>
 #include <fwk_id.h>
@@ -78,9 +81,108 @@ struct mod_system_power_ctx {
      * suspend.
      */
     fwk_id_t last_core_pd_id;
+#ifdef BUILD_HAS_MOD_TIMER
+    const struct mod_timer_alarm_api *test_wake_alarm;
+#endif
+    bool test_wake_armed;
+    bool test_retention_pending;
+    bool test_retention_off_verified;
 };
 
 static struct mod_system_power_ctx system_power_ctx;
+static int set_system_power_state(unsigned int state);
+
+#ifdef BUILD_HAS_MOD_TIMER
+static void test_suspend_wake_callback(uintptr_t unused)
+{
+    int status;
+
+    (void)unused;
+    if (!system_power_ctx.test_wake_armed)
+        return;
+    system_power_ctx.test_wake_armed = false;
+    FWK_LOG_INFO("[SYS-POW TEST] Timer wake: requesting AP ON");
+    status = system_power_ctx.pd_restricted_api->set_state(
+        system_power_ctx.last_core_pd_id, false,
+        MOD_SYSTEM_POWER_SOC_WAKEUP_STATE);
+    if (status != FWK_SUCCESS)
+        FWK_LOG_ERR("[SYS-POW TEST] AP wake request failed: %d", status);
+}
+
+static int test_suspend_power_off(void)
+{
+    int status;
+    unsigned int i, actual_state;
+    struct system_power_dev_ctx *dev_ctx;
+
+    if (system_power_ctx.test_wake_alarm == NULL)
+        return FWK_E_SUPPORT;
+    status = system_power_ctx.pd_driver_input_api->get_last_core_pd_id(
+        &system_power_ctx.last_core_pd_id);
+    if (status != FWK_SUCCESS)
+        return status;
+
+    if (system_power_ctx.config->test_keep_systop_on) {
+        if (system_power_ctx.config->test_children_off_check == NULL)
+            return FWK_E_SUPPORT;
+        status = system_power_ctx.config->test_children_off_check();
+        if (status != FWK_SUCCESS)
+            return status;
+    }
+
+    if (!system_power_ctx.config->test_keep_systop_on &&
+        system_power_ctx.config->test_retention_check != NULL) {
+        /* Never fingerprint an inaccessible domain, including on retries. */
+        for (i = 0; i < system_power_ctx.dev_count; i++) {
+            dev_ctx = &system_power_ctx.dev_ctx_table[i];
+            status = dev_ctx->sys_ppu_api->get_state(
+                dev_ctx->config->sys_ppu_id, &actual_state);
+            if (status != FWK_SUCCESS)
+                return status;
+            if (actual_state != MOD_PD_STATE_ON)
+                return FWK_E_STATE;
+        }
+        system_power_ctx.test_retention_off_verified = false;
+        status = system_power_ctx.config->test_retention_check(true);
+        if (status != FWK_SUCCESS)
+            return status;
+        system_power_ctx.test_retention_pending = true;
+    }
+
+    status = set_system_power_state(MOD_SYSTEM_POWER_POWER_STATE_SLEEP0);
+    if (status != FWK_SUCCESS)
+        return status;
+
+    /* Do not arm wake or claim OFF on a mere accepted power request. */
+    for (i = 0; i < system_power_ctx.dev_count; i++) {
+        dev_ctx = &system_power_ctx.dev_ctx_table[i];
+        status = dev_ctx->sys_ppu_api->get_state(
+            dev_ctx->config->sys_ppu_id, &actual_state);
+        if (status != FWK_SUCCESS || actual_state !=
+            (system_power_ctx.config->test_keep_systop_on ?
+                MOD_PD_STATE_ON : MOD_PD_STATE_OFF)) {
+            FWK_LOG_ERR("[SYS-POW TEST] SYS%u requested physical state not observed (%d)", i, status);
+            return FWK_E_STATE;
+        }
+    }
+    if (system_power_ctx.config->test_keep_systop_on) {
+        FWK_LOG_INFO("[SYS-POW TEST] AP cores/clusters OFF; SYSTOP remains ON; arming timer (logical SLEEP0)");
+    } else {
+        FWK_LOG_INFO("[SYS-POW TEST] AP SYS0 PPU OFF observed; arming timer");
+        system_power_ctx.test_retention_off_verified = true;
+    }
+    system_power_ctx.test_wake_armed = true;
+    status = system_power_ctx.test_wake_alarm->start(
+        system_power_ctx.config->test_wake_alarm_id,
+        system_power_ctx.config->test_wake_delay_us,
+        MOD_TIMER_ALARM_TYPE_ONCE, test_suspend_wake_callback, 0);
+    if (status != FWK_SUCCESS) {
+        system_power_ctx.test_wake_armed = false;
+        FWK_LOG_ERR("[SYS-POW TEST] Wake alarm arm failed: %d", status);
+    }
+    return status;
+}
+#endif
 
 /*
  * Static helpers
@@ -242,6 +344,13 @@ static int system_power_set_state(fwk_id_t pd_id, unsigned int state)
 
     switch (state) {
     case (unsigned int)MOD_PD_STATE_ON:
+#ifdef BUILD_HAS_MOD_TIMER
+        if (system_power_ctx.test_wake_armed) {
+            system_power_ctx.test_wake_alarm->stop(
+                system_power_ctx.config->test_wake_alarm_id);
+            system_power_ctx.test_wake_armed = false;
+        }
+#endif
         status = disable_all_irqs();
         if (status != FWK_SUCCESS) {
             return status;
@@ -257,6 +366,10 @@ static int system_power_set_state(fwk_id_t pd_id, unsigned int state)
         break;
 
     case (unsigned int)MOD_SYSTEM_POWER_POWER_STATE_SLEEP0:
+#ifdef BUILD_HAS_MOD_TIMER
+        if (system_power_ctx.config->test_wake_delay_us != 0)
+            return test_suspend_power_off();
+#endif
         ext_ppus_set_state(MOD_PD_STATE_OFF);
 
         status = fwk_interrupt_clear_pending(soc_wakeup_irq);
@@ -377,6 +490,8 @@ static int system_power_report_power_state_transition(fwk_id_t dev_id,
     unsigned int state)
 {
     static unsigned int sys_ppu_transition_count = 0;
+    unsigned int i, actual_state;
+    int status;
 
     sys_ppu_transition_count++;
 
@@ -384,9 +499,34 @@ static int system_power_report_power_state_transition(fwk_id_t dev_id,
         return FWK_SUCCESS;
     }
 
-    system_power_ctx.state = system_power_ctx.requested_state;
-
     sys_ppu_transition_count = 0;
+
+    /* Validate SRAM before publishing ON to the PD tree. Publishing first
+     * could release a child CPU before its retained memory is checked.
+     */
+    if (system_power_ctx.test_retention_pending &&
+        system_power_ctx.requested_state == MOD_PD_STATE_ON) {
+        if (!system_power_ctx.test_retention_off_verified)
+            return FWK_E_STATE;
+        for (i = 0; i < system_power_ctx.dev_count; i++) {
+            struct system_power_dev_ctx *ctx = &system_power_ctx.dev_ctx_table[i];
+
+            status = ctx->sys_ppu_api->get_state(ctx->config->sys_ppu_id,
+                                                &actual_state);
+            if (status != FWK_SUCCESS)
+                return status;
+            if (actual_state != MOD_PD_STATE_ON)
+                return FWK_E_STATE;
+        }
+        status = system_power_ctx.config->test_retention_check(false);
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_ERR("[SYS-POW TEST] SRAM retention failed; CPU release blocked: %d", status);
+            return status;
+        }
+        system_power_ctx.test_retention_pending = false;
+    }
+
+    system_power_ctx.state = system_power_ctx.requested_state;
 
     return system_power_ctx.pd_driver_input_api->report_power_state_transition(
         system_power_ctx.mod_pd_system_id, system_power_ctx.state);
@@ -479,6 +619,20 @@ static int system_power_bind(fwk_id_t id, unsigned int round)
     if (fwk_id_is_type(id, FWK_ID_TYPE_MODULE)) {
 
         config = system_power_ctx.config;
+
+#ifdef BUILD_HAS_MOD_TIMER
+        if (config->test_wake_delay_us != 0) {
+            if (config->soc_wakeup_irq != FWK_INTERRUPT_NONE)
+                return FWK_E_PARAM;
+            status = fwk_module_bind(config->test_wake_alarm_id,
+                MOD_TIMER_API_ID_ALARM, &system_power_ctx.test_wake_alarm);
+            if (status != FWK_SUCCESS)
+                return status;
+        }
+#else
+        if (config->test_wake_delay_us != 0)
+            return FWK_E_SUPPORT;
+#endif
 
         for (i = 0; i < config->ext_ppus_count; i++) {
             status = fwk_module_bind(
