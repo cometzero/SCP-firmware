@@ -62,6 +62,12 @@ struct mod_scmi_system_power_config {
     unsigned int system_suspend_state;
 
     /*!
+     * Hide and reject system suspend when platform wake/context restoration
+     * is not available. False preserves the legacy advertised capability.
+     */
+    bool disable_system_suspend;
+
+    /*!
      * \brief Identifier of the alarm for graceful request timeout.
      *
      * \note This alarm is optional, if it is not used it must be set to

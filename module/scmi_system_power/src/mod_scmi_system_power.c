@@ -257,8 +257,9 @@ static int scmi_sys_power_msg_attributes_handler(fwk_id_t service_id,
     };
 
     if (message_id == MOD_SCMI_SYS_POWER_STATE_SET) {
-        return_values.attributes |= SYS_POWER_STATE_SET_ATTRIBUTES_SUSPEND |
-                                    SYS_POWER_STATE_SET_ATTRIBUTES_WARM_RESET;
+        return_values.attributes |= SYS_POWER_STATE_SET_ATTRIBUTES_WARM_RESET;
+        if (!scmi_sys_power_ctx.config->disable_system_suspend)
+            return_values.attributes |= SYS_POWER_STATE_SET_ATTRIBUTES_SUSPEND;
     }
 
 exit:
@@ -393,6 +394,13 @@ static int scmi_sys_power_state_set_handler(fwk_id_t service_id,
 
     if (parameters->flags & (uint32_t)(~STATE_SET_FLAGS_MASK)) {
         return_values.status = (int32_t)SCMI_INVALID_PARAMETERS;
+        goto exit;
+    }
+
+    /* Reject before policy dispatch, notifications or asynchronous acceptance. */
+    if (scmi_sys_power_ctx.config->disable_system_suspend &&
+        mod_scmi_system_state == SCMI_SYSTEM_STATE_SUSPEND) {
+        return_values.status = (int32_t)SCMI_NOT_SUPPORTED;
         goto exit;
     }
 

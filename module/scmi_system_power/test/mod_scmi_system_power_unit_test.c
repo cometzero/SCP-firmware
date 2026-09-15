@@ -56,6 +56,7 @@ void setUp(void)
     fake_config.wakeup_power_domain_id = pd_id;
     fake_config.wakeup_composite_state = 0;
     fake_config.system_suspend_state = MOD_PD_SYSTEM_SHUTDOWN;
+    fake_config.disable_system_suspend = false;
 }
 
 void tearDown(void)
@@ -370,9 +371,71 @@ void test_system_state_get_suspend(void)
     TEST_ASSERT_EQUAL(system_state, SCMI_SYSTEM_STATE_SUSPEND);
 }
 
+static uint32_t captured_attributes;
+static int32_t captured_status;
+
+static int capture_scmi_response(
+    fwk_id_t service_id, const void *payload, size_t size, int call_count)
+{
+    (void)service_id;
+    (void)call_count;
+    TEST_ASSERT_GREATER_OR_EQUAL(sizeof(int32_t), size);
+    captured_status = *(const int32_t *)payload;
+    if (size == sizeof(struct scmi_protocol_message_attributes_p2a))
+        captured_attributes =
+            ((const struct scmi_protocol_message_attributes_p2a *)payload)->attributes;
+    return FWK_SUCCESS;
+}
+
+void test_suspend_capability_disabled_without_affecting_warm_reset(void)
+{
+    const uint32_t message = MOD_SCMI_SYS_POWER_STATE_SET;
+
+    fake_config.disable_system_suspend = true;
+    scmi_respond_StubWithCallback(capture_scmi_response);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        scmi_sys_power_msg_attributes_handler(FWK_ID_NONE, &message));
+    TEST_ASSERT_EQUAL(SCMI_SUCCESS, captured_status);
+    TEST_ASSERT_EQUAL(SYS_POWER_STATE_SET_ATTRIBUTES_WARM_RESET,
+        captured_attributes);
+}
+
+void test_suspend_capability_enabled_by_default(void)
+{
+    const uint32_t message = MOD_SCMI_SYS_POWER_STATE_SET;
+
+    scmi_respond_StubWithCallback(capture_scmi_response);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        scmi_sys_power_msg_attributes_handler(FWK_ID_NONE, &message));
+    TEST_ASSERT_EQUAL(SCMI_SUCCESS, captured_status);
+    TEST_ASSERT_EQUAL(SYS_POWER_STATE_SET_ATTRIBUTES_WARM_RESET |
+        SYS_POWER_STATE_SET_ATTRIBUTES_SUSPEND, captured_attributes);
+}
+
+void test_disabled_suspend_rejected_before_policy_or_power_domain(void)
+{
+    struct scmi_sys_power_state_set_a2p request = {
+        .system_state = SCMI_SYSTEM_STATE_SUSPEND,
+    };
+
+    fake_config.disable_system_suspend = true;
+    scmi_respond_StubWithCallback(capture_scmi_response);
+    /* No agent, policy, timer, notification or power-domain call is allowed. */
+    for (uint32_t flags = 0; flags <= STATE_SET_FLAGS_GRACEFUL_REQUEST; flags++) {
+        request.flags = flags;
+        TEST_ASSERT_EQUAL(FWK_SUCCESS, scmi_sys_power_state_set_handler(
+            FWK_ID_NONE, (const uint32_t *)&request));
+        TEST_ASSERT_EQUAL(SCMI_NOT_SUPPORTED, captured_status);
+        TEST_ASSERT_FALSE(scmi_sys_power_ctx.start_graceful_process);
+    }
+}
+
 int scmi_test_main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_suspend_capability_disabled_without_affecting_warm_reset);
+    RUN_TEST(test_suspend_capability_enabled_by_default);
+    RUN_TEST(test_disabled_suspend_rejected_before_policy_or_power_domain);
 
     RUN_TEST(test_state_set_reset_handler_success);
     RUN_TEST(test_state_set_reset_handler_pending);
