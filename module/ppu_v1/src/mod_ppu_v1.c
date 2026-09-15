@@ -60,6 +60,8 @@ struct ppu_v1_pd_ctx {
 
     /*! Alarm to be used for deeper locking states */
     struct mod_timer_alarm_api *alarm_api;
+    struct mod_timer_alarm_api *suspend_poll_alarm;
+    uint32_t suspend_polls_left;
 };
 
 /* Cluster power domain specific context */
@@ -300,7 +302,11 @@ static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state)
                                           PPU_V1_MODE_ON,
                                           PPU_V1_EDGE_SENSITIVITY_MASKED);
         ppu_v1_interrupt_mask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
-        ppu_v1_set_power_mode(ppu, PPU_V1_MODE_OFF, pd_ctx->timer_ctx);
+        status = ppu_v1_set_power_mode(ppu, PPU_V1_MODE_OFF, pd_ctx->timer_ctx);
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_ERR("[PPU_V1] Core OFF failed: %d", status);
+            return status;
+        }
         ppu_v1_lock_off_disable(ppu);
         ppu_v1_off_unlock(ppu);
         status = pd_ctx->pd_driver_input_api->report_power_state_transition(
@@ -314,7 +320,11 @@ static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state)
         ppu_v1_set_input_edge_sensitivity(
             ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
 
-        ppu_v1_set_power_mode(ppu, PPU_V1_MODE_ON, pd_ctx->timer_ctx);
+        status = ppu_v1_set_power_mode(ppu, PPU_V1_MODE_ON, pd_ctx->timer_ctx);
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_ERR("[PPU_V1] Core ON failed: %d", status);
+            return status;
+        }
         ppu_v1_dynamic_enable(ppu, PPU_V1_MODE_OFF);
         status = pd_ctx->pd_driver_input_api->report_power_state_transition(
             pd_ctx->bound_id, MOD_PD_STATE_ON);
@@ -361,10 +371,45 @@ static int ppu_v1_core_pd_reset(fwk_id_t core_pd_id)
     return status;
 }
 
+#ifdef BUILD_HAS_MOD_TIMER
+static void suspend_poll_callback(uintptr_t param)
+{
+    struct ppu_v1_pd_ctx *pd_ctx = (struct ppu_v1_pd_ctx *)param;
+    unsigned int state;
+    int status;
+
+    if (pd_ctx->suspend_polls_left == 0)
+        return;
+    status = get_state(&pd_ctx->ppu, &state);
+    if (status == FWK_SUCCESS && state == MOD_PD_STATE_OFF) {
+        pd_ctx->suspend_polls_left = 0;
+        FWK_LOG_INFO("[PPU TEST] Last AP core PWSR OFF observed");
+        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
+            pd_ctx->bound_id, MOD_PD_STATE_OFF);
+        if (status != FWK_SUCCESS)
+            FWK_LOG_ERR("[PPU TEST] OFF report failed: %d", status);
+        return;
+    }
+    if (--pd_ctx->suspend_polls_left == 0) {
+        FWK_LOG_ERR("[PPU TEST] OFF timeout PWPR=%08x PWSR=%08x DISR=%08x",
+            pd_ctx->ppu.ppu_reg->PWPR, pd_ctx->ppu.ppu_reg->PWSR,
+            pd_ctx->ppu.ppu_reg->DISR);
+        return;
+    }
+    status = pd_ctx->suspend_poll_alarm->start(
+        pd_ctx->config->suspend_poll_alarm_id,
+        pd_ctx->config->suspend_poll_interval_us, MOD_TIMER_ALARM_TYPE_ONCE,
+        suspend_poll_callback, param);
+    if (status != FWK_SUCCESS)
+        FWK_LOG_ERR("[PPU TEST] Suspend poll rearm failed: %d", status);
+}
+#endif
+
 static int ppu_v1_core_pd_prepare_for_system_suspend(fwk_id_t core_pd_id)
 {
     struct ppu_v1_pd_ctx *pd_ctx;
     struct ppu_v1_regs *ppu;
+    int status;
 
     pd_ctx = ppu_v1_ctx.pd_ctx_table + fwk_id_get_element_idx(core_pd_id);
     ppu = &pd_ctx->ppu;
@@ -372,7 +417,19 @@ static int ppu_v1_core_pd_prepare_for_system_suspend(fwk_id_t core_pd_id)
     ppu_v1_set_input_edge_sensitivity(ppu,
                                       PPU_V1_MODE_ON,
                                       PPU_V1_EDGE_SENSITIVITY_MASKED);
-    ppu_v1_request_power_mode(ppu, PPU_V1_MODE_OFF);
+    status = ppu_v1_request_power_mode(ppu, PPU_V1_MODE_OFF);
+    if (status != FWK_SUCCESS)
+        return status;
+
+#ifdef BUILD_HAS_MOD_TIMER
+    if (pd_ctx->suspend_poll_alarm != NULL) {
+        pd_ctx->suspend_polls_left = pd_ctx->config->suspend_poll_attempts;
+        return pd_ctx->suspend_poll_alarm->start(
+            pd_ctx->config->suspend_poll_alarm_id,
+            pd_ctx->config->suspend_poll_interval_us, MOD_TIMER_ALARM_TYPE_ONCE,
+            suspend_poll_callback, (uintptr_t)pd_ctx);
+    }
+#endif
 
     return FWK_SUCCESS;
 }
@@ -470,11 +527,20 @@ static void unlock_all_cores(struct ppu_v1_pd_ctx *pd_ctx)
     }
 }
 
+static bool core_lock_completed_or_wake(void *data)
+{
+    struct ppu_v1_regs *ppu = data;
+
+    return ppu_v1_is_locked(ppu) ||
+        ppu_v1_is_power_devactive_high(ppu, PPU_V1_MODE_ON);
+}
+
 static bool lock_all_dynamic_cores(struct ppu_v1_pd_ctx *pd_ctx)
 {
     struct ppu_v1_cluster_pd_ctx *cluster_pd_ctx;
     struct ppu_v1_regs *core_ppu;
     unsigned int core_idx;
+    int status;
 
     fwk_assert(pd_ctx != NULL);
 
@@ -488,9 +554,18 @@ static bool lock_all_dynamic_cores(struct ppu_v1_pd_ctx *pd_ctx)
         }
 
         ppu_v1_lock_off_enable(core_ppu);
-        while ((!ppu_v1_is_locked(core_ppu)) &&
-               (!ppu_v1_is_power_devactive_high(core_ppu, PPU_V1_MODE_ON))) {
-            continue;
+        if (pd_ctx->timer_ctx != NULL) {
+            status = pd_ctx->timer_ctx->timer_api->wait(
+                pd_ctx->timer_ctx->timer_id, pd_ctx->timer_ctx->delay_us,
+                core_lock_completed_or_wake, core_ppu);
+            if (status != FWK_SUCCESS) {
+                FWK_LOG_ERR("[PPU_V1] Core %u lock OFF failed: %d",
+                    core_idx, status);
+                return false;
+            }
+        } else {
+            while (!core_lock_completed_or_wake(core_ppu))
+                continue;
         }
 
         if (ppu_v1_is_power_devactive_high(core_ppu, PPU_V1_MODE_ON)) {
@@ -505,6 +580,7 @@ static bool cluster_off(struct ppu_v1_pd_ctx *pd_ctx)
 {
     struct ppu_v1_regs *ppu;
     bool lock_successful;
+    int status;
 
     fwk_assert(pd_ctx != NULL);
 
@@ -520,11 +596,16 @@ static bool cluster_off(struct ppu_v1_pd_ctx *pd_ctx)
         return false;
     }
 
-    ppu_v1_set_power_mode(ppu, PPU_V1_MODE_OFF, pd_ctx->timer_ctx);
+    status = ppu_v1_set_power_mode(ppu, PPU_V1_MODE_OFF, pd_ctx->timer_ctx);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR("[PPU_V1] Cluster OFF failed: %d", status);
+        unlock_all_cores(pd_ctx);
+        return false;
+    }
     return true;
 }
 
-static void cluster_on(struct ppu_v1_pd_ctx *pd_ctx)
+static int cluster_on(struct ppu_v1_pd_ctx *pd_ctx)
 {
     int status;
     struct ppu_v1_regs *ppu;
@@ -537,13 +618,19 @@ static void cluster_on(struct ppu_v1_pd_ctx *pd_ctx)
                                       PPU_V1_MODE_ON,
                                       PPU_V1_EDGE_SENSITIVITY_MASKED);
 
-    ppu_v1_request_operating_mode(ppu, pd_ctx->config->opmode);
+    status = ppu_v1_request_operating_mode(ppu, pd_ctx->config->opmode);
+    if (status != FWK_SUCCESS)
+        return status;
 
     if (ppu_v1_ctx.is_cluster_ppu_dynamic_mode_configured) {
         ppu_v1_lock_off_enable(ppu);
         ppu_v1_dynamic_enable(ppu, PPU_V1_MODE_OFF);
     } else {
-        ppu_v1_set_power_mode(ppu, PPU_V1_MODE_ON, pd_ctx->timer_ctx);
+        status = ppu_v1_set_power_mode(ppu, PPU_V1_MODE_ON, pd_ctx->timer_ctx);
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_ERR("[PPU_V1] Cluster ON failed: %d", status);
+            return status;
+        }
     }
 
     status = pd_ctx->pd_driver_input_api->report_power_state_transition(
@@ -556,6 +643,7 @@ static void cluster_on(struct ppu_v1_pd_ctx *pd_ctx)
     }
 
     unlock_all_cores(pd_ctx);
+    return status;
 }
 
 static int ppu_v1_cluster_pd_init(struct ppu_v1_pd_ctx *pd_ctx)
@@ -600,9 +688,7 @@ static int ppu_v1_cluster_pd_set_state(fwk_id_t cluster_pd_id,
 
     switch (state) {
     case MOD_PD_STATE_ON:
-        cluster_on(pd_ctx);
-
-        return FWK_SUCCESS;
+        return cluster_on(pd_ctx);
 
     case MOD_PD_STATE_OFF:
         if (!cluster_off(pd_ctx)) {
@@ -656,7 +742,9 @@ static void cluster_pd_ppu_normal_mode_int_handler(struct ppu_v1_pd_ctx *pd_ctx)
     switch (current_mode) {
     case PPU_V1_MODE_OFF:
         /* Cluster has to be powered on */
-        cluster_on(pd_ctx);
+        status = cluster_on(pd_ctx);
+        if (status != FWK_SUCCESS)
+            return;
         ppu_v1_set_input_edge_sensitivity(ppu,
                                           PPU_V1_MODE_ON,
                                           PPU_V1_EDGE_SENSITIVITY_FALLING_EDGE);
@@ -933,6 +1021,15 @@ static int ppu_v1_bind(fwk_id_t id, unsigned int round)
     pd_ctx = ppu_v1_ctx.pd_ctx_table + fwk_id_get_element_idx(id);
 
 #ifdef BUILD_HAS_MOD_TIMER
+    if (pd_ctx->config->suspend_poll_interval_us != 0) {
+        if (pd_ctx->config->suspend_poll_attempts == 0 ||
+            pd_ctx->config->ppu.irq != FWK_INTERRUPT_NONE)
+            return FWK_E_PARAM;
+        status = fwk_module_bind(pd_ctx->config->suspend_poll_alarm_id,
+            MOD_TIMER_API_ID_ALARM, &pd_ctx->suspend_poll_alarm);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
     if (pd_ctx->timer_ctx != NULL &&
         !fwk_id_is_equal(pd_ctx->timer_ctx->timer_id, FWK_ID_NONE)) {
         /* Bind to the timer */

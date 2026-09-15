@@ -195,6 +195,11 @@ struct mod_ppu_v1_pd_config {
      * value greater than 0 if using the alarm.
      */
     uint32_t alarm_delay;
+
+    /*! Optional bounded suspend completion polling for an unconnected PPU IRQ. */
+    fwk_id_t suspend_poll_alarm_id;
+    uint32_t suspend_poll_interval_us;
+    uint32_t suspend_poll_attempts;
 };
 
 /*!

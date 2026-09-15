@@ -59,7 +59,7 @@ void test_ppu_v1_pd_init_error(void)
     int status;
     fwk_id_t pd_id;
     unsigned int unused = 0;
-    struct mod_ppu_v1_pd_config config;
+    struct mod_ppu_v1_pd_config config = { 0 };
 
     config.pd_type = MOD_PD_TYPE_COUNT + 1;
     status = ppu_v1_pd_init(pd_id, unused, &config);
@@ -71,7 +71,7 @@ void test_ppu_v1_pd_init(void)
     int status;
     fwk_id_t pd_id;
     unsigned int unused = 0;
-    struct mod_ppu_v1_pd_config config;
+    struct mod_ppu_v1_pd_config config = { 0 };
 
     config.pd_type = MOD_PD_TYPE_CLUSTER;
     config.timer_config = NULL;
@@ -79,7 +79,7 @@ void test_ppu_v1_pd_init(void)
     config.default_power_on = false;
 
     fwk_id_get_element_idx_ExpectAnyArgsAndReturn(0);
-    fwk_optional_id_is_defined_ExpectAnyArgsAndReturn(true);
+    fwk_optional_id_is_defined_ExpectAnyArgsAndReturn(false);
 
     struct ppu_v1_pd_ctx *core_pd_ctx_table_temp[CORES_PER_CLUSTER];
     static struct ppu_v1_pd_ctx p0;
@@ -205,9 +205,217 @@ void test_deeper_locking_alarm_callback(void)
     deeper_locking_alarm_callback(param);
 }
 
+static unsigned int suspend_off_reports;
+
+static int capture_suspend_report(fwk_id_t id, unsigned int state)
+{
+    (void)id;
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, state);
+    suspend_off_reports++;
+    return FWK_SUCCESS;
+}
+
+void test_suspend_poll_reports_only_observed_off(void)
+{
+    struct mod_pd_driver_input_api input = {
+        .report_power_state_transition = capture_suspend_report,
+    };
+    struct ppu_v1_pd_ctx pd = {
+        .suspend_polls_left = 2,
+        .pd_driver_input_api = &input,
+    };
+
+    suspend_off_reports = 0;
+    ppu_v1_get_power_mode_ExpectAndReturn(&pd.ppu, PPU_V1_MODE_OFF);
+    ppu_v1_is_dynamic_enabled_ExpectAndReturn(&pd.ppu, false);
+    suspend_poll_callback((uintptr_t)&pd);
+    TEST_ASSERT_EQUAL(1, suspend_off_reports);
+    TEST_ASSERT_EQUAL(0, pd.suspend_polls_left);
+    /* A stale callback cannot duplicate the completion. */
+    suspend_poll_callback((uintptr_t)&pd);
+    TEST_ASSERT_EQUAL(1, suspend_off_reports);
+}
+
+void test_suspend_poll_timeout_does_not_report_off(void)
+{
+    struct ppu_v1_ppu_reg ppu_registers = { 0 };
+    struct mod_pd_driver_input_api input = {
+        .report_power_state_transition = capture_suspend_report,
+    };
+    struct ppu_v1_pd_ctx pd = {
+        .suspend_polls_left = 1,
+        .pd_driver_input_api = &input,
+        .ppu.ppu_reg = &ppu_registers,
+    };
+
+    suspend_off_reports = 0;
+    ppu_v1_get_power_mode_ExpectAndReturn(&pd.ppu, PPU_V1_MODE_ON);
+    suspend_poll_callback((uintptr_t)&pd);
+    TEST_ASSERT_EQUAL(0, suspend_off_reports);
+    TEST_ASSERT_EQUAL(0, pd.suspend_polls_left);
+}
+
+void test_suspend_poll_rearms_with_bounded_remaining_count(void)
+{
+    const struct mod_ppu_v1_pd_config config = {
+        .suspend_poll_alarm_id = FWK_ID_NONE_INIT,
+        .suspend_poll_interval_us = 1000,
+    };
+    struct ppu_v1_pd_ctx pd = {
+        .config = &config,
+        .suspend_polls_left = 2,
+        .suspend_poll_alarm = &alarm_api_driver,
+    };
+
+    ppu_v1_get_power_mode_ExpectAndReturn(&pd.ppu, PPU_V1_MODE_ON);
+    start_alarm_api_ExpectAndReturn(config.suspend_poll_alarm_id, 1000,
+        MOD_TIMER_ALARM_TYPE_ONCE, suspend_poll_callback, (uintptr_t)&pd,
+        FWK_SUCCESS);
+    suspend_poll_callback((uintptr_t)&pd);
+    TEST_ASSERT_EQUAL(1, pd.suspend_polls_left);
+}
+
+static unsigned int cluster_reports;
+
+static int capture_cluster_report(fwk_id_t id, unsigned int state)
+{
+    (void)id;
+    (void)state;
+    cluster_reports++;
+    return FWK_SUCCESS;
+}
+
+static void check_cluster_transition_result(unsigned int state, int result)
+{
+    const struct mod_ppu_v1_pd_config config = { 0 };
+    struct ppu_v1_cluster_pd_ctx cluster = { 0 };
+    struct mod_pd_driver_input_api input = {
+        .report_power_state_transition = capture_cluster_report,
+    };
+    struct ppu_v1_pd_ctx pd = {
+        .config = &config, .data = &cluster, .pd_driver_input_api = &input,
+    };
+
+    ppu_v1_ctx.pd_ctx_table = &pd;
+    cluster_reports = 0;
+    fwk_id_get_element_idx_ExpectAnyArgsAndReturn(0);
+    ppu_v1_set_input_edge_sensitivity_Expect(&pd.ppu, PPU_V1_MODE_ON,
+        PPU_V1_EDGE_SENSITIVITY_MASKED);
+    if (state == MOD_PD_STATE_ON)
+        ppu_v1_request_operating_mode_ExpectAndReturn(
+            &pd.ppu, config.opmode, FWK_SUCCESS);
+    ppu_v1_set_power_mode_ExpectAndReturn(&pd.ppu,
+        state == MOD_PD_STATE_ON ? PPU_V1_MODE_ON : PPU_V1_MODE_OFF,
+        NULL, result);
+
+    int status = ppu_v1_cluster_pd_set_state(FWK_ID_NONE, state);
+    TEST_ASSERT_EQUAL(result == FWK_SUCCESS ? FWK_SUCCESS :
+        (state == MOD_PD_STATE_OFF ? FWK_E_STATE : result), status);
+    TEST_ASSERT_EQUAL(result == FWK_SUCCESS ? 1 : 0, cluster_reports);
+}
+
+void test_cluster_off_timeout_does_not_report_off(void)
+{
+    check_cluster_transition_result(MOD_PD_STATE_OFF, FWK_E_TIMEOUT);
+}
+
+void test_cluster_on_timeout_does_not_report_on(void)
+{
+    check_cluster_transition_result(MOD_PD_STATE_ON, FWK_E_TIMEOUT);
+}
+
+void test_cluster_success_reports_observed_transition(void)
+{
+    check_cluster_transition_result(MOD_PD_STATE_OFF, FWK_SUCCESS);
+    check_cluster_transition_result(MOD_PD_STATE_ON, FWK_SUCCESS);
+}
+
+static int lock_wait_timeout(
+    fwk_id_t id, unsigned int timeout, bool (*condition)(void *), void *data)
+{
+    (void)id;
+    TEST_ASSERT_EQUAL(1000, timeout);
+    TEST_ASSERT_EQUAL_PTR(core_lock_completed_or_wake, condition);
+    TEST_ASSERT_NOT_NULL(data);
+    return FWK_E_TIMEOUT;
+}
+
+void test_dynamic_core_lock_wait_is_bounded_when_timer_configured(void)
+{
+    struct mod_timer_api timer_api = { .wait = lock_wait_timeout };
+    struct ppu_v1_timer_ctx timer = { .timer_api = &timer_api, .delay_us = 1000 };
+    struct ppu_v1_pd_ctx core = { 0 };
+    struct ppu_v1_pd_ctx *cores[] = { &core };
+    struct ppu_v1_cluster_pd_ctx cluster = {
+        .core_count = 1, .core_pd_ctx_table = cores,
+    };
+    struct ppu_v1_pd_ctx pd = { .data = &cluster, .timer_ctx = &timer };
+
+    ppu_v1_is_dynamic_enabled_ExpectAndReturn(&core.ppu, true);
+    ppu_v1_lock_off_enable_Expect(&core.ppu);
+    TEST_ASSERT_FALSE(lock_all_dynamic_cores(&pd));
+}
+
+static void check_core_transition_result(unsigned int state, int result)
+{
+    struct mod_pd_driver_input_api input = {
+        .report_power_state_transition = capture_cluster_report,
+    };
+    struct ppu_v1_pd_ctx pd = { .pd_driver_input_api = &input };
+
+    ppu_v1_ctx.pd_ctx_table = &pd;
+    cluster_reports = 0;
+    fwk_id_get_element_idx_ExpectAnyArgsAndReturn(0);
+    if (state == MOD_PD_STATE_ON)
+        ppu_v1_interrupt_unmask_Expect(&pd.ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    ppu_v1_set_input_edge_sensitivity_Expect(&pd.ppu, PPU_V1_MODE_ON,
+        PPU_V1_EDGE_SENSITIVITY_MASKED);
+    if (state == MOD_PD_STATE_OFF)
+        ppu_v1_interrupt_mask_Expect(&pd.ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    ppu_v1_set_power_mode_ExpectAndReturn(&pd.ppu,
+        state == MOD_PD_STATE_ON ? PPU_V1_MODE_ON : PPU_V1_MODE_OFF,
+        NULL, result);
+    if (result == FWK_SUCCESS) {
+        if (state == MOD_PD_STATE_ON) {
+            ppu_v1_dynamic_enable_Expect(&pd.ppu, PPU_V1_MODE_OFF);
+        } else {
+            ppu_v1_lock_off_disable_Expect(&pd.ppu);
+            ppu_v1_off_unlock_Expect(&pd.ppu);
+        }
+    }
+    TEST_ASSERT_EQUAL(result, ppu_v1_core_pd_set_state(FWK_ID_NONE, state));
+    TEST_ASSERT_EQUAL(result == FWK_SUCCESS ? 1 : 0, cluster_reports);
+}
+
+void test_core_off_timeout_does_not_report_off(void)
+{
+    check_core_transition_result(MOD_PD_STATE_OFF, FWK_E_TIMEOUT);
+}
+
+void test_core_on_timeout_does_not_report_on(void)
+{
+    check_core_transition_result(MOD_PD_STATE_ON, FWK_E_TIMEOUT);
+}
+
+void test_core_success_reports_observed_transition(void)
+{
+    check_core_transition_result(MOD_PD_STATE_OFF, FWK_SUCCESS);
+    check_core_transition_result(MOD_PD_STATE_ON, FWK_SUCCESS);
+}
+
 int mod_ppu_v1_test_main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_core_off_timeout_does_not_report_off);
+    RUN_TEST(test_core_on_timeout_does_not_report_on);
+    RUN_TEST(test_core_success_reports_observed_transition);
+    RUN_TEST(test_cluster_off_timeout_does_not_report_off);
+    RUN_TEST(test_cluster_on_timeout_does_not_report_on);
+    RUN_TEST(test_cluster_success_reports_observed_transition);
+    RUN_TEST(test_dynamic_core_lock_wait_is_bounded_when_timer_configured);
+    RUN_TEST(test_suspend_poll_reports_only_observed_off);
+    RUN_TEST(test_suspend_poll_timeout_does_not_report_off);
+    RUN_TEST(test_suspend_poll_rearms_with_bounded_remaining_count);
 
     RUN_TEST(test_ppu_v1_mod_init);
     RUN_TEST(test_ppu_v1_pd_init_error);
