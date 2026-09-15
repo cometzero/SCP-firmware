@@ -63,6 +63,7 @@ static int return_status;
 
 void setUp(void)
 {
+    perf_fch_set_paused(false);
     scmi_perf_ctx.scmi_api = &from_protocol_api;
     scmi_perf_ctx.config = config_scmi_perf.data;
     scmi_perf_ctx.domain_count = scmi_perf_ctx.config->perf_doms_count;
@@ -534,6 +535,37 @@ void utest_perf_fch_init_success(void)
         perf_fch_ctx.perf_ctx->config->fast_channels_rate_limit);
 }
 
+void utest_paused_fast_channels_drop_callback(void)
+{
+    perf_fch_set_paused(true);
+    perf_fch_ctx.pending_req_count = 0;
+    fast_channel_callback(0);
+    TEST_ASSERT_EQUAL(0, perf_fch_ctx.pending_req_count);
+    TEST_ASSERT_TRUE(perf_fch_is_paused());
+}
+
+void utest_paused_fast_channels_drain_queued_event(void)
+{
+    struct fwk_event event = { .id = FWK_ID_EVENT_INIT(
+        FWK_MODULE_IDX_SCMI_PERF, SCMI_PERF_EVENT_IDX_FAST_CHANNELS_PROCESS) };
+
+    perf_fch_set_paused(true);
+    perf_fch_ctx.pending_req_count = 1;
+    fwk_id_get_event_idx_ExpectAndReturn(
+        event.id, SCMI_PERF_EVENT_IDX_FAST_CHANNELS_PROCESS);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, perf_fch_process_event(&event));
+    TEST_ASSERT_EQUAL(0, perf_fch_ctx.pending_req_count);
+}
+
+void utest_paused_fast_channels_suppress_output_writes(void)
+{
+    perf_fch_set_paused(true);
+    /* Out-of-range index would dereference invalid memory without the gate. */
+    perf_fch_set_fch_get_level(UINT32_MAX, 123);
+    perf_fch_set_paused(false);
+    TEST_ASSERT_FALSE(perf_fch_is_paused());
+}
+
 int scmi_perf_fch_test_main(void)
 {
     UNITY_BEGIN();
@@ -549,6 +581,9 @@ int scmi_perf_fch_test_main(void)
     RUN_TEST(utest_scmi_perf_describe_fast_channels_invalid_message_id);
 
     RUN_TEST(utest_perf_fch_init_success);
+    RUN_TEST(utest_paused_fast_channels_drop_callback);
+    RUN_TEST(utest_paused_fast_channels_drain_queued_event);
+    RUN_TEST(utest_paused_fast_channels_suppress_output_writes);
 
     return UNITY_END();
 }

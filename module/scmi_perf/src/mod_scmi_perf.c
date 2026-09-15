@@ -20,6 +20,12 @@
 #    include "perf_plugins_handler.h"
 #endif
 #include <mod_timer.h>
+#if defined(BUILD_HAS_MOD_POWER_DOMAIN) && defined(BUILD_HAS_NOTIFICATION) && \
+    defined(BUILD_HAS_SCMI_PERF_FAST_CHANNELS)
+#    include <mod_power_domain.h>
+#    include <fwk_notification.h>
+#    define SCMI_PERF_HAS_PD_QUIESCE
+#endif
 #include "scmi_perf.h"
 
 #include <fwk_assert.h>
@@ -182,7 +188,7 @@ static void scmi_perf_notify_limits_fch_updated(
     struct scmi_perf_domain_ctx *domain_ctx;
     const struct fast_channel_ctx *fch_ctx;
     domain_ctx = &scmi_perf_ctx.domain_ctx_table[idx];
-    if (perf_fch_domain_has_fastchannels(idx)) {
+    if (!perf_fch_is_paused() && perf_fch_domain_has_fastchannels(idx)) {
         fch_ctx = &domain_ctx->fch_ctx[MOD_SCMI_PERF_FAST_CHANNEL_LIMIT_GET];
         get_limit = (struct mod_scmi_perf_fast_channel_limit
                          *)((uintptr_t)fch_ctx->fch_address.local_view_address);
@@ -531,6 +537,27 @@ static int scmi_perf_start(fwk_id_t id)
     unsigned int dom_idx;
     bool has_phy_group;
 
+#ifdef SCMI_PERF_HAS_PD_QUIESCE
+    if (scmi_perf_ctx.config->fast_channel_power_domain_id != NULL) {
+        fwk_id_t pd_id = scmi_perf_ctx.config->fast_channel_power_domain_id();
+
+        status = fwk_notification_subscribe(
+            mod_pd_notification_id_power_state_pre_transition, pd_id, id);
+        if (status != FWK_SUCCESS) {
+            return status;
+        }
+        status = fwk_notification_subscribe(
+            mod_pd_notification_id_power_state_transition, pd_id, id);
+        if (status != FWK_SUCCESS) {
+            return status;
+        }
+    }
+#else
+    if (scmi_perf_ctx.config->fast_channel_power_domain_id != NULL) {
+        return FWK_E_SUPPORT;
+    }
+#endif
+
     scmi_perf_ctx.opp_table = fwk_mm_calloc(
         scmi_perf_ctx.dvfs_doms_count, sizeof(struct perf_opp_table));
 
@@ -653,7 +680,56 @@ static int scmi_perf_process_event(
 }
 
 /* SCMI Performance Management Protocol Definition */
+#ifdef SCMI_PERF_HAS_PD_QUIESCE
+static int scmi_perf_process_notification(
+    const struct fwk_event *event,
+    struct fwk_event *resp_event)
+{
+    const struct mod_scmi_perf_config *config = scmi_perf_ctx.config;
+
+    if ((config->fast_channel_power_domain_id == NULL) ||
+        !fwk_id_is_equal(event->source_id, config->fast_channel_power_domain_id())) {
+        return FWK_E_PARAM;
+    }
+
+    if (fwk_id_is_equal(
+            event->id, mod_pd_notification_id_power_state_pre_transition)) {
+        const struct mod_pd_power_state_pre_transition_notification_params *p =
+            (const void *)event->params;
+        struct mod_pd_power_state_pre_transition_notification_resp_params *r =
+            (void *)resp_event->params;
+
+        if (p->target_state != MOD_PD_STATE_ON) {
+            /* Framework serializes handlers: no FC access can outlive this ACK. */
+            perf_fch_set_paused(true);
+            FWK_LOG_INFO("[SCMI-PERF] Fast Channels quiesced before power-down");
+        }
+        r->status = FWK_SUCCESS;
+        return FWK_SUCCESS;
+    }
+
+    if (fwk_id_is_equal(event->id, mod_pd_notification_id_power_state_transition)) {
+        const struct mod_pd_power_state_transition_notification_params *p =
+            (const void *)event->params;
+
+        if ((p->state == MOD_PD_STATE_ON) && perf_fch_is_paused()) {
+            if (config->fast_channel_memory_retained) {
+                perf_fch_set_paused(false);
+                FWK_LOG_INFO("[SCMI-PERF] Retained Fast Channels resumed");
+            } else {
+                FWK_LOG_INFO("[SCMI-PERF] Fast Channels remain quiesced: memory not restored");
+            }
+        }
+        return FWK_SUCCESS;
+    }
+    return FWK_E_PARAM;
+}
+#endif
+
 const struct fwk_module module_scmi_perf = {
+#ifdef SCMI_PERF_HAS_PD_QUIESCE
+    .process_notification = scmi_perf_process_notification,
+#endif
     .api_count = (unsigned int)MOD_SCMI_PERF_API_COUNT,
     .event_count = (unsigned int)SCMI_PERF_EVENT_IDX_COUNT,
     .type = FWK_MODULE_TYPE_PROTOCOL,

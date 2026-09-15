@@ -427,6 +427,9 @@ bool perf_fch_prot_msg_attributes_has_fastchannels(
 
 bool perf_fch_domain_has_fastchannels(uint32_t domain_idx);
 
+void perf_fch_set_paused(bool paused);
+bool perf_fch_is_paused(void);
+
 int perf_fch_describe_fast_channels(
     fwk_id_t service_id,
     const uint32_t *payload);

@@ -208,6 +208,16 @@ struct mod_scmi_perf_config {
 
     /*! Number of Performance Plugins */
     size_t plugins_count;
+
+    /*! Optional owner of Fast Channel memory (resolved after topology init). */
+    fwk_id_t (*fast_channel_power_domain_id)(void);
+
+    /*!
+     * Resume polling after the owning domain reports ON only if its memory
+     * contents and access path are guaranteed valid at that point. Otherwise
+     * leave Fast Channels quiesced until the next firmware initialization.
+     */
+    bool fast_channel_memory_retained;
 };
 
 /*!

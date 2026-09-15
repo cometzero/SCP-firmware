@@ -58,3 +58,7 @@ endif()
 if("transport" IN_LIST SCP_MODULES)
     target_link_libraries(${SCP_MODULE_TARGET} PRIVATE module-transport)
 endif()
+
+if("power-domain" IN_LIST SCP_MODULES)
+    target_link_libraries(${SCP_MODULE_TARGET} PRIVATE module-power-domain)
+endif()

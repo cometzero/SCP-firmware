@@ -40,6 +40,7 @@ struct mod_scmi_perf_fc_ctx {
     const struct mod_timer_alarm_api *fc_alarm_api;
 
     volatile uint32_t pending_req_count;
+    volatile bool paused;
     /*
      * For a timer based fast channel interrupt type we must register
      * fast channel callback only once with the fast channel driver
@@ -59,6 +60,16 @@ static unsigned int fast_channel_elem_size[MOD_SCMI_PERF_FAST_CHANNEL_COUNT] = {
 };
 
 static struct mod_scmi_perf_fc_ctx perf_fch_ctx;
+
+void perf_fch_set_paused(bool paused)
+{
+    perf_fch_ctx.paused = paused;
+}
+
+bool perf_fch_is_paused(void)
+{
+    return perf_fch_ctx.paused;
+}
 
 static void fast_channel_callback(uintptr_t param);
 
@@ -105,7 +116,7 @@ void perf_fch_set_fch_get_level(uint32_t domain_idx, uint32_t level)
     uint32_t *get_level;
     struct mod_scmi_perf_ctx *perf_ctx = perf_fch_ctx.perf_ctx;
     domain_ctx = &perf_ctx->domain_ctx_table[domain_idx];
-    if (perf_fch_domain_has_fastchannels(domain_idx)) {
+    if (!perf_fch_is_paused() && perf_fch_domain_has_fastchannels(domain_idx)) {
         fch_ctx = &domain_ctx->fch_ctx[MOD_SCMI_PERF_FAST_CHANNEL_LEVEL_GET];
         get_level =
             (uint32_t *)((uintptr_t)fch_ctx->fch_address.local_view_address);
@@ -372,6 +383,10 @@ static void perf_eval_performance(
 static void fast_channel_callback(uintptr_t param)
 {
     int status;
+
+    if (perf_fch_is_paused()) {
+        return;
+    }
 
     struct fwk_event_light event = (struct fwk_event_light){
         .id = FWK_ID_EVENT(
@@ -717,6 +732,12 @@ int perf_fch_process_event(const struct fwk_event *event)
 
     switch (event_idx) {
     case SCMI_PERF_EVENT_IDX_FAST_CHANNELS_PROCESS:
+
+        /* A polling event may already be queued when power-down is prepared. */
+        if (perf_fch_is_paused()) {
+            decrement_pending_req_count();
+            return FWK_SUCCESS;
+        }
 
 #ifdef BUILD_HAS_SCMI_PERF_PLUGIN_HANDLER
         perf_fch_process_plugins_handler();
