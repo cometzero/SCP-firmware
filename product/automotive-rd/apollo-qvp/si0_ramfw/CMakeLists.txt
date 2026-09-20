@@ -7,6 +7,11 @@
 
 add_executable(apollo-qvp-si0-bl2)
 
+if(SCP_APOLLO_QVP_PMIC)
+    target_sources(apollo-qvp-si0-bl2 PRIVATE config_tps6594.c)
+    target_compile_definitions(apollo-qvp-si0-bl2 PRIVATE SCP_APOLLO_QVP_PMIC)
+endif()
+
 target_include_directories(apollo-qvp-si0-bl2 PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/include")

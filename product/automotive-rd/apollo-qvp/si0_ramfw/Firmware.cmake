@@ -33,6 +33,8 @@ set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS TRUE)
 set(SCP_ENABLE_EXCEPTION_SYMTAB TRUE)
 set(SCP_EXCEPTION_SYMTAB_MAX_SIZE 131072)
 
+option(SCP_APOLLO_QVP_PMIC "Initialize SI CL0 QVP TPS6594 board PMICs" OFF)
+
 if (NOT DEFINED SCP_PLATFORM_VARIANT)
     set(SCP_PLATFORM_VARIANT "fvp")
 endif()
@@ -103,6 +105,12 @@ list(APPEND SCP_MODULES
     "gicx00-multiview"
     "gicx00"
 )
+
+if(SCP_APOLLO_QVP_PMIC)
+    # init callbacks execute in module order: PMICs must precede power drivers.
+    list(FIND SCP_MODULES "ppu-v1" pmic_power_index)
+    list(INSERT SCP_MODULES ${pmic_power_index} "tps6594")
+endif()
 
 if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
 list(APPEND SCP_MODULES

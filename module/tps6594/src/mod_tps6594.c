@@ -1,0 +1,221 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+#include "tps6594.h"
+
+#include <fwk_id.h>
+#include <fwk_log.h>
+#include <fwk_module.h>
+#include <fwk_status.h>
+
+static const struct mod_tps6594_config *config;
+static struct tps6594_i2c controller;
+static struct tps6594_bus bus = {
+    .ctx = &controller,
+    .transfer = tps6594_i2c_transfer,
+};
+static bool ready;
+
+static int set_voltage(unsigned int pmic, unsigned int rail, uint32_t uv)
+{
+    if (!ready || pmic >= config->count)
+        return FWK_E_PARAM;
+    return tps6594_voltage(&bus, config->addresses[pmic], rail, uv);
+}
+
+static int set_enabled(unsigned int pmic, unsigned int rail, bool enabled)
+{
+    if (!ready || pmic >= config->count)
+        return FWK_E_PARAM;
+    return tps6594_enable(&bus, config->addresses[pmic], rail, enabled);
+}
+
+static int gpio_direction(unsigned int pmic, unsigned int pin, bool output)
+{
+    if (!ready || pmic >= config->count)
+        return FWK_E_PARAM;
+    return tps6594_gpio_direction(&bus, config->addresses[pmic], pin, output);
+}
+
+static int gpio_write(unsigned int pmic, unsigned int pin, bool value)
+{
+    if (!ready || pmic >= config->count)
+        return FWK_E_PARAM;
+    return tps6594_gpio_write(&bus, config->addresses[pmic], pin, value);
+}
+
+static int gpio_read(unsigned int pmic, unsigned int pin, bool *value)
+{
+    if (!ready || pmic >= config->count)
+        return FWK_E_PARAM;
+    return tps6594_gpio_read(&bus, config->addresses[pmic], pin, value);
+}
+
+static int read_faults(unsigned int pmic, uint8_t status[11])
+{
+    if (!ready || pmic >= config->count || !status)
+        return FWK_E_PARAM;
+    return bus.transfer(bus.ctx, config->addresses[pmic], 0x6d, status, 11, true);
+}
+
+static const struct mod_tps6594_api api = {
+    .set_voltage = set_voltage,
+    .set_enabled = set_enabled,
+    .gpio_direction = gpio_direction,
+    .gpio_write = gpio_write,
+    .gpio_read = gpio_read,
+    .read_faults = read_faults,
+};
+
+/* QVP exposes GPIO0->1 and GPIO8->9 loopbacks; restore after validation. */
+static int gpio_test(uint8_t address)
+{
+    uint8_t original[11], direction[11], outputs[2], expected[2], inputs[2];
+    unsigned int pin, i;
+    int status, restore_status;
+
+    status = bus.transfer(bus.ctx, address, 0x31, original, 11, true);
+    if (status != FWK_SUCCESS)
+        return status;
+    status = bus.transfer(bus.ctx, address, 0x3d, outputs, 2, true);
+    if (status != FWK_SUCCESS)
+        return status;
+    /* Reset defaults are open-drain; unpulled pins cannot self-read high. */
+    for (i = 0; i < 11; i++)
+        direction[i] = (original[i] & ~(1U << 1)) | 1;
+    expected[0] = expected[1] = 0;
+    status = bus.transfer(bus.ctx, address, 0x3d, expected, 2, false);
+    if (status != FWK_SUCCESS)
+        goto restore;
+    status = bus.transfer(bus.ctx, address, 0x31, direction, 11, false);
+    if (status != FWK_SUCCESS)
+        goto restore;
+    /* Walking one plus all-low checks both levels and bank boundaries. */
+    for (pin = 0; pin <= 11; pin++) {
+        expected[0] = pin < 8 ? 1U << pin : 0;
+        expected[1] = pin >= 8 && pin < 11 ? 1U << (pin - 8) : 0;
+        status = bus.transfer(bus.ctx, address, 0x3d, expected, 2, false);
+        if (status != FWK_SUCCESS)
+            break;
+        status = bus.transfer(bus.ctx, address, 0x3f, inputs, 2, true);
+        if (status != FWK_SUCCESS)
+            break;
+        if (inputs[0] != expected[0] || (inputs[1] & 7) != expected[1]) {
+            FWK_LOG_ERR("[TPS6594] GPIO walk pin=%u actual=%02x:%02x expected=%02x:%02x",
+                pin, inputs[0], inputs[1], expected[0], expected[1]);
+            status = FWK_E_DEVICE;
+            break;
+        }
+    }
+    if (status != FWK_SUCCESS)
+        goto restore;
+    /* Validate the physical input path across both register banks. */
+    direction[1] &= ~1U;
+    direction[9] &= ~1U;
+    status = bus.transfer(bus.ctx, address, 0x31, direction, 11, false);
+    if (status != FWK_SUCCESS)
+        goto restore;
+    for (i = 0; i < 2; i++) {
+        expected[0] = expected[1] = i;
+        status = bus.transfer(bus.ctx, address, 0x3d, expected, 2, false);
+        if (status != FWK_SUCCESS)
+            goto restore;
+        status = bus.transfer(bus.ctx, address, 0x3f, inputs, 2, true);
+        if (status != FWK_SUCCESS)
+            goto restore;
+        if ((inputs[0] & 2) != i * 2 || (inputs[1] & 2) != i * 2) {
+            FWK_LOG_ERR("[TPS6594] GPIO loop level=%u actual=%02x:%02x expected_bit1=%u",
+                i, inputs[0], inputs[1], i * 2);
+            status = FWK_E_DEVICE;
+            goto restore;
+        }
+    }
+restore:
+    restore_status = bus.transfer(bus.ctx, address, 0x31, original, 11, false);
+    if (status == FWK_SUCCESS)
+        status = restore_status;
+    restore_status = bus.transfer(bus.ctx, address, 0x3d, outputs, 2, false);
+    if (status == FWK_SUCCESS)
+        status = restore_status;
+    /* Discard only GPIO events generated by the temporary loopback test. */
+    expected[0] = 0x07;
+    expected[1] = 0xff;
+    restore_status = bus.transfer(bus.ctx, address, 0x63, expected, 2, false);
+    if (status == FWK_SUCCESS)
+        status = restore_status;
+    restore_status = bus.transfer(bus.ctx, address, 0x63, inputs, 2, true);
+    if (status == FWK_SUCCESS)
+        status = restore_status;
+    if (status == FWK_SUCCESS && ((inputs[0] & 7) || inputs[1])) {
+        FWK_LOG_ERR("[TPS6594] GPIO clear actual=%02x:%02x expected_leaves=0",
+            inputs[0], inputs[1]);
+        status = FWK_E_DEVICE;
+    }
+    return status;
+}
+
+static int module_init(fwk_id_t id, unsigned int elements, const void *data)
+{
+    uint64_t start;
+    unsigned int i;
+    int status;
+
+    config = data;
+    if (!config || !config->addresses || !config->count || !config->time_us)
+        return FWK_E_DATA;
+    if (config->gpio_self_test && !config->configure_registers)
+        return FWK_E_DATA;
+    controller.base = config->i2c_base;
+    controller.time_us = config->time_us;
+    controller.timeout_us = config->transfer_timeout_us;
+    start = config->time_us();
+    FWK_LOG_INFO("[TPS6594] begin count=%u before=power", config->count);
+    status = tps6594_i2c_init(&controller);
+    if (status != FWK_SUCCESS)
+        return status;
+    for (i = 0; i < config->count; i++) {
+        status = config->configure_registers ?
+            tps6594_init(&bus, config->addresses[i], config->rail_uv) :
+            tps6594_probe(&bus, config->addresses[i]);
+        if (status == FWK_SUCCESS && config->gpio_self_test) {
+            status = gpio_test(config->addresses[i]);
+            if (status != FWK_SUCCESS)
+                FWK_LOG_ERR("[TPS6594] phase=gpio address=0x%02x status=%d",
+                    config->addresses[i], status);
+        } else if (status != FWK_SUCCESS) {
+            FWK_LOG_ERR("[TPS6594] phase=register-init address=0x%02x status=%d",
+                config->addresses[i], status);
+        }
+        if (status != FWK_SUCCESS) {
+            FWK_LOG_ERR("[TPS6594] failed address=0x%02x status=%d",
+                config->addresses[i], status);
+            return status;
+        }
+        FWK_LOG_INFO("[TPS6594] ready address=0x%02x rails=9 gpio=11 "
+            "policy=%s rtc=untouched", config->addresses[i],
+            config->configure_registers ? "configure" : "preserve");
+        FWK_LOG_INFO("[TPS6594] check address=0x%02x probe=PASS "
+            "rail_config=%s gpio_test=%s", config->addresses[i],
+            config->configure_registers ? "PASS" : "SKIP",
+            config->gpio_self_test ? "PASS" : "SKIP");
+    }
+    ready = true;
+    FWK_LOG_INFO("[TPS6594] complete count=%u elapsed_us=%u", config->count,
+        (unsigned int)(config->time_us() - start));
+    return FWK_SUCCESS;
+}
+
+static int bind_request(fwk_id_t source, fwk_id_t target, fwk_id_t api_id,
+    const void **result)
+{
+    if (!fwk_id_is_type(target, FWK_ID_TYPE_MODULE) ||
+        fwk_id_get_api_idx(api_id) != 0)
+        return FWK_E_PARAM;
+    *result = &api;
+    return FWK_SUCCESS;
+}
+
+const struct fwk_module module_tps6594 = {
+    .type = FWK_MODULE_TYPE_DRIVER,
+    .api_count = 1,
+    .init = module_init,
+    .process_bind_request = bind_request,
+};
