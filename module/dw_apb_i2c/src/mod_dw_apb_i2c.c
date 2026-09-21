@@ -28,6 +28,8 @@ struct dw_apb_i2c_ctx {
     bool read_on_going;
     uint8_t byte_count;
     uint8_t *data;
+    bool failed;
+    bool ready;
 };
 
 static struct dw_apb_i2c_ctx *ctx_table;
@@ -228,6 +230,159 @@ static int receive_as_controller(
     return FWK_PENDING;
 }
 
+struct polled_transfer {
+    struct dw_apb_i2c_ctx *ctx;
+    const struct mod_i2c_request *request;
+    unsigned int sent;
+    unsigned int received;
+    int status;
+    bool completion_only;
+};
+
+static int disable_polled(struct dw_apb_i2c_ctx *ctx)
+{
+    int status;
+
+    ctx->i2c_reg->IC_ENABLE = IC_ENABLE_STATUS_DISABLED;
+    status = ctx->timer_api->wait(
+        ctx->config->timer_id, ctx->config->transfer_timeout_us,
+        is_i2c_disabled, ctx->i2c_reg);
+    if (status != FWK_SUCCESS)
+        ctx->failed = true;
+    return status;
+}
+
+static void drain_polled_rx(struct polled_transfer *transfer)
+{
+    struct dw_apb_i2c_reg *reg = transfer->ctx->i2c_reg;
+
+    while (transfer->received < transfer->request->receive_byte_count &&
+           (reg->IC_STATUS & IC_STATUS_RFNE_MASK))
+        transfer->request->receive_data[transfer->received++] =
+            (uint8_t)reg->IC_DATA_CMD;
+}
+
+static bool poll_transfer(void *data)
+{
+    struct polled_transfer *transfer = data;
+    const struct mod_i2c_request *request = transfer->request;
+    struct dw_apb_i2c_reg *reg = transfer->ctx->i2c_reg;
+    unsigned int total =
+        request->transmit_byte_count + request->receive_byte_count;
+    uint32_t command, irq;
+
+    irq = reg->IC_RAW_INTR_STAT;
+    if (irq & IC_INTR_TX_ABRT_MASK) {
+        transfer->status = FWK_E_DEVICE;
+        return true;
+    }
+    drain_polled_rx(transfer);
+    irq = reg->IC_RAW_INTR_STAT;
+    if (irq & IC_INTR_TX_ABRT_MASK) {
+        transfer->status = FWK_E_DEVICE;
+        return true;
+    }
+    if (irq & IC_INTR_STOP_DET_MASK) {
+        /* STOP can arrive after the preceding RX-not-empty sample. */
+        drain_polled_rx(transfer);
+        transfer->status =
+            transfer->sent == total &&
+                transfer->received == request->receive_byte_count ?
+            FWK_SUCCESS : FWK_E_DEVICE;
+        return true;
+    }
+    if (transfer->completion_only || transfer->sent >= total ||
+        !(reg->IC_STATUS & IC_STATUS_TFNF_MASK))
+        return false;
+
+    if (transfer->sent < request->transmit_byte_count) {
+        command = request->transmit_data[transfer->sent];
+    } else {
+        /* Limit outstanding reads to the RX FIFO capacity. */
+        if (transfer->sent - request->transmit_byte_count - transfer->received >=
+            I2C_RECEIVE_BUFFER_LENGTH)
+            return false;
+        command = IC_DATA_CMD_READ;
+        if (request->transmit_byte_count &&
+            transfer->sent == request->transmit_byte_count)
+            command |= IC_DATA_CMD_RESTART;
+    }
+    if (transfer->sent + 1 == total)
+        command |= IC_DATA_CMD_STOP;
+    reg->IC_DATA_CMD = command;
+    transfer->sent++;
+    return false;
+}
+
+static int transfer_as_controller(
+    fwk_id_t dev_id, struct mod_i2c_request *request)
+{
+    struct dw_apb_i2c_ctx *ctx;
+    struct polled_transfer transfer;
+    uint64_t start, ticks, now;
+    int status, disable_status;
+
+    if (!fwk_module_is_valid_element_id(dev_id) ||
+        fwk_id_get_module_idx(dev_id) != FWK_MODULE_IDX_DW_APB_I2C || !request ||
+        !request->target_address || request->target_address >= 0x80 ||
+        (!request->transmit_byte_count && !request->receive_byte_count) ||
+        (request->transmit_byte_count && !request->transmit_data) ||
+        (request->receive_byte_count && !request->receive_data))
+        return FWK_E_PARAM;
+    ctx = ctx_table + fwk_id_get_element_idx(dev_id);
+    if (!ctx->ready || ctx->failed)
+        return FWK_E_STATE;
+    status = disable_polled(ctx);
+    if (status != FWK_SUCCESS)
+        return status;
+    (void)ctx->i2c_reg->IC_CLR_INTR;
+    ctx->i2c_reg->IC_TAR = request->target_address;
+    status = ctx->timer_api->time_to_timestamp(
+        ctx->config->timer_id, ctx->config->transfer_timeout_us, &ticks);
+    if (status == FWK_SUCCESS)
+        status = ctx->timer_api->get_counter(ctx->config->timer_id, &start);
+    if (status != FWK_SUCCESS) {
+        ctx->failed = true;
+        return status;
+    }
+    ctx->i2c_reg->IC_ENABLE = IC_ENABLE_STATUS_ENABLED;
+    transfer = (struct polled_transfer) {
+        .ctx = ctx,
+        .request = request,
+        .status = FWK_E_DEVICE,
+    };
+    for (;;) {
+        if (poll_transfer(&transfer)) {
+            status = transfer.status;
+            break;
+        }
+        status = ctx->timer_api->get_counter(ctx->config->timer_id, &now);
+        if (status != FWK_SUCCESS) {
+            ctx->failed = true;
+            break;
+        }
+        if (now - start >= ticks) {
+            /* Completion may arrive during the counter sample. */
+            transfer.completion_only = true;
+            if (poll_transfer(&transfer)) {
+                status = transfer.status;
+            } else {
+                status = FWK_E_TIMEOUT;
+                /* A command may survive disable: never retry a timeout. */
+                ctx->failed = true;
+            }
+            break;
+        }
+    }
+    disable_status = disable_polled(ctx);
+    (void)ctx->i2c_reg->IC_CLR_INTR;
+    return status == FWK_SUCCESS ? disable_status : status;
+}
+
+static const struct mod_i2c_driver_api polled_driver_api = {
+    .transfer_as_controller = transfer_as_controller,
+};
+
 static const struct mod_i2c_driver_api driver_api = {
     .transmit_as_controller = transmit_as_controller,
     .receive_as_controller = receive_as_controller
@@ -252,7 +407,7 @@ static int dw_apb_i2c_element_init(fwk_id_t element_id,
     struct mod_dw_apb_i2c_dev_config *config =
         (struct mod_dw_apb_i2c_dev_config *)data;
 
-    if (config->reg == 0) {
+    if (config->reg == 0 || (config->polled && !config->transfer_timeout_us)) {
         return FWK_E_DATA;
     }
 
@@ -282,6 +437,9 @@ static int dw_apb_i2c_bind(fwk_id_t id, unsigned int round)
         return status;
     }
 
+    if (config->polled)
+        return FWK_SUCCESS;
+
     return fwk_module_bind(ctx->i2c_id, mod_i2c_api_id_driver_response,
         &ctx->i2c_api);
 }
@@ -305,7 +463,7 @@ static int dw_apb_i2c_process_bind_request(fwk_id_t source_id,
 
     ctx->i2c_id = source_id;
 
-    *api = &driver_api;
+    *api = ctx->config->polled ? &polled_driver_api : &driver_api;
 
     return FWK_SUCCESS;
 }
@@ -322,6 +480,19 @@ static int dw_apb_i2c_start(fwk_id_t id)
     }
 
     ctx = ctx_table + fwk_id_get_element_idx(id);
+    if (ctx->config->polled) {
+        if (ctx->i2c_reg->IC_COMP_TYPE != UINT32_C(0x44570140))
+            return FWK_E_DEVICE;
+        ctx->i2c_reg->IC_INTR_MASK = 0;
+        status = disable_polled(ctx);
+        if (status != FWK_SUCCESS)
+            return status;
+        /* Master, fast speed, repeated START, slave disabled. */
+        ctx->i2c_reg->IC_CON = UINT32_C(0x65);
+        (void)ctx->i2c_reg->IC_CLR_INTR;
+        ctx->ready = true;
+        return FWK_SUCCESS;
+    }
     i2c_irq = ctx->config->i2c_irq;
 
     status = fwk_interrupt_set_isr_param(i2c_irq, i2c_isr, (uintptr_t)ctx);

@@ -15,6 +15,7 @@
 #include <fwk_module_idx.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*!
  * \addtogroup GroupModules Modules
@@ -42,6 +43,10 @@ struct mod_dw_apb_i2c_dev_config {
     unsigned int i2c_irq;
     /*! Base address of the I2C device registers */
     uintptr_t reg;
+    /*! Use synchronous transfers without installing an interrupt handler. */
+    bool polled;
+    /*! Required nonzero timeout for polled transfers and controller disable. */
+    uint32_t transfer_timeout_us;
 };
 
 /*! API indices */

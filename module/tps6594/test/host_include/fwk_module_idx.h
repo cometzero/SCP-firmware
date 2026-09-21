@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+#ifndef TEST_FWK_MODULE_IDX_H
+#define TEST_FWK_MODULE_IDX_H
+enum fwk_module_idx {
+    FWK_MODULE_IDX_TPS6594,
+    FWK_MODULE_IDX_I2C,
+    FWK_MODULE_IDX_TIMER,
+    FWK_MODULE_IDX_GPIO,
+    FWK_MODULE_IDX_PMIC,
+    FWK_MODULE_IDX_DW_APB_I2C,
+    FWK_MODULE_IDX_COUNT,
+};
+#endif

@@ -51,6 +51,9 @@ static struct fwk_element ppu_element_table[] = {
             .pd_type = MOD_PD_TYPE_SYSTEM,
             .ppu.reg_base = SI0_PPU_SYS0_BASE,
             .default_power_on = true,
+#ifdef SCP_APOLLO_QVP_PMIC
+            .defer_power_on_until_start = true,
+#endif
             .observer_id = FWK_ID_NONE_INIT,
         }),
     },

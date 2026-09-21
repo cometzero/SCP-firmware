@@ -3,6 +3,38 @@
 
 #include <fwk_status.h>
 
+int tps6594_read_status(const struct tps6594_bus *bus, uint8_t address,
+    struct tps6594_status *snapshot)
+{
+    int status;
+    unsigned int i;
+    struct {
+        uint8_t reg;
+        uint8_t *data;
+        size_t count;
+    } reads[] = {
+        { 0x04, snapshot ? snapshot->buck_ctrl : NULL, 10 },
+        { 0x0e, snapshot ? snapshot->buck_vout : NULL, 10 },
+        { 0x1d, snapshot ? snapshot->ldo_ctrl : NULL, 4 },
+        { 0x23, snapshot ? snapshot->ldo_vout : NULL, 4 },
+        { 0x31, snapshot ? snapshot->gpio_conf : NULL, 11 },
+        { 0x3d, snapshot ? snapshot->gpio_out : NULL, 2 },
+        { 0x3f, snapshot ? snapshot->gpio_in : NULL, 2 },
+        { 0x6d, snapshot ? snapshot->faults : NULL, 11 },
+    };
+
+    if (!snapshot)
+        return FWK_E_PARAM;
+    /* Live status only: do not read or acknowledge latched INT/RTC state. */
+    for (i = 0; i < sizeof(reads) / sizeof(reads[0]); i++) {
+        status = bus->transfer(bus->ctx, address, reads[i].reg,
+            reads[i].data, reads[i].count, true);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
+    return FWK_SUCCESS;
+}
+
 int tps6594_probe(const struct tps6594_bus *bus, uint8_t address)
 {
     uint8_t revision;
@@ -86,6 +118,65 @@ int tps6594_voltage(const struct tps6594_bus *bus, uint8_t address,
     }
     return update(bus, address, reg,
         rail < 5 ? 0xff : (rail < 8 ? 0x7e : 0x7f), value);
+}
+
+int tps6594_get_voltage(const struct tps6594_bus *bus, uint8_t address,
+    unsigned int rail, uint32_t *uv)
+{
+    uint8_t value, control, reg;
+    uint32_t voltage;
+    int status;
+
+    if (rail >= TPS6594_RAIL_COUNT || !uv)
+        return FWK_E_PARAM;
+    reg = rail < 5 ? 0x0e + rail * 2 : 0x23 + rail - 5;
+    if (rail < 5) {
+        status = bus->transfer(bus->ctx, address, 0x04 + rail * 2,
+            &control, 1, true);
+        if (status != FWK_SUCCESS)
+            return status;
+        reg += !!(control & 8);
+    }
+    status = bus->transfer(bus->ctx, address, reg, &value, 1, true);
+    if (status != FWK_SUCCESS)
+        return status;
+    if (rail < 5) {
+        if (value < 0x0f)
+            voltage = 300000 + value * 20000;
+        else if (value < 0x73)
+            voltage = 600000 + (value - 0x0f) * 5000;
+        else if (value < 0xab)
+            voltage = 1100000 + (value - 0x73) * 10000;
+        else
+            voltage = 1660000 + (value - 0xab) * 20000;
+    } else if (rail < 8) {
+        value = (value & 0x7e) >> 1;
+        if (value < 4 || value > 0x3a)
+            return FWK_E_RANGE;
+        voltage = 600000 + (value - 4) * 50000;
+    } else {
+        value &= 0x7f;
+        if (value < 0x20 || value > 0x74)
+            return FWK_E_RANGE;
+        voltage = 1200000 + (value - 0x20) * 25000;
+    }
+    *uv = voltage;
+    return FWK_SUCCESS;
+}
+
+int tps6594_get_enabled(const struct tps6594_bus *bus, uint8_t address,
+    unsigned int rail, bool *enabled)
+{
+    uint8_t value;
+    int status;
+
+    if (rail >= TPS6594_RAIL_COUNT || !enabled)
+        return FWK_E_PARAM;
+    status = bus->transfer(bus->ctx, address,
+        rail < 5 ? 0x04 + rail * 2 : 0x1d + rail - 5, &value, 1, true);
+    if (status == FWK_SUCCESS)
+        *enabled = !!(value & 1);
+    return status;
 }
 
 int tps6594_enable(const struct tps6594_bus *bus, uint8_t address,

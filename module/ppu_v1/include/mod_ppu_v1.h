@@ -153,10 +153,19 @@ struct mod_ppu_v1_pd_config {
 
     /*!
      * Flag indicating if this domain should be powered on during element
-     * init. This flag is only supported for device and system PPUs and should
-     * not be set for any other type. Timeout is not provided at this stage.
+     * init, or during start if defer_power_on_until_start is set. This flag is
+     * only supported for device and system PPUs and should not be set for any
+     * other type. Timeout is not provided for this initial transition.
      */
     bool default_power_on;
+
+    /*!
+     * Defer the default_power_on transition until element start. Products
+     * requiring a prerequisite driver, such as a PMIC, must order that
+     * driver's start before this module. Ignored if default_power_on is false.
+     * The default value (false) preserves power-on during element init.
+     */
+    bool defer_power_on_until_start;
 
     /*!
      * \brief Identifier of an entity wishing to be notified when the PPU

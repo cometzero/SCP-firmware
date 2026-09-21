@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 #include "tps6594.h"
 
+#include <mod_gpio.h>
+#include <mod_pmic.h>
+#include <mod_i2c.h>
+#include <mod_timer.h>
+
 #include <fwk_id.h>
 #include <fwk_log.h>
 #include <fwk_module.h>
@@ -13,6 +18,27 @@ static struct tps6594_bus bus = {
     .transfer = tps6594_i2c_transfer,
 };
 static bool ready;
+static const struct mod_timer_api *timer_api;
+
+static int gpio_direction(unsigned int pmic, unsigned int pin, bool output);
+
+static const struct mod_tps6594_element_config *pin_config(fwk_id_t id)
+{
+    return fwk_module_get_data(id);
+}
+
+static int driver_direction(fwk_id_t id, bool output)
+{
+    const struct mod_tps6594_element_config *pin;
+
+    if (!fwk_module_is_valid_element_id(id) ||
+        fwk_id_get_module_idx(id) != FWK_MODULE_IDX_TPS6594)
+        return FWK_E_PARAM;
+    pin = pin_config(id);
+    if (pin->type != MOD_TPS6594_ELEMENT_GPIO)
+        return FWK_E_PARAM;
+    return gpio_direction(pin->pmic, pin->pin, output);
+}
 
 static int set_voltage(unsigned int pmic, unsigned int rail, uint32_t uv)
 {
@@ -48,6 +74,93 @@ static int gpio_read(unsigned int pmic, unsigned int pin, bool *value)
         return FWK_E_PARAM;
     return tps6594_gpio_read(&bus, config->addresses[pmic], pin, value);
 }
+
+static int driver_write(fwk_id_t id, bool value)
+{
+    const struct mod_tps6594_element_config *pin;
+
+    if (!fwk_module_is_valid_element_id(id) ||
+        fwk_id_get_module_idx(id) != FWK_MODULE_IDX_TPS6594)
+        return FWK_E_PARAM;
+    pin = pin_config(id);
+    if (pin->type != MOD_TPS6594_ELEMENT_GPIO)
+        return FWK_E_PARAM;
+    return gpio_write(pin->pmic, pin->pin, value);
+}
+
+static int driver_read(fwk_id_t id, bool *value)
+{
+    const struct mod_tps6594_element_config *pin;
+
+    if (!fwk_module_is_valid_element_id(id) ||
+        fwk_id_get_module_idx(id) != FWK_MODULE_IDX_TPS6594)
+        return FWK_E_PARAM;
+    pin = pin_config(id);
+    if (pin->type != MOD_TPS6594_ELEMENT_GPIO)
+        return FWK_E_PARAM;
+    return gpio_read(pin->pmic, pin->pin, value);
+}
+
+static int pmic_address(fwk_id_t id, uint8_t *address)
+{
+    const struct mod_tps6594_element_config *device;
+
+    if (!fwk_module_is_valid_element_id(id) ||
+        fwk_id_get_module_idx(id) != FWK_MODULE_IDX_TPS6594)
+        return FWK_E_PARAM;
+    device = fwk_module_get_data(id);
+    if (device->type != MOD_TPS6594_ELEMENT_PMIC)
+        return FWK_E_PARAM;
+    if (!ready)
+        return FWK_E_STATE;
+    *address = config->addresses[device->pmic];
+    return FWK_SUCCESS;
+}
+
+static int pmic_set_voltage(fwk_id_t id, unsigned int rail, uint32_t uv)
+{
+    uint8_t address;
+    int status = pmic_address(id, &address);
+
+    return status == FWK_SUCCESS ? tps6594_voltage(&bus, address, rail, uv) : status;
+}
+
+static int pmic_get_voltage(fwk_id_t id, unsigned int rail, uint32_t *uv)
+{
+    uint8_t address;
+    int status = pmic_address(id, &address);
+
+    return status == FWK_SUCCESS ? tps6594_get_voltage(&bus, address, rail, uv) : status;
+}
+
+static int pmic_set_enabled(fwk_id_t id, unsigned int rail, bool enabled)
+{
+    uint8_t address;
+    int status = pmic_address(id, &address);
+
+    return status == FWK_SUCCESS ? tps6594_enable(&bus, address, rail, enabled) : status;
+}
+
+static int pmic_get_enabled(fwk_id_t id, unsigned int rail, bool *enabled)
+{
+    uint8_t address;
+    int status = pmic_address(id, &address);
+
+    return status == FWK_SUCCESS ? tps6594_get_enabled(&bus, address, rail, enabled) : status;
+}
+
+static const struct mod_pmic_driver_api pmic_api = {
+    .set_voltage = pmic_set_voltage,
+    .get_voltage = pmic_get_voltage,
+    .set_enabled = pmic_set_enabled,
+    .get_enabled = pmic_get_enabled,
+};
+
+static const struct mod_gpio_driver_api gpio_api = {
+    .set_direction = driver_direction,
+    .write = driver_write,
+    .read = driver_read,
+};
 
 static int read_faults(unsigned int pmic, uint8_t status[11])
 {
@@ -154,27 +267,96 @@ restore:
 
 static int module_init(fwk_id_t id, unsigned int elements, const void *data)
 {
-    uint64_t start;
-    unsigned int i;
-    int status;
-
     config = data;
-    if (!config || !config->addresses || !config->count || !config->time_us)
+    if (!config || !config->addresses || !config->count ||
+        !fwk_module_is_valid_element_id(config->i2c_id) ||
+        !fwk_module_is_valid_element_id(config->timer_id))
         return FWK_E_DATA;
     if (config->gpio_self_test && !config->configure_registers)
         return FWK_E_DATA;
-    controller.base = config->i2c_base;
-    controller.time_us = config->time_us;
-    controller.timeout_us = config->transfer_timeout_us;
-    start = config->time_us();
-    FWK_LOG_INFO("[TPS6594] begin count=%u before=power", config->count);
-    status = tps6594_i2c_init(&controller);
+    controller.id = config->i2c_id;
+    ready = false;
+    return FWK_SUCCESS;
+}
+
+static int element_init(fwk_id_t id, unsigned int sub_elements, const void *data)
+{
+    const struct mod_tps6594_element_config *pin = data;
+
+    if (!pin || pin->pmic >= config->count ||
+        (pin->type != MOD_TPS6594_ELEMENT_GPIO && pin->type != MOD_TPS6594_ELEMENT_PMIC) ||
+        (pin->type == MOD_TPS6594_ELEMENT_GPIO && pin->pin >= TPS6594_GPIO_COUNT))
+        return FWK_E_DATA;
+    return FWK_SUCCESS;
+}
+
+static int module_bind(fwk_id_t id, unsigned int round)
+{
+    int status;
+
+    if (round || !fwk_id_is_type(id, FWK_ID_TYPE_MODULE))
+        return FWK_SUCCESS;
+    status = fwk_module_bind(config->i2c_id, mod_i2c_api_id_i2c,
+        &controller.api);
     if (status != FWK_SUCCESS)
         return status;
+    return fwk_module_bind(config->timer_id, MOD_TIMER_API_ID_TIMER, &timer_api);
+}
+
+static int print_status(uint8_t address)
+{
+    struct tps6594_status s;
+    unsigned int i, bank;
+    int status = tps6594_read_status(&bus, address, &s);
+
+    if (status != FWK_SUCCESS)
+        return status;
+    for (i = 0; i < 5; i++) {
+        bank = !!(s.buck_ctrl[i * 2] & 8);
+        FWK_LOG_INFO("[TPS6594] address=0x%02x BUCK%u enable=%u "
+            "vout_bank=%u vout_raw=0x%02x stat=0x%02x", address, i + 1,
+            s.buck_ctrl[i * 2] & 1, bank + 1, s.buck_vout[i * 2 + bank],
+            s.faults[i / 2]);
+    }
+    for (i = 0; i < 4; i++)
+        FWK_LOG_INFO("[TPS6594] address=0x%02x LDO%u enable=%u "
+            "vout_raw=0x%02x stat=0x%02x", address, i + 1,
+            s.ldo_ctrl[i] & 1, s.ldo_vout[i], s.faults[3 + i / 2]);
+    for (i = 0; i < TPS6594_GPIO_COUNT; i++)
+        FWK_LOG_INFO("[TPS6594] address=0x%02x GPIO%u mux=%u "
+            "direction=%s out=%u in=%u", address, i + 1,
+            s.gpio_conf[i] >> 5, s.gpio_conf[i] & 1 ? "output" : "input",
+            (s.gpio_out[i / 8] >> (i % 8)) & 1,
+            (s.gpio_in[i / 8] >> (i % 8)) & 1);
+    return FWK_SUCCESS;
+}
+
+static int module_start(fwk_id_t id)
+{
+    unsigned int i;
+    uint32_t frequency;
+    uint64_t start, end, elapsed;
+    int status;
+
+    if (!fwk_id_is_type(id, FWK_ID_TYPE_MODULE))
+        return FWK_SUCCESS;
+    status = timer_api->get_frequency(config->timer_id, &frequency);
+    if (status != FWK_SUCCESS)
+        return status;
+    if (!frequency)
+        return FWK_E_DATA;
+    status = timer_api->get_counter(config->timer_id, &start);
+    if (status != FWK_SUCCESS)
+        return status;
+    FWK_LOG_INFO("[TPS6594] begin count=%u before=power", config->count);
+    if (!controller.api || !controller.api->transfer_as_controller)
+        return FWK_E_SUPPORT;
     for (i = 0; i < config->count; i++) {
-        status = config->configure_registers ?
-            tps6594_init(&bus, config->addresses[i], config->rail_uv) :
-            tps6594_probe(&bus, config->addresses[i]);
+        status = tps6594_probe(&bus, config->addresses[i]);
+        if (status == FWK_SUCCESS)
+            status = print_status(config->addresses[i]);
+        if (status == FWK_SUCCESS && config->configure_registers)
+            status = tps6594_init(&bus, config->addresses[i], config->rail_uv);
         if (status == FWK_SUCCESS && config->gpio_self_test) {
             status = gpio_test(config->addresses[i]);
             if (status != FWK_SUCCESS)
@@ -197,17 +379,37 @@ static int module_init(fwk_id_t id, unsigned int elements, const void *data)
             config->configure_registers ? "PASS" : "SKIP",
             config->gpio_self_test ? "PASS" : "SKIP");
     }
+    status = timer_api->get_counter(config->timer_id, &end);
+    if (status != FWK_SUCCESS)
+        return status;
+    elapsed = end - start;
+    elapsed = (elapsed / frequency) * 1000000 +
+        ((elapsed % frequency) * 1000000) / frequency;
     ready = true;
     FWK_LOG_INFO("[TPS6594] complete count=%u elapsed_us=%u", config->count,
-        (unsigned int)(config->time_us() - start));
+        (unsigned int)elapsed);
+    /* Subsequent PPU start may now perform the deferred SYS0 power-on. */
+    FWK_LOG_INFO("[TPS6594] power-ready");
     return FWK_SUCCESS;
 }
 
 static int bind_request(fwk_id_t source, fwk_id_t target, fwk_id_t api_id,
     const void **result)
 {
+    if (fwk_id_get_api_idx(api_id) == MOD_TPS6594_API_IDX_GPIO &&
+        fwk_module_is_valid_element_id(target) &&
+        pin_config(target)->type == MOD_TPS6594_ELEMENT_GPIO) {
+        *result = &gpio_api;
+        return FWK_SUCCESS;
+    }
+    if (fwk_id_get_api_idx(api_id) == MOD_TPS6594_API_IDX_PMIC_DRIVER &&
+        fwk_module_is_valid_element_id(target) &&
+        pin_config(target)->type == MOD_TPS6594_ELEMENT_PMIC) {
+        *result = &pmic_api;
+        return FWK_SUCCESS;
+    }
     if (!fwk_id_is_type(target, FWK_ID_TYPE_MODULE) ||
-        fwk_id_get_api_idx(api_id) != 0)
+        fwk_id_get_api_idx(api_id) != MOD_TPS6594_API_IDX_PMIC)
         return FWK_E_PARAM;
     *result = &api;
     return FWK_SUCCESS;
@@ -215,7 +417,10 @@ static int bind_request(fwk_id_t source, fwk_id_t target, fwk_id_t api_id,
 
 const struct fwk_module module_tps6594 = {
     .type = FWK_MODULE_TYPE_DRIVER,
-    .api_count = 1,
+    .api_count = MOD_TPS6594_API_COUNT,
     .init = module_init,
+    .element_init = element_init,
+    .bind = module_bind,
+    .start = module_start,
     .process_bind_request = bind_request,
 };

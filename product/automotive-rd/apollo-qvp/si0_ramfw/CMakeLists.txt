@@ -8,7 +8,8 @@
 add_executable(apollo-qvp-si0-bl2)
 
 if(SCP_APOLLO_QVP_PMIC)
-    target_sources(apollo-qvp-si0-bl2 PRIVATE config_tps6594.c)
+    target_sources(apollo-qvp-si0-bl2 PRIVATE
+        config_tps6594.c config_gpio.c config_pmic.c config_i2c.c config_dw_apb_i2c.c)
     target_compile_definitions(apollo-qvp-si0-bl2 PRIVATE SCP_APOLLO_QVP_PMIC)
 endif()
 

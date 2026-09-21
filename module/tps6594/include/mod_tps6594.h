@@ -2,6 +2,8 @@
 #ifndef MOD_TPS6594_H
 #define MOD_TPS6594_H
 
+#include <fwk_id.h>
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -11,16 +13,34 @@
 
 /* Single firmware-thread API. No ISR callers or concurrent bus masters. */
 struct mod_tps6594_config {
-    uintptr_t i2c_base;
-    uint64_t (*time_us)(void);
-    uint32_t transfer_timeout_us;
+    fwk_id_t i2c_id;
+    fwk_id_t timer_id;
     const uint8_t *addresses;
     unsigned int count;
-    /* Default false: one read-only presence probe preserves all PMIC state. */
+    /* Default false: read-only probe/status preserves all PMIC state. */
     bool configure_registers;
     /* Diagnostic QVP loopback test; requires configure_registers. */
     bool gpio_self_test;
     uint32_t rail_uv[TPS6594_RAIL_COUNT];
+};
+
+enum mod_tps6594_api_idx {
+    MOD_TPS6594_API_IDX_PMIC,
+    MOD_TPS6594_API_IDX_GPIO,
+    MOD_TPS6594_API_IDX_PMIC_DRIVER,
+    MOD_TPS6594_API_COUNT,
+};
+
+enum mod_tps6594_element_type {
+    MOD_TPS6594_ELEMENT_GPIO,
+    MOD_TPS6594_ELEMENT_PMIC,
+};
+
+/* GPIO elements select a pin; PMIC elements expose all rails of one device. */
+struct mod_tps6594_element_config {
+    unsigned int pmic;
+    unsigned int pin;
+    enum mod_tps6594_element_type type;
 };
 
 struct mod_tps6594_api {

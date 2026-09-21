@@ -27,6 +27,29 @@ processing of I2C transaction requests follow a FIFO logic. When a transaction
 is completed, the processing of the transaction request at the head of the
 queue, if any, is initiated.
 
+The optional `transfer_as_controller()` API instead executes one synchronous
+transaction and returns its final status without generating a response event.
+It accepts a `mod_i2c_request`: a nonzero transmit length writes bytes, a nonzero
+receive length reads bytes, and specifying both performs a write followed by a
+repeated START and read, with one final STOP. The buffers only need to remain
+valid until the call returns. A 7-bit nonzero target address is required.
+
+This API is for firmware-thread callers, including module startup; ISR and
+concurrent calls are unsupported. It returns `FWK_E_BUSY` while the HAL has an
+active asynchronous transaction and `FWK_E_SUPPORT` for drivers without the
+optional callback. Synchronous-only drivers are also supported; the event-based
+APIs return `FWK_E_SUPPORT` before queuing a request to such a driver.
+
+DW APB I2C selects this path with `mod_dw_apb_i2c_dev_config.polled = true` and
+a nonzero `transfer_timeout_us`. It binds the timer API, masks controller
+interrupts, initializes the master/repeated-START configuration, and does not
+register an ISR or bind the HAL completion callback. Its timer-bounded FIFO
+polling handles repeated START, STOP, and transmit aborts. Timeout, timer failure,
+or failure to disable the controller blocks later requests with `FWK_E_STATE`,
+since a queued command may still complete after the failure. Recovery requires
+controller/platform reinitialization. The default IRQ-based driver path is
+unchanged.
+
 # Restriction                             {#module_i2c_architecture_restriction}
 
 The following features are unsupported. Support may be added in the future.
@@ -156,3 +179,20 @@ is pending, the processing of this last transaction request is not initiated
 immediately to avoid multiple transactions being processed within the same event
 processing. A reload event is then sent and the processing of the next pending
 request is initiated as part of the processing of the reload event.
+
+Asynchronous request events carry a native pointer to a module-owned copy of
+the request descriptor. The event payload remains 16 bytes on both 32-bit and
+64-bit targets; pointers are copied with `memcpy` to avoid event-parameter
+alignment assumptions. The descriptor is allocated with `fwk_mm_alloc_notrap`
+and freed when copied into the active device context, when event submission
+fails, or when a request is rejected in the panic state. Allocation failure
+returns `FWK_E_NOMEM` without submitting an event. Queued delayed requests keep
+their own descriptor until they become active. Data buffers remain owned by the
+caller and must stay valid until the response is delivered.
+
+The device also tracks descriptors of requests dispatched while busy. If the
+framework fails to allocate their delayed response, these orphaned descriptors
+are reclaimed when the delayed queue becomes empty. Entering the terminal panic
+state releases all tracked descriptors; undelivered request events keep their
+own ownership until their panic response is handled. This does not change the
+framework's existing request/response loss behavior on event-pool exhaustion.

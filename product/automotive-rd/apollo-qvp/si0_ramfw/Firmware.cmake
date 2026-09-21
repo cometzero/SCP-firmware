@@ -34,6 +34,11 @@ set(SCP_ENABLE_EXCEPTION_SYMTAB TRUE)
 set(SCP_EXCEPTION_SYMTAB_MAX_SIZE 131072)
 
 option(SCP_APOLLO_QVP_PMIC "Initialize SI CL0 QVP TPS6594 board PMICs" OFF)
+option(SCP_APOLLO_QVP_PMIC_GPIO_TEST "Run QVP-only GPIO HAL diagnostics" OFF)
+
+if(SCP_APOLLO_QVP_PMIC_GPIO_TEST AND NOT SCP_APOLLO_QVP_PMIC)
+    message(FATAL_ERROR "PMIC GPIO diagnostics require SCP_APOLLO_QVP_PMIC")
+endif()
 
 if (NOT DEFINED SCP_PLATFORM_VARIANT)
     set(SCP_PLATFORM_VARIANT "fvp")
@@ -106,12 +111,6 @@ list(APPEND SCP_MODULES
     "gicx00"
 )
 
-if(SCP_APOLLO_QVP_PMIC)
-    # init callbacks execute in module order: PMICs must precede power drivers.
-    list(FIND SCP_MODULES "ppu-v1" pmic_power_index)
-    list(INSERT SCP_MODULES ${pmic_power_index} "tps6594")
-endif()
-
 if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
 list(APPEND SCP_MODULES
     "system-pll"
@@ -148,6 +147,21 @@ list(APPEND SCP_MODULES
     "psu"
     "fch-polled"
 )
+
+if(SCP_APOLLO_QVP_PMIC)
+    # Defer SYS0 power-on until start, after timer and PMIC probe succeed.
+    list(REMOVE_ITEM SCP_MODULES "ppu-v1")
+    list(FIND SCP_MODULES "timer" pmic_timer_index)
+    math(EXPR pmic_index "${pmic_timer_index} + 1")
+    list(INSERT SCP_MODULES ${pmic_index}
+        "dw-apb-i2c" "i2c" "tps6594" "gpio" "pmic" "ppu-v1")
+    if(SCP_APOLLO_QVP_PMIC_GPIO_TEST)
+        list(APPEND SCP_MODULE_PATHS
+            "${CMAKE_CURRENT_LIST_DIR}/../../../../module/tps6594/test/runtime")
+        math(EXPR pmic_test_index "${pmic_index} + 5")
+        list(INSERT SCP_MODULES ${pmic_test_index} "test-tps6594")
+    endif()
+endif()
 
 if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
 list(APPEND SCP_MODULES

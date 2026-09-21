@@ -20,7 +20,6 @@
 
 #include <fwk_element.h>
 #include <fwk_id.h>
-#include <fwk_log.h>
 #include <fwk_macros.h>
 #include <fwk_mm.h>
 #include <fwk_module.h>
@@ -121,11 +120,6 @@ static const struct fwk_element *platform_power_domain_get_element_table(
     unsigned int total_count;
     unsigned int si_capacity;
     int st;
-
-#ifdef SCP_APOLLO_QVP_PMIC
-    /* PMIC init failed closed before framework reached this power module. */
-    FWK_LOG_INFO("[TPS6594] power-ready");
-#endif
 
     systop_pd_config =
         fwk_mm_calloc(1, sizeof(struct mod_power_domain_element_config));

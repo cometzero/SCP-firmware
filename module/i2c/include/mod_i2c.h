@@ -85,9 +85,6 @@ struct mod_i2c_request {
     uint8_t *receive_data;
 };
 
-static_assert(sizeof(struct mod_i2c_request) <= FWK_EVENT_PARAMETERS_SIZE,
-    "An I2C request should fit in the params field of an event\n");
-
 /*!
  * \brief I2C driver interface.
  *
@@ -136,6 +133,14 @@ struct mod_i2c_driver_api {
     int (*receive_as_controller)(
         fwk_id_t dev_id,
         struct mod_i2c_request *receive_request);
+
+    /*!
+     * Optional synchronous transfer. TX is followed by repeated START and RX
+     * when both lengths are nonzero. Returns a final status, never FWK_PENDING;
+     * no response event is generated. Buffers remain valid until return.
+     */
+    int (*transfer_as_controller)(
+        fwk_id_t dev_id, struct mod_i2c_request *request);
 };
 
 /*!
@@ -228,6 +233,16 @@ struct mod_i2c_api {
         uint8_t *receive_data,
         uint8_t transmit_byte_count,
         uint8_t receive_byte_count);
+
+    /*!
+     * Synchronously execute a TX, RX, or combined TX/repeated-START/RX request.
+     * Intended for firmware-thread callers; ISR and concurrent callers are
+     * unsupported. Returns FWK_E_SUPPORT if the driver has no synchronous API,
+     * FWK_E_BUSY if an asynchronous transaction is active, or a final driver
+     * status. No completion event is generated; buffers may be stack allocated.
+     */
+    int (*transfer_as_controller)(
+        fwk_id_t dev_id, struct mod_i2c_request *request);
 };
 
 /*!

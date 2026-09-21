@@ -127,6 +127,12 @@ struct mod_si0_platform_config {
 
     /*! Transport channel identifier */
     fwk_id_t transport_id;
+
+    /*! Optional PMIC HAL element identifier. */
+    fwk_id_t pmic_id;
+
+    /*! Number of PMIC rails to inspect at startup; zero disables inspection. */
+    unsigned int pmic_rail_count;
 };
 
 /*!

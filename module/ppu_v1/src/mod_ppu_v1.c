@@ -953,6 +953,8 @@ static int ppu_v1_pd_init(fwk_id_t pd_id, unsigned int unused, const void *data)
         case MOD_PD_TYPE_DEVICE_DEBUG:
             /* Fall through */
         case MOD_PD_TYPE_SYSTEM:
+            if (config->defer_power_on_until_start)
+                return FWK_SUCCESS;
             ppu_v1_init(&pd_ctx->ppu);
             return ppu_v1_set_power_mode(&pd_ctx->ppu, PPU_V1_MODE_ON, NULL);
 
@@ -1225,6 +1227,14 @@ static int ppu_v1_start(fwk_id_t id)
         id);
     if (status != FWK_SUCCESS) {
         return status;
+    }
+
+    if (pd_ctx->config->default_power_on &&
+        pd_ctx->config->defer_power_on_until_start) {
+        ppu_v1_init(&pd_ctx->ppu);
+        status = ppu_v1_set_power_mode(&pd_ctx->ppu, PPU_V1_MODE_ON, NULL);
+        if (status != FWK_SUCCESS)
+            return status;
     }
 
     switch (pd_ctx->config->pd_type) {

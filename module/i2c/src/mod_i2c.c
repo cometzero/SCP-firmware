@@ -27,14 +27,57 @@ enum mod_i2c_dev_state {
     MOD_I2C_DEV_PANIC,
 };
 
+struct mod_i2c_queued_request {
+    struct mod_i2c_request request;
+    struct mod_i2c_queued_request *next;
+};
+
 struct mod_i2c_dev_ctx {
     const struct mod_i2c_dev_config *config;
     const struct mod_i2c_driver_api *driver_api;
     struct mod_i2c_request request;
     enum mod_i2c_dev_state state;
+    struct mod_i2c_queued_request *pending_requests;
 };
 
 static struct mod_i2c_dev_ctx *ctx_table;
+
+/* Only a pointer is carried by the event, including on 64-bit targets. */
+static_assert(sizeof(struct mod_i2c_queued_request *) <= FWK_EVENT_PARAMETERS_SIZE,
+    "An I2C request pointer must fit in an event");
+
+static struct mod_i2c_queued_request *event_request(const struct fwk_event *event)
+{
+    struct mod_i2c_queued_request *request;
+
+    /* Event parameters do not necessarily have native pointer alignment. */
+    memcpy(&request, event->params, sizeof(request));
+    return request;
+}
+
+static void take_request(
+    struct mod_i2c_dev_ctx *ctx, const struct fwk_event *event)
+{
+    struct mod_i2c_queued_request *request = event_request(event);
+    struct mod_i2c_queued_request **link = &ctx->pending_requests;
+
+    while (*link != NULL && *link != request)
+        link = &(*link)->next;
+    if (*link != NULL)
+        *link = request->next;
+    ctx->request = request->request;
+    fwk_mm_free(request);
+}
+
+static void release_pending_requests(struct mod_i2c_dev_ctx *ctx)
+{
+    struct mod_i2c_queued_request *request;
+
+    while ((request = ctx->pending_requests) != NULL) {
+        ctx->pending_requests = request->next;
+        fwk_mm_free(request);
+    }
+}
 
 enum mod_i2c_internal_event_idx {
     MOD_I2C_EVENT_IDX_REQUEST_COMPLETED = MOD_I2C_EVENT_IDX_COUNT,
@@ -65,8 +108,18 @@ static int create_i2c_request(fwk_id_t dev_id,
 {
     int status;
     struct fwk_event event;
-    struct mod_i2c_request *event_param =
-        (struct mod_i2c_request *)event.params;
+    struct mod_i2c_queued_request *queued_request;
+    struct mod_i2c_dev_ctx *ctx;
+
+    if (!fwk_module_is_valid_element_id(dev_id) ||
+        fwk_id_get_module_idx(dev_id) != FWK_MODULE_IDX_I2C)
+        return FWK_E_PARAM;
+    get_ctx(dev_id, &ctx);
+    if ((request->transmit_byte_count &&
+         !ctx->driver_api->transmit_as_controller) ||
+        (request->receive_byte_count &&
+         !ctx->driver_api->receive_as_controller))
+        return FWK_E_SUPPORT;
 
     /* The target address should be on 7 bits */
     if (!fwk_expect(request->target_address < 0x80)) {
@@ -78,7 +131,12 @@ static int create_i2c_request(fwk_id_t dev_id,
         .response_requested = true,
     };
 
-    *event_param = *request;
+    queued_request = fwk_mm_alloc_notrap(1, sizeof(*queued_request));
+    if (queued_request == NULL)
+        return FWK_E_NOMEM;
+    queued_request->request = *request;
+    queued_request->next = NULL;
+    memcpy(event.params, &queued_request, sizeof(queued_request));
 
     if ((request->transmit_byte_count > 0) &&
         (request->receive_byte_count > 0)) {
@@ -99,6 +157,7 @@ static int create_i2c_request(fwk_id_t dev_id,
         return FWK_PENDING;
     }
 
+    fwk_mm_free(queued_request);
     return status;
 }
 
@@ -178,7 +237,34 @@ static int transmit_then_receive_as_controller(
     return create_i2c_request(dev_id, &request);
 }
 
+static int transfer_as_controller(
+    fwk_id_t dev_id, struct mod_i2c_request *request)
+{
+    struct mod_i2c_dev_ctx *ctx;
+    int status;
+
+    if (!fwk_module_is_valid_element_id(dev_id) ||
+        fwk_id_get_module_idx(dev_id) != FWK_MODULE_IDX_I2C || !request ||
+        !request->target_address || request->target_address >= 0x80 ||
+        (!request->transmit_byte_count && !request->receive_byte_count) ||
+        (request->transmit_byte_count && !request->transmit_data) ||
+        (request->receive_byte_count && !request->receive_data))
+        return FWK_E_PARAM;
+
+    get_ctx(dev_id, &ctx);
+    if (!ctx->driver_api->transfer_as_controller)
+        return FWK_E_SUPPORT;
+    if (ctx->state != MOD_I2C_DEV_IDLE)
+        return FWK_E_BUSY;
+    ctx->state = MOD_I2C_DEV_TX_RX;
+    status = ctx->driver_api->transfer_as_controller(
+        ctx->config->driver_id, request);
+    ctx->state = MOD_I2C_DEV_IDLE;
+    return status;
+}
+
 static struct mod_i2c_api i2c_api = {
+    .transfer_as_controller = transfer_as_controller,
     .transmit_as_controller = transmit_as_controller,
     .receive_as_controller = receive_as_controller,
     .transmit_then_receive_as_controller = transmit_then_receive_as_controller,
@@ -257,8 +343,9 @@ static int mod_i2c_bind(fwk_id_t id, unsigned int round)
         return status;
     }
 
-    if ((ctx->driver_api->transmit_as_controller == NULL) ||
-        (ctx->driver_api->receive_as_controller == NULL)) {
+    if (!ctx->driver_api->transfer_as_controller &&
+        ((!ctx->driver_api->transmit_as_controller) ||
+         (!ctx->driver_api->receive_as_controller))) {
         return FWK_E_DATA;
     }
 
@@ -362,6 +449,7 @@ static int reload(fwk_id_t dev_id, struct mod_i2c_dev_ctx *ctx)
     }
 
     if (is_empty) {
+        release_pending_requests(ctx);
         ctx->state = MOD_I2C_DEV_IDLE;
     } else {
         ctx->state = MOD_I2C_DEV_RELOAD;
@@ -380,7 +468,6 @@ static int process_next_request(fwk_id_t dev_id, struct mod_i2c_dev_ctx *ctx)
     int status, drv_status;
     bool is_empty;
     struct fwk_event delayed_response;
-    struct mod_i2c_request *request;
     struct mod_i2c_event_param *event_param;
 
     status = fwk_is_delayed_response_list_empty(dev_id, &is_empty);
@@ -389,6 +476,8 @@ static int process_next_request(fwk_id_t dev_id, struct mod_i2c_dev_ctx *ctx)
     }
 
     if (is_empty) {
+        /* Reclaim descriptors whose delayed-response allocation failed. */
+        release_pending_requests(ctx);
         ctx->state = MOD_I2C_DEV_IDLE;
         return FWK_SUCCESS;
     }
@@ -398,8 +487,7 @@ static int process_next_request(fwk_id_t dev_id, struct mod_i2c_dev_ctx *ctx)
         return status;
     }
 
-    request = (struct mod_i2c_request *)delayed_response.params;
-    ctx->request = *request;
+    take_request(ctx, &delayed_response);
 
     drv_status = process_request(ctx, delayed_response.id);
     if (drv_status != FWK_PENDING) {
@@ -422,7 +510,6 @@ static int mod_i2c_process_event(const struct fwk_event *event,
     int status, drv_status;
     bool is_request;
     struct mod_i2c_dev_ctx *ctx;
-    struct mod_i2c_request *request;
     struct mod_i2c_event_param *event_param, *resp_param;
 
     enum mod_i2c_internal_event_idx event_id_type;
@@ -434,18 +521,23 @@ static int mod_i2c_process_event(const struct fwk_event *event,
 
     if (is_request) {
         if (ctx->state == MOD_I2C_DEV_PANIC) {
+            fwk_mm_free(event_request(event));
             event_param = (struct mod_i2c_event_param *)resp_event->params;
             event_param->status = FWK_E_PANIC;
 
             return FWK_SUCCESS;
         } else if (ctx->state != MOD_I2C_DEV_IDLE) {
+            struct mod_i2c_queued_request *request = event_request(event);
+
+            /* Own this descriptor even if the framework cannot delay it. */
+            request->next = ctx->pending_requests;
+            ctx->pending_requests = request;
             resp_event->is_delayed_response = true;
 
             return FWK_SUCCESS;
         }
 
-        request = (struct mod_i2c_request *)event->params;
-        ctx->request = *request;
+        take_request(ctx, event);
 
         drv_status = process_request(ctx, event->id);
 
@@ -462,6 +554,10 @@ static int mod_i2c_process_event(const struct fwk_event *event,
 
         return FWK_SUCCESS;
     }
+
+    /* Delayed descriptors have been released on entry to terminal panic. */
+    if (ctx->state == MOD_I2C_DEV_PANIC)
+        return FWK_E_PANIC;
 
     event_id_type =
         (enum mod_i2c_internal_event_idx)fwk_id_get_event_idx(event->id);
@@ -513,6 +609,7 @@ static int mod_i2c_process_event(const struct fwk_event *event,
 
     if (status != FWK_SUCCESS) {
         ctx->state = MOD_I2C_DEV_PANIC;
+        release_pending_requests(ctx);
     }
 
     return status;

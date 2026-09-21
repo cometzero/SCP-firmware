@@ -23,14 +23,17 @@
  * I2C controller register definitions
  */
 struct dw_apb_i2c_reg {
-           uint8_t        RESERVED0[0x04 - 0x00];
+    FWK_RW uint32_t       IC_CON;
     FWK_RW uint32_t       IC_TAR;
            uint8_t        RESERVED1[0x10 - 0x08];
     FWK_RW uint32_t       IC_DATA_CMD;
            uint8_t        RESERVED2[0x2C - 0x14];
     FWK_R  uint32_t       IC_INTR_STAT;
     FWK_RW uint32_t       IC_INTR_MASK;
-           uint8_t        RESERVED3[0x54 - 0x34];
+    FWK_R  uint32_t       IC_RAW_INTR_STAT;
+           uint8_t        RESERVED3[0x40 - 0x38];
+    FWK_R  uint32_t       IC_CLR_INTR;
+           uint8_t        RESERVED3A[0x54 - 0x44];
     FWK_R  uint32_t       IC_CLR_TX_ABRT;
            uint8_t        RESERVED4[0x60 - 0x58];
     FWK_R  uint32_t       IC_CLR_STOP_DET;
@@ -39,7 +42,8 @@ struct dw_apb_i2c_reg {
     FWK_R  uint32_t       IC_STATUS;
            uint8_t        RESERVED6[0x9C - 0x74];
     FWK_R  uint32_t       IC_ENABLE_STATUS;
-           uint8_t        RESERVED7[0x100 - 0xA0];
+           uint8_t        RESERVED7[0xFC - 0xA0];
+    FWK_R  uint32_t       IC_COMP_TYPE;
 };
 
 #define IC_TAR_ADDRESS                  UINT32_C(0x000003FF)
@@ -50,6 +54,7 @@ struct dw_apb_i2c_reg {
 
 #define IC_STATUS_MST_ACTIVITY_MASK     UINT32_C(0x00000020)
 #define IC_STATUS_TFNF_MASK             UINT32_C(0x00000002)
+#define IC_STATUS_RFNE_MASK             UINT32_C(0x00000008)
 
 #define IC_DATA_CMD_CMD_MASK            UINT32_C(0x00000100)
 #define IC_DATA_CMD_DATA_MASK           UINT32_C(0x000000FF)
@@ -60,6 +65,8 @@ struct dw_apb_i2c_reg {
  *    register, setting write mode automatically.
  */
 #define IC_DATA_CMD_READ                0x100
+#define IC_DATA_CMD_STOP                (UINT32_C(1) << 9)
+#define IC_DATA_CMD_RESTART             (UINT32_C(1) << 10)
 
 /* IRQ Masks */
 #define IC_INTR_TX_ABRT_POS             6

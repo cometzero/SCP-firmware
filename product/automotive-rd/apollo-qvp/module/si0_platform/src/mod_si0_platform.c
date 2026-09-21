@@ -21,6 +21,10 @@
 #include <mod_si0_platform.h>
 #include <mod_transport.h>
 
+#ifdef BUILD_HAS_MOD_PMIC
+#include <mod_pmic.h>
+#endif
+
 #include <fwk_core.h>
 #include <fwk_id.h>
 #include <fwk_log.h>
@@ -56,6 +60,10 @@ struct si0_platform_ctx {
 
     /* SDS API pointer */
     const struct mod_sds_api *sds_api;
+
+#ifdef BUILD_HAS_MOD_PMIC
+    const struct mod_pmic_api *pmic_api;
+#endif
 
     /* Config containig data required for platform initialization */
     const struct mod_si0_platform_config *config;
@@ -93,6 +101,16 @@ static bool is_cpu_isolated(
  */
 static int validate_config_data(const struct mod_si0_platform_config *config)
 {
+    if (config->pmic_rail_count != 0) {
+#ifdef BUILD_HAS_MOD_PMIC
+        if (!fwk_id_is_type(config->pmic_id, FWK_ID_TYPE_ELEMENT) ||
+            (fwk_id_get_module_idx(config->pmic_id) != FWK_MODULE_IDX_PMIC))
+            return FWK_E_PARAM;
+#else
+        return FWK_E_SUPPORT;
+#endif
+    }
+
     if (is_cpu_isolated(config, config->primary_cpu_mpid)) {
         FWK_LOG_ERR("[SI0 PLATFORM] Found primary CPU in isolated CPU list");
         return FWK_E_PARAM;
@@ -168,6 +186,17 @@ static int si0_platform_bind(fwk_id_t id, unsigned int round)
         return FWK_SUCCESS;
     }
 
+#ifdef BUILD_HAS_MOD_PMIC
+    if (si0_platform_ctx.config->pmic_rail_count != 0) {
+        status = fwk_module_bind(
+            si0_platform_ctx.config->pmic_id,
+            FWK_ID_API(FWK_MODULE_IDX_PMIC, MOD_PMIC_API_IDX_PMIC),
+            &si0_platform_ctx.pmic_api);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
+#endif
+
     /* Bind to modules required for handshaking with RSE */
     status = platform_rse_bind(si0_platform_ctx.config);
     if (status != FWK_SUCCESS) {
@@ -240,11 +269,52 @@ static int si0_platform_process_bind_request(
     return status;
 }
 
+#ifdef BUILD_HAS_MOD_PMIC
+static int check_pmic_rails(void)
+{
+    const struct mod_si0_platform_config *config = si0_platform_ctx.config;
+    unsigned int rail;
+    uint32_t uv;
+    bool enabled;
+    int status;
+
+    for (rail = 0; rail < config->pmic_rail_count; rail++) {
+        status = si0_platform_ctx.pmic_api->get_enabled(
+            config->pmic_id, rail, &enabled);
+        if (status != FWK_SUCCESS)
+            goto error;
+        status = si0_platform_ctx.pmic_api->get_voltage(
+            config->pmic_id, rail, &uv);
+        if (status != FWK_SUCCESS)
+            goto error;
+
+        FWK_LOG_INFO(
+            "[SI0 PLATFORM] PMIC rail=%u enabled=%u programmed_uv=%u",
+            rail,
+            (unsigned int)enabled,
+            (unsigned int)uv);
+    }
+
+    return FWK_SUCCESS;
+
+error:
+    FWK_LOG_ERR(
+        "[SI0 PLATFORM] PMIC rail=%u read failed: %d", rail, status);
+    return status;
+}
+#endif
+
 static int si0_platform_start(fwk_id_t id)
 {
     int status;
     struct fwk_event event = { 0 };
     unsigned int event_count = 0U;
+
+#ifdef BUILD_HAS_MOD_PMIC
+    status = check_pmic_rails();
+    if (status != FWK_SUCCESS)
+        return status;
+#endif
 
 #ifdef BUILD_HAS_NOTIFICATION
     fwk_id_t pd_transition_source_id =

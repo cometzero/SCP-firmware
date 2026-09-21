@@ -33,6 +33,10 @@ struct mod_si0_platform_config system_config = {
     .transport_id = FWK_ID_ELEMENT_INIT(
         FWK_MODULE_IDX_TRANSPORT,
         SI0_CFGD_MOD_TRANSPORT_EIDX_RSE_WARM_SYNC),
+#ifdef SCP_APOLLO_QVP_PMIC
+    .pmic_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_PMIC, 0),
+    .pmic_rail_count = 9,
+#endif
 };
 
 /*!
