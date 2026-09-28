@@ -15,6 +15,7 @@
 
 #    include <Mockfwk_id.h>
 #    include <Mockfwk_module.h>
+#    include <Mockfwk_notification.h>
 #endif
 
 #include <internal/transport.h>
@@ -24,7 +25,26 @@
 #include <fwk_element.h>
 #include <fwk_macros.h>
 
+static struct mod_transport_buffer *initializing_mailbox;
+static unsigned int initialization_barriers;
+
+static void test_memory_barrier(void)
+{
+    if (initializing_mailbox == NULL)
+        return;
+    TEST_ASSERT_EQUAL_UINT32(0, initializing_mailbox->status);
+    if (++initialization_barriers == 2) {
+        TEST_ASSERT_EQUAL_UINT32(0, initializing_mailbox->reserved0);
+        TEST_ASSERT_EQUAL_UINT64(0, initializing_mailbox->reserved1);
+        TEST_ASSERT_EQUAL_UINT32(0, initializing_mailbox->flags);
+        TEST_ASSERT_EQUAL_UINT32(0, initializing_mailbox->length);
+        TEST_ASSERT_EQUAL_UINT32(0, initializing_mailbox->message_header);
+    }
+}
+
+#define __sync_synchronize test_memory_barrier
 #include UNIT_TEST_SRC
+#undef __sync_synchronize
 
 #define BUILD_HAS_BASE_PROTOCOL
 
@@ -644,11 +664,33 @@ void test_transport_transmit_valid_param_ob(void)
     }
 }
 
+void test_transport_mailbox_init_publishes_free_last(void)
+{
+    struct transport_channel_ctx *ctx = &transport_ctx.channel_ctx_table[
+        FAKE_SERVICE_IDX_OUT_BAND_TEST_CHANNEL];
+    struct mod_transport_channel_config config = *ctx->config;
+    config.channel_type = MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER;
+    config.policies = MOD_TRANSPORT_POLICY_INIT_MAILBOX;
+    ctx->config = &config;
+    initializing_mailbox =
+        (struct mod_transport_buffer *)config.out_band_mailbox_address;
+    memset(initializing_mailbox, 0xA5, sizeof(*initializing_mailbox));
+    initialization_barriers = 0;
+    fwk_notification_notify_IgnoreAndReturn(FWK_SUCCESS);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, transport_mailbox_init(ctx));
+    TEST_ASSERT_EQUAL_UINT32(2, initialization_barriers);
+    TEST_ASSERT_EQUAL_UINT32(MOD_TRANSPORT_MAILBOX_STATUS_FREE_MASK,
+                             initializing_mailbox->status);
+    TEST_ASSERT_TRUE(ctx->out_band_mailbox_ready);
+    initializing_mailbox = NULL;
+}
+
 int scmi_test_main(void)
 {
     UNITY_BEGIN();
 
     RUN_TEST(test_transport_payload_size);
+    RUN_TEST(test_transport_mailbox_init_publishes_free_last);
 
     RUN_TEST(test_transport_write_payload_invalid_state_unlocked);
     RUN_TEST(test_transport_write_payload_invalid_param_null_payload);

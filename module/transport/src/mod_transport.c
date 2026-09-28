@@ -838,12 +838,23 @@ static int transport_mailbox_init(struct transport_channel_ctx *channel_ctx)
         /* Only the completer channel should initialize the shared mailbox */
         if (channel_ctx->config->channel_type ==
             MOD_TRANSPORT_CHANNEL_TYPE_COMPLETER) {
-            /* Initialize mailbox such that the requester has ownership */
-            *((struct mod_transport_buffer *)
-                  channel_ctx->config->out_band_mailbox_address) =
-                (struct mod_transport_buffer){
-                    .status = (1U << MOD_TRANSPORT_MAILBOX_STATUS_FREE_POS)
-                };
+            struct mod_transport_buffer *buffer =
+                (struct mod_transport_buffer *)
+                    channel_ctx->config->out_band_mailbox_address;
+
+            /* Keep ownership while initializing. Publishing FREE in a whole
+             * struct assignment can expose an empty, partly initialized
+             * mailbox to a boot-time requester before the remaining stores.
+             */
+            buffer->status = 0;
+            __sync_synchronize();
+            buffer->reserved0 = 0;
+            buffer->reserved1 = 0;
+            buffer->flags = 0;
+            buffer->length = 0;
+            buffer->message_header = 0;
+            __sync_synchronize();
+            buffer->status = MOD_TRANSPORT_MAILBOX_STATUS_FREE_MASK;
         }
         /* Notify that this mailbox is initialized */
         struct fwk_event transport_channel_initialized_notification = {
