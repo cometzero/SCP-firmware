@@ -20,7 +20,13 @@
  */
 enum mod_pfdi_monitor_api_idx {
     MOD_PFDI_MONITOR_API_IDX_PFDI_MONITOR,
+    MOD_PFDI_MONITOR_API_IDX_RESTART,
     MOD_PFDI_MONITOR_API_IDX_COUNT
+};
+
+/*! SI0-only firmware restart boundary; ordinary hotplug must not use it. */
+struct mod_pfdi_monitor_restart_api {
+    int (*prepare)(fwk_id_t power_domain_id);
 };
 
 /*!

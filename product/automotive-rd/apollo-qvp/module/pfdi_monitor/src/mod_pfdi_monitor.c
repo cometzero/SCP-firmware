@@ -40,6 +40,13 @@ struct pfdi_monitor_core_context {
     enum pfdi_monitor_core_state core_state;
     /* PFDI core configuration data */
     const struct mod_pfdi_monitor_core_config *core_cfg;
+    unsigned int generation;
+    bool powered_off;
+};
+
+struct pfdi_monitor_event_params {
+    uint32_t status;
+    unsigned int generation;
 };
 
 /* Module context */
@@ -72,6 +79,8 @@ static int pfdi_monitor_oor_status(fwk_id_t id, uint32_t status)
         return FWK_E_PARAM;
     }
 
+    ((struct pfdi_monitor_event_params *)event.params)->generation =
+        ctx.core_ctx_table[element_idx].generation;
     ret = fwk_put_event(&event);
     if (ret != FWK_SUCCESS) {
         /*
@@ -104,6 +113,8 @@ static int pfdi_monitor_onl_status(fwk_id_t id, uint32_t status)
         return FWK_E_PARAM;
     }
 
+    ((struct pfdi_monitor_event_params *)event.params)->generation =
+        ctx.core_ctx_table[element_idx].generation;
     ret = fwk_put_event(&event);
     if (ret != FWK_SUCCESS) {
         /*
@@ -140,6 +151,8 @@ static void pfdi_monitor_timeout(uintptr_t id)
         fwk_trap();
     }
 
+    ((struct pfdi_monitor_event_params *)event.params)->generation =
+        ctx.core_ctx_table[element_idx].generation;
     status = fwk_put_event(&event);
 
     if (status != FWK_SUCCESS) {
@@ -281,6 +294,32 @@ static int pfdi_monitor_bind(fwk_id_t id, unsigned int round)
         core_cfg->alarm_id, MOD_TIMER_API_ID_ALARM, &core_ctx->alarm_api);
 }
 
+static int pfdi_monitor_prepare_restart(fwk_id_t power_domain_id)
+{
+    struct pfdi_monitor_core_context *core;
+    unsigned int i;
+    int status;
+
+    for (i = 0; i < ctx.core_count; i++) {
+        core = &ctx.core_ctx_table[i];
+        if (!fwk_id_is_equal(core->core_cfg->pd_source_id, power_domain_id))
+            continue;
+        if (!core->powered_off)
+            return FWK_E_STATE;
+        status = core->alarm_api->stop(core->core_cfg->alarm_id);
+        if (status != FWK_SUCCESS && status != FWK_E_STATE)
+            return status;
+        core->generation++;
+        core->core_state = PFDI_MONITOR_STATE_WAIT_FOR_OOR;
+        return FWK_SUCCESS;
+    }
+    return FWK_E_PARAM;
+}
+
+static const struct mod_pfdi_monitor_restart_api restart_api = {
+    .prepare = pfdi_monitor_prepare_restart,
+};
+
 static int pfdi_monitor_process_bind_request(
     fwk_id_t source_id,
     fwk_id_t target_id,
@@ -297,6 +336,11 @@ static int pfdi_monitor_process_bind_request(
     api_idx = (enum mod_pfdi_monitor_api_idx)fwk_id_get_api_idx(api_id);
 
     switch (api_idx) {
+    case MOD_PFDI_MONITOR_API_IDX_RESTART:
+        if (!fwk_id_is_equal(source_id, FWK_ID_MODULE(FWK_MODULE_IDX_SI0_PLATFORM)))
+            return FWK_E_ACCESS;
+        *api = &restart_api;
+        return FWK_SUCCESS;
     case MOD_PFDI_MONITOR_API_IDX_PFDI_MONITOR:
         *api = &pfdi_monitor_api;
         status = FWK_SUCCESS;
@@ -330,6 +374,10 @@ static int pfdi_monitor_process_event(
 
     core_ctx = &ctx.core_ctx_table[element_idx];
     core_cfg = core_ctx->core_cfg;
+
+    if (((const struct pfdi_monitor_event_params *)event->params)->generation !=
+        core_ctx->generation)
+        return FWK_SUCCESS; /* Queued status/timeout from the previous boot. */
 
     switch (fwk_id_get_event_idx(event->id)) {
     case (unsigned int)PFDI_MONITOR_EVENT_IDX_OOR_STATUS:
@@ -496,6 +544,7 @@ int pfdi_monitor_process_notificiation(
                 "%s has been turned off, switching off PFDI monitoring",
                 fwk_module_get_element_name(event->target_id));
             /* Stop the alarm */
+            core_ctx->powered_off = true;
             status = core_ctx->alarm_api->stop(core_cfg->alarm_id);
             if ((status != FWK_SUCCESS) && (status != FWK_E_STATE)) {
                 FWK_LOG_ERR(
@@ -507,6 +556,7 @@ int pfdi_monitor_process_notificiation(
             }
             break;
         case (unsigned int)MOD_PD_STATE_ON:
+            core_ctx->powered_off = false;
             FWK_LOG_INFO(
                 MOD_NAME "%s has been turned on, switching on PFDI monitoring",
                 fwk_module_get_element_name(event->target_id));
