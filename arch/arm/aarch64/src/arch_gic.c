@@ -179,14 +179,14 @@ int arch_interrupt_is_pending(unsigned int interrupt, bool *pending)
     switch (interrupt_type_from_id(interrupt)) {
     case INTERRUPT_TYPE_SGI:
     case INTERRUPT_TYPE_PPI:
-        fwk_mmio_write_32(
-            FMW_GICR_BASE + GICR_SGI_BASE + GICR_ICENABLER0,
-            FWK_BIT(interrupt));
+        *pending =
+            (fwk_mmio_read_32(FMW_GICR_BASE + GICR_SGI_BASE + GICR_ISPENDR0) &
+             FWK_BIT(interrupt)) != 0;
         break;
     case INTERRUPT_TYPE_SPI:
-        fwk_mmio_write_32(
-            FMW_GICD_BASE + GICD_ICENABLER(interrupt / 32),
-            FWK_BIT(interrupt % 32));
+        *pending =
+            (fwk_mmio_read_32(FMW_GICD_BASE + GICD_ISPENDR(interrupt / 32)) &
+             FWK_BIT(interrupt % 32)) != 0;
         break;
     case INTERRUPT_TYPE_OTHER:
         return FWK_E_SUPPORT;
