@@ -141,14 +141,16 @@ static void mhu3_isr(void)
              * although MHUv3 supports upto 128 channels, it is not
              * expected hardware to be configured more than 32 channels.
              */
-            if (((1u << channel->dbch.mbx_channel) &
-                 mbx_reg->MBX_DBCH_INT_ST[0]) != 0u) {
+            if ((((1u << channel->dbch.mbx_channel) &
+                  mbx_reg->MBX_DBCH_INT_ST[0]) != 0u) &&
+                ((mdbcw_reg[channel->dbch.mbx_channel].MDBCW_ST_MSK &
+                  (1UL << channel->dbch.mbx_flag_pos)) != 0u)) {
                 /*
-                 * Clear Doorbell flag, we should clear only the flag(bit) which
-                 * is set. However, we are using only one flag(bit) of
-                 * corresponding doorbell channel for communication.
+                 * Logical channels can share a physical doorbell channel.
+                 * Dispatch only its unmasked flag and write the W1C register
+                 * directly: a read-modify-write could clear unrelated flags.
                  */
-                mdbcw_reg[channel->dbch.mbx_channel].MDBCW_CLR |=
+                mdbcw_reg[channel->dbch.mbx_channel].MDBCW_CLR =
                     (1UL << channel->dbch.mbx_flag_pos);
                 if (channel_ctx->transport_id_bound) {
                     channel_ctx->transport_api->signal_message(

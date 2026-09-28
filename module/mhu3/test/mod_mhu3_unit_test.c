@@ -614,6 +614,83 @@ static int mhu3_fake_init(void)
     return 0;
 }
 
+static unsigned int doorbell_callbacks;
+static unsigned int doorbell_callback_count;
+
+static int capture_doorbell(fwk_id_t id)
+{
+    unsigned int flag = fwk_id_get_element_idx(id);
+
+    /* Fake MMIO deliberately retains the previous W1C write. */
+    TEST_ASSERT_EQUAL_HEX32(1UL << flag, fake_device_1_mdbcw->MDBCW_CLR);
+    doorbell_callbacks |= 1UL << flag;
+    doorbell_callback_count++;
+    return FWK_SUCCESS;
+}
+
+static void check_shared_doorbell_flags(
+    uint32_t channel_status, uint32_t raw_flags, uint32_t unmasked_flags,
+    uint32_t expected_flags, unsigned int expected_count)
+{
+    struct mhu3_device_ctx *device = &mhu3_ctx.device_ctx_table[0];
+    struct mhu3_device_ctx saved = *device;
+    struct mod_mhu3_channel_config channels[] = {
+        MOD_MHU3_INIT_DBCH(0, 1, 0, 1),
+        MOD_MHU3_INIT_DBCH(0, 2, 0, 2),
+        MOD_MHU3_INIT_DBCH(0, 3, 0, 3),
+    };
+    struct mod_mhu3_device_config config = *device->config;
+    struct mhu3_channel_ctx contexts[3] = { 0 };
+    const struct mod_transport_driver_input_api api = {
+        .signal_message = capture_doorbell,
+    };
+    unsigned int irq = config.irq;
+    unsigned int i;
+
+    config.channels = channels;
+    device->config = &config;
+    device->channels_count = 3;
+    device->channel_ctx_table = contexts;
+    for (i = 0; i < 3; i++) {
+        contexts[i].transport_id_bound = true;
+        contexts[i].transport_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_MHU3, i + 1);
+        contexts[i].transport_api = &api;
+    }
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_DBCH_INT_ST[0] = channel_status;
+    *(uint32_t *)&fake_device_1_mdbcw->MDBCW_ST = raw_flags;
+    *(uint32_t *)&fake_device_1_mdbcw->MDBCW_ST_MSK = unmasked_flags;
+    fake_device_1_mdbcw->MDBCW_CLR = 1UL << 31;
+    doorbell_callbacks = 0;
+    doorbell_callback_count = 0;
+    fwk_interrupt_get_current_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    fwk_interrupt_get_current_ReturnThruPtr_interrupt(&irq);
+    mhu3_isr();
+    *device = saved;
+    TEST_ASSERT_EQUAL_HEX32(expected_flags, doorbell_callbacks);
+    TEST_ASSERT_EQUAL_UINT(expected_count, doorbell_callback_count);
+    if (!expected_count)
+        TEST_ASSERT_EQUAL_HEX32(1UL << 31, fake_device_1_mdbcw->MDBCW_CLR);
+    Mockfwk_interrupt_Verify();
+}
+
+void test_mhu3_isr_shared_channel_dispatches_only_pending_flag(void)
+{
+    check_shared_doorbell_flags(1, 8, 8, 8, 1);
+    check_shared_doorbell_flags(1, 2, 2, 2, 1);
+}
+
+void test_mhu3_isr_shared_channel_preserves_other_w1c_flags(void)
+{
+    check_shared_doorbell_flags(1, 14, 14, 14, 3);
+}
+
+void test_mhu3_isr_shared_channel_ignores_masked_and_inactive_flags(void)
+{
+    check_shared_doorbell_flags(1, 14, 4, 4, 1);
+    check_shared_doorbell_flags(1, 14, 0, 0, 0);
+    check_shared_doorbell_flags(0, 14, 14, 0, 0);
+}
+
 int mhu3_test_main(void)
 {
     int status;
@@ -651,6 +728,9 @@ int mhu3_test_main(void)
     RUN_TEST(test_mhu3_fch_register_callback_invalid_sub_element_id);
     RUN_TEST(test_mhu3_fch_register_callback_null_param);
     RUN_TEST(test_mhu3_fch_register_callback_null_callback_addr);
+    RUN_TEST(test_mhu3_isr_shared_channel_dispatches_only_pending_flag);
+    RUN_TEST(test_mhu3_isr_shared_channel_preserves_other_w1c_flags);
+    RUN_TEST(test_mhu3_isr_shared_channel_ignores_masked_and_inactive_flags);
 
     return UNITY_END();
 }
