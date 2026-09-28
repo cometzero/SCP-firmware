@@ -35,6 +35,23 @@ enum mod_scmi_system_view {
     MOD_SCMI_SYSTEM_VIEW_COUNT,
 };
 
+enum mod_scmi_system_power_api_idx {
+    MOD_SCMI_SYSTEM_POWER_API_IDX_PROTOCOL,
+    MOD_SCMI_SYSTEM_POWER_API_IDX_PLATFORM,
+    MOD_SCMI_SYSTEM_POWER_API_COUNT,
+};
+
+/*! Platform-origin recovery notification, independent of an SCMI agent. */
+struct mod_scmi_system_power_platform_api {
+    /*!
+     * Notify subscribed agents after the platform has stopped AP cores.
+     * Success means dispatch, not completion: the caller must wait for its
+     * platform-specific acknowledgement. Returns FWK_E_STATE if no agent
+     * subscribed, or FWK_E_SUPPORT if notification support is disabled.
+     */
+    int (*notify_warm_reset)(void);
+};
+
 /*!
  * \brief SCMI System Power Management Protocol configuration data.
  */
@@ -79,6 +96,9 @@ struct mod_scmi_system_power_config {
      * Timeout period to wait for graceful response (microseconds)
      */
     uint32_t graceful_timeout;
+
+    /*! Module authorized to notify platform-origin recovery; NONE disables. */
+    fwk_id_t platform_notification_id;
 };
 
 /*!

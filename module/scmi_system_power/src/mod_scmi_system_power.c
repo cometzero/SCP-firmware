@@ -796,9 +796,51 @@ static int scmi_sys_power_bind(fwk_id_t id, unsigned int round)
     return FWK_SUCCESS;
 }
 
+static int platform_notify_warm_reset(void)
+{
+#ifdef BUILD_HAS_SCMI_NOTIFICATIONS
+    const struct scmi_sys_power_state_notifier notification = {
+        .agent_id = 0, /* SCMI platform, not an impersonated requesting agent. */
+        .flags = 0,
+        .system_state = SCMI_SYSTEM_STATE_WARM_RESET,
+    };
+    unsigned int i;
+    unsigned int notified = 0;
+    fwk_id_t id;
+
+    for (i = 0; i < scmi_sys_power_ctx.agent_count; i++) {
+        id = scmi_sys_power_ctx.system_power_notifications[i];
+        if (fwk_id_is_equal(id, FWK_ID_NONE))
+            continue;
+        scmi_sys_power_ctx.scmi_api->notify(
+            id, MOD_SCMI_PROTOCOL_ID_SYS_POWER, SCMI_SYS_POWER_STATE_SET_NOTIFY,
+            &notification, sizeof(notification));
+        notified++;
+    }
+    /* The SCMI notify API is void; completion requires the platform ACK. */
+    return notified ? FWK_SUCCESS : FWK_E_STATE;
+#else
+    return FWK_E_SUPPORT;
+#endif
+}
+
+static const struct mod_scmi_system_power_platform_api platform_api = {
+    .notify_warm_reset = platform_notify_warm_reset,
+};
+
 static int scmi_sys_power_process_bind_request(fwk_id_t source_id,
     fwk_id_t _target_id, fwk_id_t api_id, const void **api)
 {
+    if (fwk_id_get_api_idx(api_id) == MOD_SCMI_SYSTEM_POWER_API_IDX_PLATFORM) {
+        if (fwk_id_is_equal(
+                scmi_sys_power_ctx.config->platform_notification_id,
+                FWK_ID_NONE) ||
+            !fwk_id_is_equal(
+                source_id, scmi_sys_power_ctx.config->platform_notification_id))
+            return FWK_E_ACCESS;
+        *api = &platform_api;
+        return FWK_SUCCESS;
+    }
     if (!fwk_id_is_equal(source_id, FWK_ID_MODULE(FWK_MODULE_IDX_SCMI))) {
         return FWK_E_ACCESS;
     }
@@ -809,7 +851,7 @@ static int scmi_sys_power_process_bind_request(fwk_id_t source_id,
 }
 
 const struct fwk_module module_scmi_system_power = {
-    .api_count = 1,
+    .api_count = MOD_SCMI_SYSTEM_POWER_API_COUNT,
     .type = FWK_MODULE_TYPE_PROTOCOL,
     .init = scmi_sys_power_init,
     .bind = scmi_sys_power_bind,

@@ -27,3 +27,10 @@ list(APPEND MOCK_REPLACEMENTS fwk_core)
 include(${SCP_ROOT}/unit_test/module_common.cmake)
 
 target_compile_definitions(${UNIT_TEST_TARGET} PUBLIC "BUILD_HAS_MOD_POWER_DOMAIN")
+
+set(TEST_FILE platform_notify)
+set(UNIT_TEST_TARGET mod_scmi_system_power_platform_notify_unit_test)
+list(APPEND MOCK_REPLACEMENTS fwk_module fwk_mm fwk_id fwk_core)
+include(${SCP_ROOT}/unit_test/module_common.cmake)
+target_compile_definitions(${UNIT_TEST_TARGET} PUBLIC
+    "BUILD_HAS_MOD_POWER_DOMAIN" "BUILD_HAS_SCMI_NOTIFICATIONS")

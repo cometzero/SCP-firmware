@@ -23,6 +23,8 @@
 const struct fwk_module_config config_scmi_system_power = {
     .data = &((struct mod_scmi_system_power_config){
         .system_view = MOD_SCMI_SYSTEM_VIEW_FULL,
+        .platform_notification_id =
+            FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
         .system_suspend_state = MOD_PD_STATE_OFF,
 #ifdef BUILD_HAS_SCMI_NOTIFICATIONS
         .alarm_id = FWK_ID_SUB_ELEMENT_INIT(
