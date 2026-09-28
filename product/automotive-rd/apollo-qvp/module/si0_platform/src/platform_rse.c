@@ -11,12 +11,15 @@
 #include <internal/si0_platform.h>
 
 #include <mod_si0_platform.h>
+#include <mod_scmi_system_power.h>
 #include <mod_timer.h>
 #include <mod_transport.h>
 
 #include <fwk_id.h>
+#include <fwk_core.h>
 #include <fwk_log.h>
 #include <fwk_module.h>
+#include <fwk_module_idx.h>
 #include <fwk_status.h>
 
 #include <stdbool.h>
@@ -32,11 +35,100 @@ struct platform_rse_ctx {
     /* Timer API */
     const struct mod_timer_api *timer_api;
 
+    const struct mod_scmi_system_power_platform_api *sys_power_api;
+    const struct mod_timer_alarm_api *alarm_api;
+    unsigned int generation;
+    uint64_t deadline;
+    uint64_t ack_counter;
+    bool recovery_pending;
+    bool completion_ready;
+
     /* Flag to indicate that the RSE doorbell has been received */
     volatile bool rse_doorbell_received;
 };
 
 static struct platform_rse_ctx ctx;
+
+struct recovery_result {
+    unsigned int generation;
+    int status;
+};
+
+static void recovery_poll(uintptr_t generation)
+{
+    struct fwk_event event = {
+        .id = FWK_ID_EVENT_INIT(
+            FWK_MODULE_IDX_SI0_PLATFORM, MOD_SI0_PLATFORM_RSE_RECOVERY_DONE),
+        .source_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .target_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+    };
+    struct recovery_result *result = (void *)event.params;
+    uint64_t now;
+    int status;
+
+    if (!ctx.recovery_pending || generation != ctx.generation)
+        return;
+    status = ctx.timer_api->get_counter(ctx.config->timer_id, &now);
+    if (status == FWK_SUCCESS) {
+        if (!ctx.rse_doorbell_received && now < ctx.deadline)
+            return;
+        status = (ctx.rse_doorbell_received && ctx.ack_counter <= ctx.deadline) ?
+            FWK_SUCCESS : FWK_E_TIMEOUT;
+    }
+    ctx.recovery_pending = false;
+    ctx.completion_ready = true;
+    ctx.alarm_api->stop(ctx.config->rse_recovery_alarm_id);
+    result->generation = ctx.generation;
+    result->status = status;
+    status = fwk_put_event(&event);
+    if (status != FWK_SUCCESS) {
+        ctx.completion_ready = false;
+        FWK_LOG_ERR(MOD_NAME "RSE recovery completion enqueue failed: %d", status);
+    }
+}
+
+int start_rse_recovery(void)
+{
+    uint64_t now, duration;
+    int status;
+
+    if (ctx.recovery_pending || ctx.completion_ready)
+        return FWK_E_BUSY;
+    status = ctx.timer_api->get_counter(ctx.config->timer_id, &now);
+    if (status != FWK_SUCCESS)
+        return status;
+    status = ctx.timer_api->time_to_timestamp(
+        ctx.config->timer_id, ctx.config->rse_recovery_timeout_us, &duration);
+    if (status != FWK_SUCCESS)
+        return status;
+    ctx.deadline = now + duration;
+    ctx.generation++;
+    ctx.rse_doorbell_received = false;
+    ctx.recovery_pending = true;
+    status = ctx.alarm_api->start(
+        ctx.config->rse_recovery_alarm_id, 10000, MOD_TIMER_ALARM_TYPE_PERIODIC,
+        recovery_poll, ctx.generation);
+    if (status == FWK_SUCCESS)
+        status = ctx.sys_power_api->notify_warm_reset();
+    if (status != FWK_SUCCESS) {
+        ctx.recovery_pending = false;
+        ctx.alarm_api->stop(ctx.config->rse_recovery_alarm_id);
+        return status;
+    }
+    FWK_LOG_INFO(MOD_NAME "Waiting asynchronously for RSE BL2 reload (%u us)",
+        ctx.config->rse_recovery_timeout_us);
+    return FWK_SUCCESS;
+}
+
+int complete_rse_recovery(const struct fwk_event *event)
+{
+    const struct recovery_result *result = (const void *)event->params;
+
+    if (!ctx.completion_ready || result->generation != ctx.generation)
+        return FWK_E_STATE;
+    ctx.completion_ready = false;
+    return result->status;
+}
 
 /* Utility function to check if SCP platform has received doorbell from RSE */
 static bool is_rse_doorbell_received(void *unused)
@@ -62,11 +154,18 @@ static int signal_error(fwk_id_t unused)
 
 static int signal_message(fwk_id_t unused)
 {
+    int status;
     (void)unused;
 
     FWK_LOG_INFO(MOD_NAME "Received doorbell event from RSE");
 
     ctx.transport_api->release_transport_channel_lock(ctx.config->transport_id);
+
+    if (ctx.recovery_pending) {
+        status = ctx.timer_api->get_counter(ctx.config->timer_id, &ctx.ack_counter);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
 
     /* Set the flag to indicate that the RSE initialization is complete */
     ctx.rse_doorbell_received = true;
@@ -89,16 +188,25 @@ const void *get_rse_platform_transport_signal_api(void)
 }
 
 /*
- * RSE has to be notified that SYSTOP is powered up and so it can enable GPC
- * bypass in the system control block.
+ * Wait for RSE to reload AP BL2 and acknowledge on the dedicated doorbell.
+ * Local recovery sends the SCMI notification after AP cores are powered off;
+ * the normal SCMI request path has already sent that notification.
  */
-int notify_rse_and_wait_for_response(void)
+int notify_rse_and_wait_for_response(bool platform_origin)
 {
     int status;
 
     ctx.rse_doorbell_received = false;
 
-    FWK_LOG_INFO("[SI0 PLATFORM] Notifying RSE and waiting for image load...");
+    /* The SCMI command path already notifies RSE. A local watchdog request
+     * must do so explicitly, only after all AP cores have powered down. */
+    if (platform_origin) {
+        status = ctx.sys_power_api->notify_warm_reset();
+        if (status != FWK_SUCCESS)
+            return status;
+    }
+
+    FWK_LOG_INFO("[SI0 PLATFORM] Waiting for RSE AP BL2 reload acknowledgement...");
 
     status = ctx.timer_api->wait(
         ctx.config->timer_id,
@@ -128,6 +236,20 @@ int platform_rse_bind(const struct mod_si0_platform_config *config)
     fwk_id_t transport_api_id;
 
     ctx.config = config;
+
+    if (config->ap_watchdog_irq != 0) {
+        status = fwk_module_bind(
+            config->rse_recovery_alarm_id, MOD_TIMER_API_ID_ALARM, &ctx.alarm_api);
+        if (status != FWK_SUCCESS)
+            return status;
+        status = fwk_module_bind(
+            FWK_ID_MODULE(FWK_MODULE_IDX_SCMI_SYSTEM_POWER),
+            FWK_ID_API(FWK_MODULE_IDX_SCMI_SYSTEM_POWER,
+                MOD_SCMI_SYSTEM_POWER_API_IDX_PLATFORM),
+            &ctx.sys_power_api);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
 
     timer_api_id = FWK_ID_API(FWK_MODULE_IDX_TIMER, MOD_TIMER_API_IDX_TIMER);
     status = fwk_module_bind(config->timer_id, timer_api_id, &ctx.timer_api);

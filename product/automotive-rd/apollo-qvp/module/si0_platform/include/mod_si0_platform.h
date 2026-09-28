@@ -55,6 +55,10 @@ enum mod_si0_platform_api_idx {
 enum mod_si0_platform_event_idx {
     /*! Event requesting check for power domain OFF */
     MOD_SI0_PLATFORM_CHECK_PD_OFF,
+    /*! Deferred AP watchdog recovery through the existing warm reset flow. */
+    MOD_SI0_PLATFORM_AP_WATCHDOG,
+    MOD_SI0_PLATFORM_RSE_RECOVERY_DONE,
+    MOD_SI0_PLATFORM_WATCHDOG_REARM,
 
     /*! Number of defined events */
     MOD_SI0_PLATFORM_EVENT_COUNT
@@ -110,6 +114,10 @@ struct mod_si0_platform_isolated_cpu_info {
  * \brief Module configuration.
  */
 struct mod_si0_platform_config {
+    /*! AP watchdog WS1 architectural INTID; zero disables recovery. */
+    unsigned int ap_watchdog_irq;
+    /*! AP cores with configured PFDI monitoring, not physical PD slots. */
+    unsigned int ap_pfdi_core_count;
     /*! MPID number of the CPU to be used as primary CPU */
     uint64_t primary_cpu_mpid;
 
@@ -124,6 +132,13 @@ struct mod_si0_platform_config {
      * event.
      */
     uint32_t rse_sync_wait_us;
+
+    /*! QVP asynchronous recovery alarm and simulation reload budget. */
+    fwk_id_t rse_recovery_alarm_id;
+    uint32_t rse_recovery_timeout_us;
+    /*! QVP-only IRQ propagation settling budget, not hardware FTTI. */
+    fwk_id_t watchdog_rearm_alarm_id;
+    uint32_t watchdog_rearm_timeout_us;
 
     /*! Transport channel identifier */
     fwk_id_t transport_id;

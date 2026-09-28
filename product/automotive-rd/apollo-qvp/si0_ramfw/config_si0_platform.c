@@ -9,7 +9,9 @@
  */
 
 #include "si0_cfgd_transport.h"
+#include "si0_cfgd_timer.h"
 #include "si0_mmap.h"
+#include "si0_irq.h"
 #include "si_scr_info.h"
 
 #include <mod_power_domain.h>
@@ -26,10 +28,22 @@
 
 struct mod_si0_platform_config system_config = {
     .primary_cpu_mpid = 0,
+    .ap_watchdog_irq = CL0_AP_NS_WDOG_WS1_IRQ,
+    .ap_pfdi_core_count = PC_CONFIGURED_CORES_COUNT,
     .isolated_cpu_info = { .isolated_cpu_mpid_list = NULL,
                            .isolated_cpu_count = 0 },
     .timer_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
     .rse_sync_wait_us = RSE_SYNC_WAIT_TIMEOUT_US,
+    .rse_recovery_alarm_id = FWK_ID_SUB_ELEMENT_INIT(
+        FWK_MODULE_IDX_TIMER, SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
+        SI0_CFGD_RSE_RECOVERY_ALARM_IDX),
+    /* QVP measured BL2 reload/verify: 3.442 s. Simulation budget, not FTTI. */
+    .rse_recovery_timeout_us = 10 * 1000 * 1000,
+    .watchdog_rearm_alarm_id = FWK_ID_SUB_ELEMENT_INIT(
+        FWK_MODULE_IDX_TIMER, SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
+        SI0_CFGD_WATCHDOG_REARM_ALARM_IDX),
+    /* QVP SI quantum is 10 ms; bound propagation settling, not safety FTTI. */
+    .watchdog_rearm_timeout_us = 100 * 1000,
     .transport_id = FWK_ID_ELEMENT_INIT(
         FWK_MODULE_IDX_TRANSPORT,
         SI0_CFGD_MOD_TRANSPORT_EIDX_RSE_WARM_SYNC),

@@ -15,11 +15,14 @@
 #include "si0_cfgd_sds.h"
 
 #include <mod_power_domain.h>
+#include <mod_apcontext.h>
+#include <mod_pfdi_monitor.h>
 #include <mod_ppu_v1.h>
 #include <mod_scmi.h>
 #include <mod_sds.h>
 #include <mod_si0_platform.h>
 #include <mod_transport.h>
+#include <mod_timer.h>
 
 #ifdef BUILD_HAS_MOD_PMIC
 #include <mod_pmic.h>
@@ -27,6 +30,7 @@
 
 #include <fwk_core.h>
 #include <fwk_id.h>
+#include <fwk_interrupt.h>
 #include <fwk_log.h>
 #include <fwk_module.h>
 #include <fwk_module_idx.h>
@@ -60,6 +64,10 @@ struct si0_platform_ctx {
 
     /* SDS API pointer */
     const struct mod_sds_api *sds_api;
+    const struct mod_apcontext_reset_api *apcontext_api;
+    const struct mod_pfdi_monitor_restart_api *pfdi_restart_api;
+    const struct mod_timer_api *rearm_timer_api;
+    const struct mod_timer_alarm_api *rearm_alarm_api;
 
 #ifdef BUILD_HAS_MOD_PMIC
     const struct mod_pmic_api *pmic_api;
@@ -72,6 +80,181 @@ struct si0_platform_ctx {
     unsigned int warm_reset_check_cnt;
 };
 static struct si0_platform_ctx si0_platform_ctx;
+static bool ap_watchdog_recovery;
+static struct {
+    bool pending;
+    unsigned int generation;
+    unsigned int attempts;
+    uint64_t deadline;
+    bool last_pending;
+} rearm_ctx;
+
+static void ap_watchdog_isr(void)
+{
+    struct fwk_event_light event = {
+        .id = FWK_ID_EVENT_INIT(
+            FWK_MODULE_IDX_SI0_PLATFORM, MOD_SI0_PLATFORM_AP_WATCHDOG),
+        /* ISR events cannot inherit the framework's current event source. */
+        .source_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .target_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+    };
+    int status;
+
+    /* WS1 is level-triggered. Keep it masked until CPU0 power-on has reset
+     * the AP watchdog; never perform the RSE handshake in interrupt context. */
+    status = fwk_interrupt_disable(si0_platform_ctx.config->ap_watchdog_irq);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR(MOD_NAME "AP watchdog IRQ mask failed: %d", status);
+        fwk_unexpected();
+        return;
+    }
+    if (ap_watchdog_recovery)
+        return;
+    ap_watchdog_recovery = true;
+    status = fwk_put_event(&event);
+    if (status != FWK_SUCCESS) {
+        FWK_LOG_ERR(MOD_NAME "AP watchdog recovery enqueue failed: %d", status);
+        fwk_unexpected();
+    }
+}
+
+static int ap_watchdog_rearm(void)
+{
+    bool pending;
+    bool enabled;
+    int status;
+    unsigned int irq = si0_platform_ctx.config->ap_watchdog_irq;
+
+    status = fwk_interrupt_clear_pending(irq);
+    if (status != FWK_SUCCESS)
+        return status;
+    status = fwk_interrupt_is_pending(irq, &pending);
+    if (status != FWK_SUCCESS)
+        return status;
+    rearm_ctx.last_pending = pending;
+    if (pending) {
+        return FWK_PENDING;
+    }
+    /* Unmask may immediately enter the ISR. Publish readiness first and do
+     * not overwrite a new recovery claimed by that ISR on return. */
+    ap_watchdog_recovery = false;
+    status = fwk_interrupt_enable(irq);
+    if (status != FWK_SUCCESS) {
+        ap_watchdog_recovery = true;
+        return status;
+    }
+    status = fwk_interrupt_is_enabled(irq, &enabled);
+    if (status != FWK_SUCCESS)
+        goto readback_failed;
+    status = fwk_interrupt_is_pending(irq, &pending);
+    if (status != FWK_SUCCESS)
+        goto readback_failed;
+    rearm_ctx.last_pending = pending;
+    /* Diagnostic snapshot only: an IRQ can arrive between these reads.
+     * Never change recovery state based on a transient register snapshot. */
+    FWK_LOG_INFO(MOD_NAME "AP watchdog IRQ %u snapshot: enabled=%u pending=%u recovery=%u",
+        irq, enabled, pending, ap_watchdog_recovery);
+    if (!ap_watchdog_recovery && enabled && !pending) {
+        FWK_LOG_INFO(MOD_NAME "AP watchdog recovery: boot CPU on, IRQ rearmed");
+    } else if (ap_watchdog_recovery) {
+        FWK_LOG_INFO(MOD_NAME "AP watchdog IRQ retriggered during rearm");
+    }
+    return status;
+readback_failed:
+    ap_watchdog_recovery = true;
+    {
+        int mask_status = fwk_interrupt_disable(irq);
+        if (mask_status != FWK_SUCCESS) {
+            FWK_LOG_ERR(MOD_NAME "Watchdog rearm readback failed; IRQ mask failed: %d",
+                mask_status);
+            return mask_status;
+        }
+    }
+    return status;
+}
+
+static void rearm_alarm_callback(uintptr_t generation)
+{
+    struct fwk_event event = {
+        .id = FWK_ID_EVENT_INIT(FWK_MODULE_IDX_SI0_PLATFORM,
+            MOD_SI0_PLATFORM_WATCHDOG_REARM),
+        .source_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .target_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+    };
+    int status;
+
+    if (!rearm_ctx.pending || generation != rearm_ctx.generation)
+        return;
+    *(unsigned int *)event.params = generation;
+    status = fwk_put_event(&event);
+    if (status != FWK_SUCCESS) {
+        rearm_ctx.pending = false;
+        FWK_LOG_ERR(MOD_NAME "Watchdog rearm enqueue failed: %d", status);
+    }
+}
+
+static int watchdog_rearm_poll(unsigned int generation)
+{
+    const struct mod_si0_platform_config *config = si0_platform_ctx.config;
+    uint64_t now;
+    bool before;
+    int status;
+
+    if (!rearm_ctx.pending || generation != rearm_ctx.generation)
+        return FWK_SUCCESS;
+    status = si0_platform_ctx.rearm_timer_api->get_counter(config->timer_id, &now);
+    if (status != FWK_SUCCESS)
+        goto fail;
+    if (now >= rearm_ctx.deadline) {
+        status = FWK_E_TIMEOUT;
+        goto fail;
+    }
+    status = fwk_interrupt_is_pending(config->ap_watchdog_irq, &before);
+    if (status != FWK_SUCCESS)
+        goto fail;
+    rearm_ctx.attempts++;
+    status = ap_watchdog_rearm();
+    FWK_LOG_INFO(MOD_NAME "Watchdog rearm attempt=%u before=%u after=%u status=%d",
+        rearm_ctx.attempts, before, rearm_ctx.last_pending, status);
+    if (status == FWK_SUCCESS) {
+        rearm_ctx.pending = false;
+        return FWK_SUCCESS;
+    }
+    if (status != FWK_PENDING)
+        goto fail;
+    status = si0_platform_ctx.rearm_alarm_api->start(
+        config->watchdog_rearm_alarm_id, 10000, MOD_TIMER_ALARM_TYPE_ONCE,
+        rearm_alarm_callback, rearm_ctx.generation);
+    if (status == FWK_SUCCESS)
+        return FWK_SUCCESS;
+fail:
+    rearm_ctx.pending = false;
+    FWK_LOG_ERR(MOD_NAME "Watchdog rearm FAILED after %u attempts: %d",
+        rearm_ctx.attempts, status);
+    return status;
+}
+
+static int start_watchdog_rearm(void)
+{
+    const struct mod_si0_platform_config *config = si0_platform_ctx.config;
+    uint64_t now, duration;
+    int status;
+
+    if (rearm_ctx.pending)
+        return FWK_E_BUSY;
+    status = si0_platform_ctx.rearm_timer_api->get_counter(config->timer_id, &now);
+    if (status != FWK_SUCCESS)
+        return status;
+    status = si0_platform_ctx.rearm_timer_api->time_to_timestamp(
+        config->timer_id, config->watchdog_rearm_timeout_us, &duration);
+    if (status != FWK_SUCCESS)
+        return status;
+    rearm_ctx.deadline = now + duration;
+    rearm_ctx.generation++;
+    rearm_ctx.attempts = 0;
+    rearm_ctx.pending = true;
+    return watchdog_rearm_poll(rearm_ctx.generation);
+}
 
 /*
  * Helper function to check if a cpu is in isolated CPU MPID list.
@@ -198,6 +381,29 @@ static int si0_platform_bind(fwk_id_t id, unsigned int round)
 #endif
 
     /* Bind to modules required for handshaking with RSE */
+    if (si0_platform_ctx.config->ap_watchdog_irq != 0) {
+        status = fwk_module_bind(si0_platform_ctx.config->timer_id,
+            FWK_ID_API(FWK_MODULE_IDX_TIMER, MOD_TIMER_API_IDX_TIMER),
+            &si0_platform_ctx.rearm_timer_api);
+        if (status != FWK_SUCCESS)
+            return status;
+        status = fwk_module_bind(si0_platform_ctx.config->watchdog_rearm_alarm_id,
+            MOD_TIMER_API_ID_ALARM, &si0_platform_ctx.rearm_alarm_api);
+        if (status != FWK_SUCCESS)
+            return status;
+        status = fwk_module_bind(
+            FWK_ID_MODULE(FWK_MODULE_IDX_PFDI_MONITOR),
+            FWK_ID_API(FWK_MODULE_IDX_PFDI_MONITOR, MOD_PFDI_MONITOR_API_IDX_RESTART),
+            &si0_platform_ctx.pfdi_restart_api);
+        if (status != FWK_SUCCESS)
+            return status;
+        status = fwk_module_bind(
+            FWK_ID_MODULE(FWK_MODULE_IDX_APCONTEXT),
+            FWK_ID_API(FWK_MODULE_IDX_APCONTEXT, MOD_APCONTEXT_API_IDX_RESET),
+            &si0_platform_ctx.apcontext_api);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
     status = platform_rse_bind(si0_platform_ctx.config);
     if (status != FWK_SUCCESS) {
         return status;
@@ -357,6 +563,14 @@ static int si0_platform_start(fwk_id_t id)
 #endif
 
     FWK_LOG_INFO(MOD_NAME "SCP started");
+
+    if (si0_platform_ctx.config->ap_watchdog_irq != 0U) {
+        status = fwk_interrupt_set_isr(
+            si0_platform_ctx.config->ap_watchdog_irq, ap_watchdog_isr);
+        if (status != FWK_SUCCESS)
+            return status;
+        status = fwk_interrupt_enable(si0_platform_ctx.config->ap_watchdog_irq);
+    }
 
     return status;
 }
@@ -521,6 +735,36 @@ static void boot_primary_core(void)
     }
 }
 
+static int finish_warm_reset(void)
+{
+    int status;
+
+    if (ap_watchdog_recovery) {
+        /* PFDI configuration is truncated to configured AP cores; the PD
+         * topology may retain all 16 physical core slots. */
+        if (si0_platform_ctx.config->ap_pfdi_core_count == 0 ||
+            si0_platform_ctx.config->ap_pfdi_core_count > platform_get_core_count())
+            return FWK_E_DATA;
+        for (unsigned int i = 0; i < si0_platform_ctx.config->ap_pfdi_core_count; i++) {
+            status = si0_platform_ctx.pfdi_restart_api->prepare(
+                FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, i));
+            if (status != FWK_SUCCESS)
+                return status;
+        }
+        /* RSE reloads BL2 only. Reinitialize the SCP-owned AP context,
+         * including the trusted mailbox, before releasing the boot CPU. */
+        status = si0_platform_ctx.apcontext_api->reset();
+        if (status != FWK_SUCCESS)
+            return status;
+    }
+    reset_scmi_mailboxes();
+    status = update_sds_reset_syndrome(SI0_WARM_RESET_SYNDROME_VALUE);
+    if (status != FWK_SUCCESS)
+        return status;
+    boot_primary_core();
+    return FWK_SUCCESS;
+}
+
 static int si0_platform_process_event(
     const struct fwk_event *event,
     struct fwk_event *resp)
@@ -534,6 +778,27 @@ static int si0_platform_process_event(
     };
 
     switch (fwk_id_get_event_idx(event->id)) {
+    case MOD_SI0_PLATFORM_WATCHDOG_REARM:
+        status = watchdog_rearm_poll(*(const unsigned int *)event->params);
+        break;
+    case MOD_SI0_PLATFORM_RSE_RECOVERY_DONE:
+        status = complete_rse_recovery(event);
+        if (status != FWK_SUCCESS) {
+            /* Fail closed: AP remains off and WS1 stays masked. */
+            FWK_LOG_ERR(MOD_NAME "RSE recovery not completed: %d", status);
+            return FWK_SUCCESS;
+        }
+        status = finish_warm_reset();
+        break;
+    case MOD_SI0_PLATFORM_AP_WATCHDOG:
+        FWK_LOG_INFO(MOD_NAME "AP watchdog WS1: requesting coordinated warm reset");
+        status = si0_platform_ctx.mod_pd_restricted_api->system_shutdown(
+            MOD_PD_SYSTEM_WARM_RESET);
+        if (status == FWK_PENDING)
+            status = FWK_SUCCESS;
+        else
+            FWK_LOG_ERR(MOD_NAME "AP watchdog recovery request failed: %d", status);
+        break;
     case MOD_SI0_PLATFORM_CHECK_PD_OFF:
         status = check_power_off_all_cores();
         if (status != FWK_SUCCESS) {
@@ -563,30 +828,18 @@ static int si0_platform_process_event(
             }
             fwk_assert(status == FWK_SUCCESS);
         } else {
+            if (ap_watchdog_recovery) {
+                status = start_rse_recovery();
+                break;
+            }
             /* Handshake with RSE via dedicated channel (DBCH[2]/FLAG 3) */
-            status = notify_rse_and_wait_for_response();
+            status = notify_rse_and_wait_for_response(false);
             if (status != FWK_SUCCESS) {
                 FWK_LOG_ERR(MOD_NAME "Error! SCP-RSE handshake failed");
                 return FWK_E_PANIC;
             }
 
-            reset_scmi_mailboxes();
-
-            status = update_sds_reset_syndrome(SI0_WARM_RESET_SYNDROME_VALUE);
-            if (status != FWK_SUCCESS) {
-                FWK_LOG_ERR(
-                    "[SI0 PLATFORM] Failed to update SDS reset syndrome, "
-                    "returned %d",
-                    status);
-                return status;
-            }
-
-            /*
-             * All the CPU power domain are powered off. Start the process to
-             * power on the first application core to complete the AP reboot
-             * sequence.
-             */
-            boot_primary_core();
+            status = finish_warm_reset();
         }
         break; /* MOD_SI0_PLATFORM_CHECK_PD_OFF */
     default:
@@ -633,7 +886,13 @@ int si0_platform_process_notification(
     } else if (fwk_id_is_equal(event->id, pd_transition_notification_id)) {
         params = (struct mod_pd_power_state_transition_notification_params *)
                      event->params;
-        return (pd_transition_ap_platform_hook(params->state));
+        status = pd_transition_ap_platform_hook(params->state);
+        if (status == FWK_SUCCESS && params->state == MOD_PD_STATE_ON &&
+            ap_watchdog_recovery) {
+            /* CPU0 OFF/ON includes AP peripheral reset and clears WS1. */
+            status = start_watchdog_rearm();
+        }
+        return status;
     } else {
         return FWK_E_PARAM;
     }

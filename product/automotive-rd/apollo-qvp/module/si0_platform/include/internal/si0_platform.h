@@ -75,7 +75,11 @@ const void *get_rse_platform_transport_signal_api(void);
  * \retval ::FWK_SUCCESS Operation succeeded.
  * \return One of the standard error codes for implementation-defined errors.
  */
-int notify_rse_and_wait_for_response(void);
+int notify_rse_and_wait_for_response(bool platform_origin);
+
+struct fwk_event;
+int start_rse_recovery(void);
+int complete_rse_recovery(const struct fwk_event *event);
 
 /*!
  * \brief Helper function to bind to transport and timer module APIs.

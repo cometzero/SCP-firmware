@@ -18,7 +18,8 @@ target_sources(
 target_link_libraries(
     ${SCP_MODULE_TARGET}
     PRIVATE module-transport module-timer module-power-domain
-    module-scmi module-system-power module-ppu-v1 module-sds)
+    module-scmi module-scmi-system-power module-system-power module-ppu-v1 module-sds
+    module-apcontext module-pfdi-monitor)
 
 if("pmic" IN_LIST SCP_MODULES)
     target_link_libraries(${SCP_MODULE_TARGET} PRIVATE module-pmic)
