@@ -333,9 +333,55 @@ void test_apcontext_process_platform_notification_fail(void)
     TEST_ASSERT_EACH_EQUAL_UINT8(expected, buff, 100);
 }
 
+void test_runtime_reset_clears_only_configured_context(void)
+{
+    uint8_t memory[80];
+    const struct mod_apcontext_config config = {
+        .base = (uintptr_t)&memory[8], .size = 64,
+    };
+    memset(memory, 0xa5, sizeof(memory));
+    ctx.config = &config;
+    ctx.wait_on_notifications = 1;
+    TEST_ASSERT_EQUAL(FWK_E_STATE, apcontext_reset());
+    TEST_ASSERT_EACH_EQUAL_UINT8(0xa5, memory, sizeof(memory));
+    ctx.wait_on_notifications = 0;
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, apcontext_reset());
+    TEST_ASSERT_EACH_EQUAL_UINT8(0xa5, memory, 8);
+    TEST_ASSERT_EACH_EQUAL_UINT8(0, &memory[8], 64);
+    TEST_ASSERT_EACH_EQUAL_UINT8(0xa5, &memory[72], 8);
+}
+
+void test_runtime_reset_binding_is_authorized(void)
+{
+    struct mod_apcontext_config config = { .reset_authority_id = FWK_ID_MODULE(7) };
+    const void *api = NULL;
+    fwk_id_t source = config.reset_authority_id;
+    fwk_id_t id = FWK_ID_API(0, MOD_APCONTEXT_API_IDX_RESET);
+    ctx.config = &config;
+    fwk_id_get_api_idx_ExpectAndReturn(id, MOD_APCONTEXT_API_IDX_RESET);
+    fwk_id_is_equal_ExpectAndReturn(source, FWK_ID_NONE, false);
+    fwk_id_is_equal_ExpectAndReturn(source, source, true);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        apcontext_process_bind_request(source, FWK_ID_NONE, id, &api));
+    TEST_ASSERT_EQUAL_PTR(&reset_api, api);
+    fwk_id_get_api_idx_ExpectAndReturn(id, MOD_APCONTEXT_API_IDX_RESET);
+    fwk_id_is_equal_ExpectAndReturn(source, FWK_ID_NONE, false);
+    fwk_id_is_equal_ExpectAndReturn(FWK_ID_NONE, source, false);
+    TEST_ASSERT_EQUAL(FWK_E_ACCESS,
+        apcontext_process_bind_request(FWK_ID_NONE, FWK_ID_NONE, id, &api));
+    config.reset_authority_id = FWK_ID_NONE;
+    fwk_id_get_api_idx_ExpectAndReturn(id, MOD_APCONTEXT_API_IDX_RESET);
+    fwk_id_is_equal_ExpectAndReturn(FWK_ID_NONE, FWK_ID_NONE, true);
+    TEST_ASSERT_EQUAL(FWK_E_ACCESS,
+        apcontext_process_bind_request(source, FWK_ID_NONE, id, &api));
+    Mockfwk_id_Verify();
+}
+
 int apcontext_test_main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_runtime_reset_clears_only_configured_context);
+    RUN_TEST(test_runtime_reset_binding_is_authorized);
 
     RUN_TEST(test_apcontext_init_success);
     RUN_TEST(test_apcontext_init_with_elements_fail);

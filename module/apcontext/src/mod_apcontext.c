@@ -158,9 +158,35 @@ static int apcontext_process_notification(const struct fwk_event *event,
     return FWK_SUCCESS;
 }
 
+static int apcontext_reset(void)
+{
+    if (ctx.config == NULL || ctx.wait_on_notifications != 0)
+        return FWK_E_STATE;
+    apcontext_zero();
+    return FWK_SUCCESS;
+}
+
+static const struct mod_apcontext_reset_api reset_api = {
+    .reset = apcontext_reset,
+};
+
+static int apcontext_process_bind_request(
+    fwk_id_t source_id, fwk_id_t target_id, fwk_id_t api_id, const void **api)
+{
+    if (fwk_id_get_api_idx(api_id) != MOD_APCONTEXT_API_IDX_RESET)
+        return FWK_E_PARAM;
+    if (fwk_id_is_equal(ctx.config->reset_authority_id, FWK_ID_NONE) ||
+        !fwk_id_is_equal(source_id, ctx.config->reset_authority_id))
+        return FWK_E_ACCESS;
+    *api = &reset_api;
+    return FWK_SUCCESS;
+}
+
 const struct fwk_module module_apcontext = {
+    .api_count = MOD_APCONTEXT_API_COUNT,
     .type = FWK_MODULE_TYPE_SERVICE,
     .init = apcontext_init,
     .start = apcontext_start,
     .process_notification = apcontext_process_notification,
+    .process_bind_request = apcontext_process_bind_request,
 };

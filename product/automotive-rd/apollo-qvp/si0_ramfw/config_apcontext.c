@@ -21,6 +21,7 @@ static const struct mod_apcontext_config apcontext_data = {
     .base = SI0_AP_CONTEXT_BASE,
     .size = SI0_AP_CONTEXT_SIZE,
     .clock_id = FWK_ID_NONE_INIT,
+    .reset_authority_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
     .platform_notification = {
         .notification_id = FWK_ID_NOTIFICATION_INIT(
             FWK_MODULE_IDX_SI0_PLATFORM,

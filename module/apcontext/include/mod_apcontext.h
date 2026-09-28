@@ -33,7 +33,7 @@
  *      and if provided as module configuration data, the AP context memory
  *      region will be accessed only after this notification is processed.
  */
-struct mod_transport_platform_notification {
+struct mod_apcontext_platform_notification {
     /*! Identifier of the notification id */
     const fwk_id_t notification_id;
 
@@ -57,7 +57,20 @@ struct mod_apcontext_config {
     /*!
      * Platform notification source and notification id (optional)
      */
-    struct mod_transport_platform_notification platform_notification;
+    struct mod_apcontext_platform_notification platform_notification;
+
+    /*! Module permitted to reset AP context; NONE disables runtime access. */
+    fwk_id_t reset_authority_id;
+};
+
+enum mod_apcontext_api_idx {
+    MOD_APCONTEXT_API_IDX_RESET,
+    MOD_APCONTEXT_API_COUNT,
+};
+
+struct mod_apcontext_reset_api {
+    /*! Clear configured context after all AP cores are off, before release. */
+    int (*reset)(void);
 };
 
 /*!
