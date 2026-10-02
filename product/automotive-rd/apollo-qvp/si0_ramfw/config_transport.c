@@ -15,7 +15,9 @@
 #include "si0_cfgd_transport.h"
 #include "si0_mmap.h"
 
-#include <mod_fch_polled.h>
+#ifdef BUILD_HAS_SCMI_PERF_FAST_CHANNELS
+#    include <mod_fch_polled.h>
+#endif
 #include <mod_mhu3.h>
 #include <mod_ras_handlers.h>
 #include <mod_si0_platform.h>

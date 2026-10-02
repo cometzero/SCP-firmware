@@ -28,7 +28,9 @@ set(SCP_ENABLE_SCMI_PFDI_MONITOR_INIT FALSE)
 
 set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS_INIT FALSE)
 
-set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS TRUE)
+# Use the interrupt-driven SCMI mailbox instead of polling fast channels.
+option(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS
+       "Enable the SCMI-perf Fast channels?" OFF)
 
 set(SCP_ENABLE_EXCEPTION_SYMTAB TRUE)
 set(SCP_EXCEPTION_SYMTAB_MAX_SIZE 131072)
@@ -147,8 +149,11 @@ list(APPEND SCP_MODULES
     "scmi-perf"
     "mock-psu"
     "psu"
-    "fch-polled"
 )
+
+if(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS)
+    list(APPEND SCP_MODULES "fch-polled")
+endif()
 
 if(SCP_APOLLO_QVP_PMIC)
     # Defer SYS0 power-on until start, after timer and PMIC probe succeed.

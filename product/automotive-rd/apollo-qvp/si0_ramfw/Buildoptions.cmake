@@ -17,7 +17,7 @@ cmake_dependent_option(
     "DEFINED SCP_ENABLE_SCMI_PERF_FAST_CHANNELS_INIT"
     "${SCP_ENABLE_SCMI_PERF_FAST_CHANNELS}")
 
-if(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS)
-    option(BUILD_HAS_MOD_TRANSPORT_FC
-           "SCMI-PERF fast channel requires transport layer to be enabled" ON)
-endif()
+# This is a dependency, not an independent platform option. Reset a stale ON
+# cache entry when switching an existing build to the mailbox transport.
+set(BUILD_HAS_MOD_TRANSPORT_FC "${SCP_ENABLE_SCMI_PERF_FAST_CHANNELS}"
+    CACHE BOOL "Enable SCMI-perf fast-channel transport support" FORCE)
