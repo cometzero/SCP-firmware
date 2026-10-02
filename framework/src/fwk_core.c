@@ -326,11 +326,32 @@ void fwk_process_event_queue(void)
 
 noreturn void __fwk_run_main_loop(void)
 {
+#ifdef FWK_IDLE_USE_WFI
+    unsigned int flags;
+#endif
+
     for (;;) {
         fwk_process_event_queue();
+#ifdef FWK_IDLE_USE_WFI
+        /*
+         * An ISR may have queued work since the queue drain completed. Keep
+         * interrupts masked from this final check through WFI so that an ISR
+         * cannot consume the wakeup and leave work queued while we sleep.
+         * A pending interrupt wakes AArch64 WFI even when masked in DAIF;
+         * restoring the mask then allows the ISR to run.
+         */
+        flags = fwk_interrupt_global_disable();
+        if (fwk_list_is_empty(&ctx.event_queue) &&
+            fwk_list_is_empty(&ctx.isr_event_queue) &&
+            (fwk_log_unbuffer() == FWK_SUCCESS)) {
+            fwk_arch_suspend();
+        }
+        (void)fwk_interrupt_global_enable(flags);
+#else
         if (fwk_log_unbuffer() == FWK_SUCCESS) {
             fwk_arch_suspend();
         }
+#endif
     }
 }
 

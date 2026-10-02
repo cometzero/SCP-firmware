@@ -49,7 +49,12 @@ inline static unsigned int arch_interrupts_disable()
  */
 inline static void arch_suspend(void)
 {
+#ifdef FWK_IDLE_USE_WFI
+    /* The framework keeps interrupts masked until WFI has completed. */
+    __asm volatile("dsb sy\n\twfi" ::: "memory");
+#else
     __asm volatile("wfe");
+#endif
 }
 
 #endif /* ARCH_HELPERS_H */

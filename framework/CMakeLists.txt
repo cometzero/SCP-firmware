@@ -17,6 +17,13 @@
 
 add_library(framework)
 
+if(SCP_ENABLE_WFI_IDLE)
+    if(NOT SCP_ARCHITECTURE STREQUAL "aarch64")
+        message(FATAL_ERROR "WFI idle is only supported on aarch64")
+    endif()
+    target_compile_definitions(framework PRIVATE FWK_IDLE_USE_WFI)
+endif()
+
 target_include_directories(framework
                            PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 

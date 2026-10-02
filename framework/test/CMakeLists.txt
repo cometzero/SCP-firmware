@@ -78,6 +78,7 @@ list(APPEND SCP_FWK_TEST_TARGETS test_fwk_ring)
 list(APPEND SCP_FWK_TEST_TARGETS test_fwk_ring_init)
 list(APPEND SCP_FWK_TEST_TARGETS test_fwk_string)
 list(APPEND SCP_FWK_TEST_TARGETS test_fwk_core)
+list(APPEND SCP_FWK_TEST_TARGETS test_fwk_idle)
 list(APPEND SCP_FWK_TEST_TARGETS test_fwk_trace)
 
 # Create a list of the tests that need notifications.
@@ -101,6 +102,9 @@ list(APPEND test_fwk_core_WRAP fwk_interrupt_global_enable)
 list(APPEND test_fwk_core_WRAP fwk_module_is_valid_entity_id)
 list(APPEND test_fwk_core_WRAP fwk_module_is_valid_event_id)
 list(APPEND test_fwk_core_WRAP fwk_module_is_valid_notification_id)
+
+list(APPEND test_fwk_idle_WRAP fwk_arch_suspend)
+list(APPEND test_fwk_idle_WRAP fwk_log_unbuffer)
 
 list(APPEND test_fwk_notification_WRAP fwk_module_get_ctx)
 list(APPEND test_fwk_notification_WRAP fwk_module_get_element_ctx)
@@ -149,6 +153,11 @@ foreach(idx RANGE ${SCP_FWK_TEST_MAX})
     list(GET SCP_FWK_TEST_TARGETS ${idx} TEST_TARGET)
 
     add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+
+    if(TEST_TARGET STREQUAL "test_fwk_idle")
+        target_compile_definitions(${TEST_TARGET}
+            PRIVATE FWK_IDLE_USE_WFI BUILD_TEST_IDLE_INTERRUPTS)
+    endif()
 
     target_compile_definitions(
         ${TEST_TARGET}

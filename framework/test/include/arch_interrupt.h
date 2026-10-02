@@ -14,16 +14,25 @@
 
 extern unsigned int critical_section_nest_level;
 
+#ifdef BUILD_TEST_IDLE_INTERRUPTS
+void test_arch_interrupts_enable(unsigned int flags);
+unsigned int test_arch_interrupts_disable(void);
+#endif
+
 /*!
  * \brief Enables global CPU interrupts. (stub)
  *
  */
 inline static void arch_interrupts_enable(unsigned int not_used)
 {
+#ifdef BUILD_TEST_IDLE_INTERRUPTS
+    test_arch_interrupts_enable(not_used);
+#else
     /* Decrement critical_section_nest_level only if in critical section */
     if (critical_section_nest_level > 0) {
         critical_section_nest_level--;
     }
+#endif
 }
 
 /*!
@@ -32,9 +41,13 @@ inline static void arch_interrupts_enable(unsigned int not_used)
  */
 inline static unsigned int arch_interrupts_disable(void)
 {
+#ifdef BUILD_TEST_IDLE_INTERRUPTS
+    return test_arch_interrupts_disable();
+#else
     critical_section_nest_level++;
 
     return 0;
+#endif
 }
 
 /*!
