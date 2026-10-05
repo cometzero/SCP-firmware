@@ -23,7 +23,7 @@ static int alarm_start(fwk_id_t id, unsigned int us,
     enum mod_timer_alarm_type type, void (*callback)(uintptr_t), uintptr_t param)
 {
     TEST_ASSERT_EQUAL(10000, us);
-    TEST_ASSERT_EQUAL(MOD_TIMER_ALARM_TYPE_PERIODIC, type);
+    TEST_ASSERT_EQUAL(MOD_TIMER_ALARM_TYPE_ONCE, type);
     starts++;
     return FWK_SUCCESS;
 }
@@ -118,11 +118,11 @@ static void test_async_immediate_ack_and_deduplicated_completion(void)
 {
     TEST_ASSERT_EQUAL(FWK_SUCCESS, start_rse_recovery());
     TEST_ASSERT_EQUAL(0, waits);
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(1, queued);
     TEST_ASSERT_EQUAL(FWK_SUCCESS, complete_rse_recovery(&completion));
     TEST_ASSERT_EQUAL(FWK_E_STATE, complete_rse_recovery(&completion));
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(1, queued);
 }
 
@@ -133,17 +133,17 @@ static void test_async_delayed_ack_and_repeated_generation(void)
     TEST_ASSERT_EQUAL(FWK_SUCCESS, start_rse_recovery());
     old_generation = ctx.generation;
     clock_ticks = 3442000;
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(0, queued);
     ctx.rse_doorbell_received = true;
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(FWK_SUCCESS, complete_rse_recovery(&completion));
     TEST_ASSERT_EQUAL(FWK_SUCCESS, start_rse_recovery());
-    recovery_poll(old_generation);
+    poll_rse_recovery(old_generation);
     TEST_ASSERT_EQUAL(1, queued);
     TEST_ASSERT_EQUAL(FWK_E_STATE, complete_rse_recovery(&completion));
     ctx.rse_doorbell_received = true;
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(2, queued);
     TEST_ASSERT_EQUAL(FWK_SUCCESS, complete_rse_recovery(&completion));
     TEST_ASSERT_EQUAL(0, waits);
@@ -154,10 +154,10 @@ static void test_async_deadline_and_late_ack_fail_closed(void)
     immediate_ack = false;
     TEST_ASSERT_EQUAL(FWK_SUCCESS, start_rse_recovery());
     clock_ticks = 10000000;
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(FWK_E_TIMEOUT, complete_rse_recovery(&completion));
     ctx.rse_doorbell_received = true;
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(1, queued);
     TEST_ASSERT_EQUAL(FWK_E_STATE, complete_rse_recovery(&completion));
     TEST_ASSERT_EQUAL(1, stops);
@@ -169,7 +169,7 @@ static void test_async_notification_failure_cancels_alarm(void)
     TEST_ASSERT_EQUAL(FWK_E_STATE, start_rse_recovery());
     TEST_ASSERT_FALSE(ctx.recovery_pending);
     TEST_ASSERT_EQUAL(1, stops);
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(0, queued);
 }
 
@@ -180,7 +180,7 @@ static void test_ack_after_deadline_before_poll_is_rejected(void)
     clock_ticks = 10000001;
     TEST_ASSERT_EQUAL(FWK_SUCCESS, signal_message(FWK_ID_NONE));
     TEST_ASSERT_EQUAL(clock_ticks, ctx.ack_counter);
-    recovery_poll(ctx.generation);
+    poll_rse_recovery(ctx.generation);
     TEST_ASSERT_EQUAL(FWK_E_TIMEOUT, complete_rse_recovery(&completion));
 }
 

@@ -15,6 +15,7 @@
 #include <fwk_module_idx.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define WARM_RESET_MAX_RETRIES 10
 
@@ -46,6 +47,7 @@ enum mod_si0_platform_api_idx {
     /*! Interface for Transport module */
     MOD_SCP_PLATFORM_API_IDX_TRANSPORT_SIGNAL,
 
+    MOD_SI0_PLATFORM_API_IDX_VMCU_CONTROL,
     MOD_SI0_PLATFORM_API_COUNT
 };
 
@@ -61,6 +63,8 @@ enum mod_si0_platform_event_idx {
     MOD_SI0_PLATFORM_WATCHDOG_REARM,
 
     /*! Number of defined events */
+    MOD_SI0_PLATFORM_CONTROL_POLL,
+    MOD_SI0_PLATFORM_RSE_RECOVERY_POLL,
     MOD_SI0_PLATFORM_EVENT_COUNT
 };
 
@@ -89,6 +93,27 @@ static const fwk_id_t mod_si0_platform_notification_subsys_init =
     FWK_ID_NOTIFICATION_INIT(
         FWK_MODULE_IDX_SI0_PLATFORM,
         MOD_SI0_PLATFORM_NOTIFICATION_IDX_SUBSYS_INITIALIZED);
+
+/* QVP AP-domain controls. COMPLETE means firmware boot release and IRQ rearm;
+ * OS/PFDI recovery must be established independently by the caller. */
+enum mod_si0_recovery_state {
+    SI0_RECOVERY_IDLE, SI0_RECOVERY_PENDING, SI0_RECOVERY_OFF,
+    SI0_RECOVERY_RELOAD, SI0_RECOVERY_BOOT, SI0_RECOVERY_COMPLETE,
+    SI0_RECOVERY_FAILED,
+};
+enum mod_si0_ap_power_state {
+    SI0_AP_RUN, SI0_AP_ARMED, SI0_AP_QUIESCING, SI0_AP_OFF,
+    SI0_AP_WAKING, SI0_AP_FAILED,
+};
+struct mod_si0_vmcu_api {
+    int (*recover)(void);
+    unsigned int (*recovery_status)(void);
+    int (*power_arm)(bool arm);
+    unsigned int (*power_status)(void);
+    int (*wake)(void);
+};
+/* Called only by the QVP SCMI policy for the trusted PSCI shutdown channel. */
+int si0_vmcu_accept_shutdown(void);
 
 /*!
  * \brief List of isolated CPU MPIDs.
@@ -138,6 +163,7 @@ struct mod_si0_platform_config {
     uint32_t rse_recovery_timeout_us;
     /*! QVP-only IRQ propagation settling budget, not hardware FTTI. */
     fwk_id_t watchdog_rearm_alarm_id;
+    fwk_id_t control_alarm_id;
     uint32_t watchdog_rearm_timeout_us;
 
     /*! Transport channel identifier */

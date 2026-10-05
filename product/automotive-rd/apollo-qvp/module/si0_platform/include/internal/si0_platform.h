@@ -79,6 +79,7 @@ int notify_rse_and_wait_for_response(bool platform_origin);
 
 struct fwk_event;
 int start_rse_recovery(void);
+void poll_rse_recovery(unsigned int generation);
 int complete_rse_recovery(const struct fwk_event *event);
 
 /*!

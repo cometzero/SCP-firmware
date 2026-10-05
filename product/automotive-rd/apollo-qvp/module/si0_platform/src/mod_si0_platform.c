@@ -36,6 +36,7 @@
 #include <fwk_module_idx.h>
 #include <fwk_notification.h>
 #include <fwk_status.h>
+#include <inttypes.h>
 
 #ifdef BUILD_HAS_NOTIFICATION
 static const fwk_id_t mod_pd_notification_id_pre_warmreset =
@@ -89,6 +90,274 @@ static struct {
     bool last_pending;
 } rearm_ctx;
 
+static enum mod_si0_recovery_state recovery_state;
+static enum mod_si0_ap_power_state ap_power_state;
+static struct {
+    bool active;
+    bool stopping_ap;
+    bool log_first_poll;
+    bool alarm_armed;
+    uint64_t callback_time;
+    uint64_t deadline;
+    unsigned int generation;
+    const struct mod_timer_alarm_api *alarm;
+} control;
+
+static int power_off_all_cores(void);
+static int check_power_off_all_cores(void);
+
+static void control_stop_alarm(void)
+{
+    unsigned int flags = fwk_interrupt_global_disable();
+    if (control.alarm_armed) {
+        control.alarm_armed = false;
+        control.alarm->stop(si0_platform_ctx.config->control_alarm_id);
+    }
+    fwk_interrupt_global_enable(flags);
+}
+
+static void control_fail(int status)
+{
+    uint64_t now = 0;
+    if (si0_platform_ctx.rearm_timer_api != NULL)
+        (void)si0_platform_ctx.rearm_timer_api->get_counter(
+            si0_platform_ctx.config->timer_id, &now);
+    FWK_LOG_ERR(MOD_NAME "CTRL fail e=%d g=%u p=%u r=%u s=%u t=%" PRIu64 " d=%" PRIu64,
+        status, control.generation, ap_power_state, recovery_state,
+        control.stopping_ap, now, control.deadline);
+    recovery_state = SI0_RECOVERY_FAILED;
+    ap_power_state = SI0_AP_FAILED;
+    control.active = false;
+    control.stopping_ap = false;
+    rearm_ctx.pending = false;
+    rearm_ctx.generation++;
+    control_stop_alarm();
+}
+
+/* Completion events can already be queued when the overall deadline expires.
+ * Check the transaction again before releasing AP or publishing COMPLETE. */
+static bool recovery_completion_allowed(enum mod_si0_recovery_state expected)
+{
+    uint64_t now;
+    int status;
+
+    if (!control.active || recovery_state != expected)
+        return false;
+    status = si0_platform_ctx.rearm_timer_api->get_counter(
+        si0_platform_ctx.config->timer_id, &now);
+    if (status != FWK_SUCCESS || now >= control.deadline) {
+        control_fail(status == FWK_SUCCESS ? FWK_E_TIMEOUT : status);
+        return false;
+    }
+    return true;
+}
+
+static void control_callback(uintptr_t generation)
+{
+    struct fwk_event event = {
+        .source_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .target_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .id = FWK_ID_EVENT_INIT(FWK_MODULE_IDX_SI0_PLATFORM,
+            MOD_SI0_PLATFORM_CONTROL_POLL),
+    };
+    if (!control.active || generation != control.generation)
+        return;
+    control.alarm_armed = false;
+    (void)si0_platform_ctx.rearm_timer_api->get_counter(
+        si0_platform_ctx.config->timer_id, &control.callback_time);
+    *(unsigned int *)event.params = generation;
+    if (fwk_put_event(&event) != FWK_SUCCESS)
+        control_fail(FWK_E_BUSY);
+}
+
+static int control_schedule(void)
+{
+    int status;
+    control.alarm_armed = true;
+    status = control.alarm->start(si0_platform_ctx.config->control_alarm_id,
+        10000, MOD_TIMER_ALARM_TYPE_ONCE, control_callback, control.generation);
+    if (status != FWK_SUCCESS)
+        control.alarm_armed = false;
+    return status;
+}
+
+static int control_start(unsigned int timeout_us)
+{
+    uint64_t now, duration;
+    int status;
+    const struct mod_si0_platform_config *config = si0_platform_ctx.config;
+    if (control.alarm == NULL)
+        return FWK_E_SUPPORT;
+    control_stop_alarm();
+    status = si0_platform_ctx.rearm_timer_api->get_counter(config->timer_id, &now);
+    if (status != FWK_SUCCESS)
+        return status;
+    status = si0_platform_ctx.rearm_timer_api->time_to_timestamp(
+        config->timer_id, timeout_us, &duration);
+    if (status != FWK_SUCCESS)
+        return status;
+    control.deadline = now + duration;
+    control.generation++;
+    control.active = true;
+    control.log_first_poll = true;
+    control.callback_time = 0;
+    FWK_LOG_INFO(MOD_NAME "CTRL start g=%u us=%u p=%u r=%u s=%u t=%" PRIu64 " d=%" PRIu64,
+        control.generation, timeout_us, ap_power_state, recovery_state,
+        control.stopping_ap, now, control.deadline);
+    status = control_schedule();
+    if (status != FWK_SUCCESS)
+        control.active = false;
+    return status;
+}
+
+static unsigned int recovery_status(void) { return recovery_state; }
+static unsigned int power_status(void) { return ap_power_state; }
+
+static int request_recovery(void)
+{
+    struct fwk_event event = {
+        .source_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .target_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .id = FWK_ID_EVENT_INIT(FWK_MODULE_IDX_SI0_PLATFORM,
+            MOD_SI0_PLATFORM_AP_WATCHDOG),
+    };
+    int status;
+    if (si0_platform_ctx.config->ap_watchdog_irq == 0)
+        return FWK_E_SUPPORT;
+    if (ap_watchdog_recovery || control.active)
+        return FWK_E_BUSY;
+    status = fwk_interrupt_disable(si0_platform_ctx.config->ap_watchdog_irq);
+    if (status != FWK_SUCCESS)
+        return status;
+    ap_watchdog_recovery = true;
+    recovery_state = SI0_RECOVERY_PENDING;
+    ap_power_state = SI0_AP_WAKING;
+    status = fwk_put_event(&event);
+    if (status != FWK_SUCCESS) {
+        ap_watchdog_recovery = false;
+        recovery_state = SI0_RECOVERY_FAILED;
+        ap_power_state = SI0_AP_FAILED;
+        (void)fwk_interrupt_enable(si0_platform_ctx.config->ap_watchdog_irq);
+    }
+    return status;
+}
+
+static int power_arm(bool arm)
+{
+    int status;
+    if (!arm) {
+        if (ap_power_state != SI0_AP_ARMED)
+            return FWK_E_STATE;
+        control_stop_alarm();
+        control.active = false;
+        ap_power_state = SI0_AP_RUN;
+        return FWK_SUCCESS;
+    }
+    if (ap_power_state != SI0_AP_RUN || ap_watchdog_recovery)
+        return FWK_E_BUSY;
+    status = control_start(30000000);
+    if (status == FWK_SUCCESS)
+        ap_power_state = SI0_AP_ARMED;
+    return status;
+}
+
+int si0_vmcu_accept_shutdown(void)
+{
+    int status;
+    if (ap_power_state != SI0_AP_ARMED)
+        return ap_power_state == SI0_AP_RUN ? FWK_E_STATE : FWK_E_ACCESS;
+    status = fwk_interrupt_disable(si0_platform_ctx.config->ap_watchdog_irq);
+    if (status == FWK_SUCCESS)
+        status = control_start(10000000);
+    if (status == FWK_SUCCESS)
+        status = power_off_all_cores();
+    if (status != FWK_SUCCESS) {
+        control_fail(status);
+        return status;
+    }
+    control.stopping_ap = true;
+    ap_power_state = SI0_AP_QUIESCING;
+    FWK_LOG_INFO(MOD_NAME "AP shutdown accepted from PSCI; retaining SYSTOP/SI/RSE "
+        "g=%u p=%u s=%u", control.generation,
+        ap_power_state, control.stopping_ap);
+    return FWK_SUCCESS;
+}
+
+static int wake_ap(void)
+{
+    if (ap_power_state != SI0_AP_OFF)
+        return FWK_E_STATE;
+    return request_recovery();
+}
+
+static const struct mod_si0_vmcu_api vmcu_control_api = {
+    .recover = request_recovery,
+    .recovery_status = recovery_status,
+    .power_arm = power_arm,
+    .power_status = power_status,
+    .wake = wake_ap,
+};
+
+static int control_update(unsigned int generation)
+{
+    uint64_t now;
+    int status;
+    if (!control.active || generation != control.generation)
+        return FWK_SUCCESS;
+    status = si0_platform_ctx.rearm_timer_api->get_counter(
+        si0_platform_ctx.config->timer_id, &now);
+    if (control.log_first_poll && status == FWK_SUCCESS) {
+        control.log_first_poll = false;
+        FWK_LOG_INFO(MOD_NAME "CTRL poll g=%u p=%u r=%u s=%u t=%" PRIu64 " d=%" PRIu64,
+            generation, ap_power_state, recovery_state, control.stopping_ap,
+            now, control.deadline);
+        FWK_LOG_INFO(MOD_NAME "CTRL callback g=%u t=%" PRIu64,
+            generation, control.callback_time);
+    }
+    if (status != FWK_SUCCESS || now >= control.deadline) {
+        control_fail(status == FWK_SUCCESS ? FWK_E_TIMEOUT : status);
+        return FWK_SUCCESS;
+    }
+    if (ap_power_state == SI0_AP_ARMED)
+        return FWK_SUCCESS;
+    if (!control.stopping_ap && recovery_state != SI0_RECOVERY_PENDING)
+        return FWK_SUCCESS;
+    status = check_power_off_all_cores();
+    if (status == FWK_PENDING)
+        return FWK_SUCCESS;
+    if (status != FWK_SUCCESS) {
+        control_fail(status);
+        return FWK_SUCCESS;
+    }
+    if (control.stopping_ap) {
+        control.stopping_ap = false;
+        control.active = false;
+        control_stop_alarm();
+        ap_power_state = SI0_AP_OFF;
+        recovery_state = SI0_RECOVERY_OFF;
+        FWK_LOG_INFO(MOD_NAME "AP cores OFF verified; IST_DONE_N may assert "
+            "gen=%u now=%" PRIu64, generation, now);
+        return FWK_SUCCESS;
+    }
+    recovery_state = SI0_RECOVERY_RELOAD;
+    status = start_rse_recovery();
+    if (status != FWK_SUCCESS)
+        control_fail(status);
+    return FWK_SUCCESS;
+}
+
+static int control_poll(unsigned int generation)
+{
+    int status = control_update(generation);
+    /* Schedule from dispatch completion, never replay elapsed polling ticks. */
+    if (control.active && generation == control.generation) {
+        int alarm_status = control_schedule();
+        if (alarm_status != FWK_SUCCESS)
+            control_fail(alarm_status);
+    }
+    return status;
+}
+
 static void ap_watchdog_isr(void)
 {
     struct fwk_event_light event = {
@@ -111,6 +380,8 @@ static void ap_watchdog_isr(void)
     if (ap_watchdog_recovery)
         return;
     ap_watchdog_recovery = true;
+    recovery_state = SI0_RECOVERY_PENDING;
+    ap_power_state = SI0_AP_WAKING;
     status = fwk_put_event(&event);
     if (status != FWK_SUCCESS) {
         FWK_LOG_ERR(MOD_NAME "AP watchdog recovery enqueue failed: %d", status);
@@ -202,6 +473,8 @@ static int watchdog_rearm_poll(unsigned int generation)
 
     if (!rearm_ctx.pending || generation != rearm_ctx.generation)
         return FWK_SUCCESS;
+    if (!recovery_completion_allowed(SI0_RECOVERY_BOOT))
+        return FWK_SUCCESS;
     status = si0_platform_ctx.rearm_timer_api->get_counter(config->timer_id, &now);
     if (status != FWK_SUCCESS)
         goto fail;
@@ -218,6 +491,15 @@ static int watchdog_rearm_poll(unsigned int generation)
         rearm_ctx.attempts, before, rearm_ctx.last_pending, status);
     if (status == FWK_SUCCESS) {
         rearm_ctx.pending = false;
+        /* Unmasking may have queued a new WS1 recovery in the ISR. */
+        if (ap_watchdog_recovery)
+            return FWK_SUCCESS;
+        recovery_state = SI0_RECOVERY_COMPLETE;
+        ap_power_state = SI0_AP_RUN;
+        if (control.active) {
+            control.active = false;
+            control_stop_alarm();
+        }
         return FWK_SUCCESS;
     }
     if (status != FWK_PENDING)
@@ -228,7 +510,7 @@ static int watchdog_rearm_poll(unsigned int generation)
     if (status == FWK_SUCCESS)
         return FWK_SUCCESS;
 fail:
-    rearm_ctx.pending = false;
+    control_fail(status);
     FWK_LOG_ERR(MOD_NAME "Watchdog rearm FAILED after %u attempts: %d",
         rearm_ctx.attempts, status);
     return status;
@@ -240,6 +522,8 @@ static int start_watchdog_rearm(void)
     uint64_t now, duration;
     int status;
 
+    if (!recovery_completion_allowed(SI0_RECOVERY_BOOT))
+        return FWK_SUCCESS;
     if (rearm_ctx.pending)
         return FWK_E_BUSY;
     status = si0_platform_ctx.rearm_timer_api->get_counter(config->timer_id, &now);
@@ -387,6 +671,10 @@ static int si0_platform_bind(fwk_id_t id, unsigned int round)
             &si0_platform_ctx.rearm_timer_api);
         if (status != FWK_SUCCESS)
             return status;
+        status = fwk_module_bind(si0_platform_ctx.config->control_alarm_id,
+            MOD_TIMER_API_ID_ALARM, &control.alarm);
+        if (status != FWK_SUCCESS)
+            return status;
         status = fwk_module_bind(si0_platform_ctx.config->watchdog_rearm_alarm_id,
             MOD_TIMER_API_ID_ALARM, &si0_platform_ctx.rearm_alarm_api);
         if (status != FWK_SUCCESS)
@@ -453,6 +741,16 @@ static int si0_platform_process_bind_request(
     api_id_type = (enum mod_si0_platform_api_idx)fwk_id_get_api_idx(api_id);
 
     switch (api_id_type) {
+    case MOD_SI0_PLATFORM_API_IDX_VMCU_CONTROL:
+#ifdef BUILD_HAS_MOD_VMCU_SAFETY
+        if (!fwk_id_is_equal(requester_id,
+                FWK_ID_MODULE(FWK_MODULE_IDX_VMCU_SAFETY)))
+            return FWK_E_ACCESS;
+#else
+        return FWK_E_SUPPORT;
+#endif
+        *api = &vmcu_control_api;
+        return FWK_SUCCESS;
     case MOD_SI0_PLATFORM_API_IDX_SCMI_POWER_DOWN:
         *api = get_platform_scmi_power_down_api();
         status = FWK_SUCCESS;
@@ -575,7 +873,7 @@ static int si0_platform_start(fwk_id_t id)
     return status;
 }
 
-static void power_off_all_cores(void)
+static int power_off_all_cores(void)
 {
     unsigned int pd_idx;
     unsigned int core_count;
@@ -602,8 +900,10 @@ static void power_off_all_cores(void)
                 fwk_module_get_element_name(
                     FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, pd_idx)));
         }
-        fwk_assert(status == FWK_SUCCESS);
+        if (status != FWK_SUCCESS)
+            return status;
     }
+    return FWK_SUCCESS;
 }
 
 static int check_power_off_all_cores(void)
@@ -761,6 +1061,7 @@ static int finish_warm_reset(void)
     status = update_sds_reset_syndrome(SI0_WARM_RESET_SYNDROME_VALUE);
     if (status != FWK_SUCCESS)
         return status;
+    recovery_state = SI0_RECOVERY_BOOT;
     boot_primary_core();
     return FWK_SUCCESS;
 }
@@ -778,17 +1079,27 @@ static int si0_platform_process_event(
     };
 
     switch (fwk_id_get_event_idx(event->id)) {
+    case MOD_SI0_PLATFORM_CONTROL_POLL:
+        return control_poll(*(const unsigned int *)event->params);
+    case MOD_SI0_PLATFORM_RSE_RECOVERY_POLL:
+        poll_rse_recovery(*(const unsigned int *)event->params);
+        return FWK_SUCCESS;
     case MOD_SI0_PLATFORM_WATCHDOG_REARM:
         status = watchdog_rearm_poll(*(const unsigned int *)event->params);
         break;
     case MOD_SI0_PLATFORM_RSE_RECOVERY_DONE:
         status = complete_rse_recovery(event);
+        if (!recovery_completion_allowed(SI0_RECOVERY_RELOAD))
+            return FWK_SUCCESS;
         if (status != FWK_SUCCESS) {
             /* Fail closed: AP remains off and WS1 stays masked. */
+            control_fail(status);
             FWK_LOG_ERR(MOD_NAME "RSE recovery not completed: %d", status);
             return FWK_SUCCESS;
         }
         status = finish_warm_reset();
+        if (status != FWK_SUCCESS)
+            control_fail(status);
         break;
     case MOD_SI0_PLATFORM_AP_WATCHDOG:
         FWK_LOG_INFO(MOD_NAME "AP watchdog WS1: requesting coordinated warm reset");
@@ -796,10 +1107,16 @@ static int si0_platform_process_event(
             MOD_PD_SYSTEM_WARM_RESET);
         if (status == FWK_PENDING)
             status = FWK_SUCCESS;
-        else
+        else {
+            control_fail(status);
             FWK_LOG_ERR(MOD_NAME "AP watchdog recovery request failed: %d", status);
+        }
         break;
     case MOD_SI0_PLATFORM_CHECK_PD_OFF:
+        if (ap_watchdog_recovery) {
+            status = control_poll(control.generation);
+            break;
+        }
         status = check_power_off_all_cores();
         if (status != FWK_SUCCESS) {
             /*
@@ -868,7 +1185,20 @@ int si0_platform_process_notification(
     fwk_assert(fwk_id_is_type(event->target_id, FWK_ID_TYPE_MODULE));
     if (fwk_id_is_equal(event->id, mod_pd_notification_id_pre_warmreset)) {
         /* Requesting power off of all cores */
-        power_off_all_cores();
+        if (ap_watchdog_recovery) {
+            status = control_start(30000000);
+            if (status != FWK_SUCCESS) {
+                control_fail(status);
+                return FWK_SUCCESS;
+            }
+            recovery_state = SI0_RECOVERY_PENDING;
+            ap_power_state = SI0_AP_WAKING;
+        }
+        status = power_off_all_cores();
+        if (status != FWK_SUCCESS) {
+            control_fail(status);
+            return FWK_SUCCESS;
+        }
 
         si0_platform_ctx.warm_reset_check_cnt = 0;
 

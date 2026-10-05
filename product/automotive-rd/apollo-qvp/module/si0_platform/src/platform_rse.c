@@ -17,6 +17,7 @@
 
 #include <fwk_id.h>
 #include <fwk_core.h>
+#include <fwk_interrupt.h>
 #include <fwk_log.h>
 #include <fwk_module.h>
 #include <fwk_module_idx.h>
@@ -42,6 +43,7 @@ struct platform_rse_ctx {
     uint64_t ack_counter;
     bool recovery_pending;
     bool completion_ready;
+    bool alarm_armed;
 
     /* Flag to indicate that the RSE doorbell has been received */
     volatile bool rse_doorbell_received;
@@ -49,12 +51,52 @@ struct platform_rse_ctx {
 
 static struct platform_rse_ctx ctx;
 
+static void stop_recovery_alarm(void)
+{
+    unsigned int flags = fwk_interrupt_global_disable();
+    /* A fired one-shot is already inactive; do not stop the shared timer. */
+    if (ctx.alarm_armed) {
+        ctx.alarm_armed = false;
+        ctx.alarm_api->stop(ctx.config->rse_recovery_alarm_id);
+    }
+    fwk_interrupt_global_enable(flags);
+}
+
 struct recovery_result {
     unsigned int generation;
     int status;
 };
 
-static void recovery_poll(uintptr_t generation)
+static void recovery_alarm(uintptr_t generation)
+{
+    struct fwk_event event = {
+        .id = FWK_ID_EVENT_INIT(
+            FWK_MODULE_IDX_SI0_PLATFORM, MOD_SI0_PLATFORM_RSE_RECOVERY_POLL),
+        .source_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+        .target_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_SI0_PLATFORM),
+    };
+    if (!ctx.recovery_pending || generation != ctx.generation)
+        return;
+    ctx.alarm_armed = false;
+    *(unsigned int *)event.params = generation;
+    if (fwk_put_event(&event) != FWK_SUCCESS) {
+        ctx.recovery_pending = false;
+        FWK_LOG_ERR(MOD_NAME "RSE poll enqueue failed; AP recovery will time out");
+    }
+}
+
+static int schedule_recovery_poll(void)
+{
+    int status;
+    ctx.alarm_armed = true;
+    status = ctx.alarm_api->start(ctx.config->rse_recovery_alarm_id, 10000,
+        MOD_TIMER_ALARM_TYPE_ONCE, recovery_alarm, ctx.generation);
+    if (status != FWK_SUCCESS)
+        ctx.alarm_armed = false;
+    return status;
+}
+
+void poll_rse_recovery(unsigned int generation)
 {
     struct fwk_event event = {
         .id = FWK_ID_EVENT_INIT(
@@ -70,14 +112,18 @@ static void recovery_poll(uintptr_t generation)
         return;
     status = ctx.timer_api->get_counter(ctx.config->timer_id, &now);
     if (status == FWK_SUCCESS) {
-        if (!ctx.rse_doorbell_received && now < ctx.deadline)
-            return;
-        status = (ctx.rse_doorbell_received && ctx.ack_counter <= ctx.deadline) ?
-            FWK_SUCCESS : FWK_E_TIMEOUT;
+        if (!ctx.rse_doorbell_received && now < ctx.deadline) {
+            status = schedule_recovery_poll();
+            if (status == FWK_SUCCESS)
+                return;
+        } else {
+            status = (ctx.rse_doorbell_received && ctx.ack_counter <= ctx.deadline) ?
+                FWK_SUCCESS : FWK_E_TIMEOUT;
+        }
     }
     ctx.recovery_pending = false;
     ctx.completion_ready = true;
-    ctx.alarm_api->stop(ctx.config->rse_recovery_alarm_id);
+    stop_recovery_alarm();
     result->generation = ctx.generation;
     result->status = status;
     status = fwk_put_event(&event);
@@ -105,14 +151,12 @@ int start_rse_recovery(void)
     ctx.generation++;
     ctx.rse_doorbell_received = false;
     ctx.recovery_pending = true;
-    status = ctx.alarm_api->start(
-        ctx.config->rse_recovery_alarm_id, 10000, MOD_TIMER_ALARM_TYPE_PERIODIC,
-        recovery_poll, ctx.generation);
+    status = schedule_recovery_poll();
     if (status == FWK_SUCCESS)
         status = ctx.sys_power_api->notify_warm_reset();
     if (status != FWK_SUCCESS) {
         ctx.recovery_pending = false;
-        ctx.alarm_api->stop(ctx.config->rse_recovery_alarm_id);
+        stop_recovery_alarm();
         return status;
     }
     FWK_LOG_INFO(MOD_NAME "Waiting asynchronously for RSE BL2 reload (%u us)",

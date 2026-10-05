@@ -44,6 +44,9 @@ struct mod_si0_platform_config system_config = {
         SI0_CFGD_WATCHDOG_REARM_ALARM_IDX),
     /* QVP SI quantum is 10 ms; bound propagation settling, not safety FTTI. */
     .watchdog_rearm_timeout_us = 100 * 1000,
+    .control_alarm_id = FWK_ID_SUB_ELEMENT_INIT(
+        FWK_MODULE_IDX_TIMER, SI0_SI0_TIMER_ALARM_ELEMENT_IDX,
+        SI0_CFGD_VMCU_CONTROL_ALARM_IDX),
     .transport_id = FWK_ID_ELEMENT_INIT(
         FWK_MODULE_IDX_TRANSPORT,
         SI0_CFGD_MOD_TRANSPORT_EIDX_RSE_WARM_SYNC),

@@ -9,6 +9,8 @@
  */
 
 #include "si0_cfgd_timer.h"
+#include "si0_cfgd_scmi.h"
+#include <mod_si0_platform.h>
 
 #include <internal/scmi_system_power.h>
 
@@ -42,6 +44,19 @@ int scmi_sys_power_state_set_policy(
     fwk_id_t service_id,
     bool graceful)
 {
+    /* An explicitly armed vMCU shutdown retains SYSTOP and SI/RSE. Only the
+     * secure PSCI service may complete that handshake after Linux shutdown. */
+    if (*state == SCMI_SYSTEM_STATE_SHUTDOWN &&
+        fwk_id_is_equal(service_id,
+            FWK_ID_ELEMENT(FWK_MODULE_IDX_SCMI, SI0_CFGD_MOD_SCMI_EIDX_PSCI))) {
+        int status = si0_vmcu_accept_shutdown();
+        if (status == FWK_SUCCESS) {
+            *policy_status = MOD_SCMI_SYS_POWER_HANDLED;
+            return FWK_SUCCESS;
+        }
+        if (status != FWK_E_STATE)
+            return status;
+    }
     if (graceful && (*state != SCMI_SYSTEM_STATE_WARM_RESET)) {
         *policy_status = MOD_SCMI_SYS_POWER_SKIP_MESSAGE_HANDLER;
     } else {
