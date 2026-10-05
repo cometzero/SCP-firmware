@@ -97,3 +97,8 @@ endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/../apollo_fvp_variant.cmake)
 apollo_fvp_apply_platform_variant(apollo-qvp-si0-bl2)
+
+if(SCP_APOLLO_QVP_VMCU_SAFETY)
+    target_sources(apollo-qvp-si0-bl2 PRIVATE config_vmcu_safety.c)
+    target_compile_definitions(apollo-qvp-si0-bl2 PUBLIC SCP_APOLLO_QVP_VMCU_SAFETY)
+endif()

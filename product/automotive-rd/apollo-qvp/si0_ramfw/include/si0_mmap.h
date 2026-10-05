@@ -38,6 +38,9 @@
 #define SI0_PERIPHERAL_BASE  0x2A000000
 #define SI0_PERIPHERAL_SIZE  (16 * FWK_MIB)
 #define SI0_UART_BASE        0x2A400000
+/* QVP board extensions, not Zena CSS architectural peripherals. */
+#define SI0_VMCU_UART_BASE   0x2A820000
+#define SI0_VMCU_GPIO_BASE   0x2A830000
 #define SI0_SSU_BASE         0x2A500000
 #define SI0_FMU0_BASE        0x2A510000
 #define SI0_FMU1_BASE        0x2A520000

@@ -35,6 +35,18 @@ static const struct fwk_element pl011_table[] = {
                 .pd_id = FWK_ID_NONE_INIT,
             },
     },
+#ifdef SCP_APOLLO_QVP_VMCU_SAFETY
+    {
+        .name = "vmcu_safety_uart",
+        .data = &(struct mod_pl011_element_cfg) {
+            .reg_base = SI0_VMCU_UART_BASE,
+            .baud_rate_bps = 115200,
+            .clock_rate_hz = 24 * FWK_MHZ,
+            .clock_id = FWK_ID_NONE_INIT,
+            .pd_id = FWK_ID_NONE_INIT,
+        },
+    },
+#endif
     { 0 },
 };
 
