@@ -42,6 +42,9 @@ struct pfdi_monitor_core_context {
     const struct mod_pfdi_monitor_core_config *core_cfg;
     unsigned int generation;
     bool powered_off;
+    bool online_seen;
+    uint32_t last_status;
+    uint32_t faults;
 };
 
 struct pfdi_monitor_event_params {
@@ -72,13 +75,13 @@ static int pfdi_monitor_oor_status(fwk_id_t id, uint32_t status)
         .target_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_PFDI_MONITOR, element_idx),
         .id = FWK_ID_EVENT_INIT(
             FWK_MODULE_IDX_PFDI_MONITOR, PFDI_MONITOR_EVENT_IDX_OOR_STATUS),
-        .params = { status },
     };
 
     if (element_idx >= ctx.core_count) {
         return FWK_E_PARAM;
     }
 
+    ((struct pfdi_monitor_event_params *)event.params)->status = status;
     ((struct pfdi_monitor_event_params *)event.params)->generation =
         ctx.core_ctx_table[element_idx].generation;
     ret = fwk_put_event(&event);
@@ -106,13 +109,13 @@ static int pfdi_monitor_onl_status(fwk_id_t id, uint32_t status)
         .target_id = FWK_ID_ELEMENT(FWK_MODULE_IDX_PFDI_MONITOR, element_idx),
         .id = FWK_ID_EVENT_INIT(
             FWK_MODULE_IDX_PFDI_MONITOR, PFDI_MONITOR_EVENT_IDX_ONL_STATUS),
-        .params = { status },
     };
 
     if (element_idx >= ctx.core_count) {
         return FWK_E_PARAM;
     }
 
+    ((struct pfdi_monitor_event_params *)event.params)->status = status;
     ((struct pfdi_monitor_event_params *)event.params)->generation =
         ctx.core_ctx_table[element_idx].generation;
     ret = fwk_put_event(&event);
@@ -310,6 +313,9 @@ static int pfdi_monitor_prepare_restart(fwk_id_t power_domain_id)
         if (status != FWK_SUCCESS && status != FWK_E_STATE)
             return status;
         core->generation++;
+        core->online_seen = false;
+        core->faults = 0;
+        core->last_status = 0;
         core->core_state = PFDI_MONITOR_STATE_WAIT_FOR_OOR;
         return FWK_SUCCESS;
     }
@@ -318,6 +324,30 @@ static int pfdi_monitor_prepare_restart(fwk_id_t power_domain_id)
 
 static const struct mod_pfdi_monitor_restart_api restart_api = {
     .prepare = pfdi_monitor_prepare_restart,
+};
+
+static int pfdi_monitor_get_status(
+    fwk_id_t core_id, struct mod_pfdi_monitor_status *status)
+{
+    unsigned int index = fwk_id_get_element_idx(core_id);
+    const struct pfdi_monitor_core_context *core;
+
+    if (status == NULL || index >= ctx.core_count)
+        return FWK_E_PARAM;
+    core = &ctx.core_ctx_table[index];
+    *status = (struct mod_pfdi_monitor_status) {
+        .generation = core->generation,
+        .last_status = core->last_status,
+        .faults = core->faults,
+        .online = !core->powered_off && core->online_seen &&
+            core->core_state == PFDI_MONITOR_STATE_WAIT_FOR_ONL,
+        .powered_off = core->powered_off,
+    };
+    return FWK_SUCCESS;
+}
+
+static const struct mod_pfdi_monitor_status_api status_api = {
+    .get = pfdi_monitor_get_status,
 };
 
 static int pfdi_monitor_process_bind_request(
@@ -336,6 +366,9 @@ static int pfdi_monitor_process_bind_request(
     api_idx = (enum mod_pfdi_monitor_api_idx)fwk_id_get_api_idx(api_id);
 
     switch (api_idx) {
+    case MOD_PFDI_MONITOR_API_IDX_STATUS:
+        *api = &status_api;
+        return FWK_SUCCESS;
     case MOD_PFDI_MONITOR_API_IDX_RESTART:
         if (!fwk_id_is_equal(source_id, FWK_ID_MODULE(FWK_MODULE_IDX_SI0_PLATFORM)))
             return FWK_E_ACCESS;
@@ -384,6 +417,7 @@ static int pfdi_monitor_process_event(
 
         /* Check if the core is in a wrong state */
         if (core_ctx->core_state != PFDI_MONITOR_STATE_WAIT_FOR_OOR) {
+            core_ctx->faults |= MOD_PFDI_FAULT_PROTOCOL;
             FWK_LOG_ERR(
                 MOD_NAME
                 "Received OoR PFDI status for %s after Onl PFDI status",
@@ -403,7 +437,10 @@ static int pfdi_monitor_process_event(
         }
 
         /* Check if the OoR PFDI succeeded */
-        if (event->params[0] != 0) {
+        core_ctx->last_status =
+            ((const struct pfdi_monitor_event_params *)event->params)->status;
+        if (core_ctx->last_status != 0) {
+            core_ctx->faults |= MOD_PFDI_FAULT_OOR;
             FWK_LOG_ERR(
                 MOD_NAME "OoR PFDI for %s failed, stopping PFDI monitoring",
                 fwk_module_get_element_name(event->target_id));
@@ -440,6 +477,7 @@ static int pfdi_monitor_process_event(
 
         /* Check if the core is in a wrong state */
         if (core_ctx->core_state == PFDI_MONITOR_STATE_WAIT_FOR_OOR) {
+            core_ctx->faults |= MOD_PFDI_FAULT_PROTOCOL;
             FWK_LOG_ERR(
                 MOD_NAME
                 "Received Onl PFDI status for %s before OoR PFDI status",
@@ -459,7 +497,10 @@ static int pfdi_monitor_process_event(
         }
 
         /* Check if the Onl PFDI succeeded */
-        if (event->params[0] != 0) {
+        core_ctx->last_status =
+            ((const struct pfdi_monitor_event_params *)event->params)->status;
+        if (core_ctx->last_status != 0) {
+            core_ctx->faults |= MOD_PFDI_FAULT_ONLINE;
             FWK_LOG_ERR(
                 MOD_NAME "Onl PFDI for %s failed, stopping PFDI monitoring",
                 fwk_module_get_element_name(event->target_id));
@@ -484,6 +525,7 @@ static int pfdi_monitor_process_event(
 
         /* Change the state to wait for Onl PFDI */
         core_ctx->core_state = PFDI_MONITOR_STATE_WAIT_FOR_ONL;
+        core_ctx->online_seen = true;
 
         FWK_LOG_DEBUG(
             MOD_NAME "Onl PFDI for %s succeeded",
@@ -492,6 +534,7 @@ static int pfdi_monitor_process_event(
         return FWK_SUCCESS;
 
     case (unsigned int)PFDI_MONITOR_EVENT_IDX_TIMEOUT:
+        core_ctx->faults |= MOD_PFDI_FAULT_TIMEOUT;
         FWK_LOG_ERR(
             MOD_NAME "Error! PFDI monitor timeout for %s",
             fwk_module_get_element_name(event->target_id));
@@ -545,6 +588,7 @@ int pfdi_monitor_process_notificiation(
                 fwk_module_get_element_name(event->target_id));
             /* Stop the alarm */
             core_ctx->powered_off = true;
+            core_ctx->online_seen = false;
             status = core_ctx->alarm_api->stop(core_cfg->alarm_id);
             if ((status != FWK_SUCCESS) && (status != FWK_E_STATE)) {
                 FWK_LOG_ERR(
@@ -557,6 +601,7 @@ int pfdi_monitor_process_notificiation(
             break;
         case (unsigned int)MOD_PD_STATE_ON:
             core_ctx->powered_off = false;
+            core_ctx->online_seen = false;
             FWK_LOG_INFO(
                 MOD_NAME "%s has been turned on, switching on PFDI monitoring",
                 fwk_module_get_element_name(event->target_id));

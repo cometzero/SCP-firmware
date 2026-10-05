@@ -14,6 +14,7 @@
 #include <fwk_id.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*!
  * \brief API indices
@@ -21,7 +22,28 @@
 enum mod_pfdi_monitor_api_idx {
     MOD_PFDI_MONITOR_API_IDX_PFDI_MONITOR,
     MOD_PFDI_MONITOR_API_IDX_RESTART,
+    MOD_PFDI_MONITOR_API_IDX_STATUS,
     MOD_PFDI_MONITOR_API_IDX_COUNT
+};
+
+/* Read-only diagnostic state; failures remain latched until an explicit restart. */
+enum mod_pfdi_monitor_fault {
+    MOD_PFDI_FAULT_OOR = 1U << 0,
+    MOD_PFDI_FAULT_ONLINE = 1U << 1,
+    MOD_PFDI_FAULT_TIMEOUT = 1U << 2,
+    MOD_PFDI_FAULT_PROTOCOL = 1U << 3,
+};
+
+struct mod_pfdi_monitor_status {
+    uint32_t generation;
+    uint32_t last_status;
+    uint32_t faults;
+    bool online;
+    bool powered_off;
+};
+
+struct mod_pfdi_monitor_status_api {
+    int (*get)(fwk_id_t core_id, struct mod_pfdi_monitor_status *status);
 };
 
 /*! SI0-only firmware restart boundary; ordinary hotplug must not use it. */
