@@ -425,6 +425,11 @@ static int scmi_sys_power_state_set_handler(fwk_id_t service_id,
         goto exit;
     }
 
+    if (policy_status == MOD_SCMI_SYS_POWER_HANDLED) {
+        return_values.status = (int32_t)SCMI_SUCCESS;
+        goto exit;
+    }
+
     if (policy_status == MOD_SCMI_SYS_POWER_SKIP_MESSAGE_HANDLER) {
 #ifdef BUILD_HAS_SCMI_NOTIFICATIONS
         scmi_sys_power_state_notify(service_id, mod_scmi_system_state, false);

@@ -131,6 +131,8 @@ enum mod_scmi_sys_power_policy_status {
 
     /*! Execute the message handler */
     MOD_SCMI_SYS_POWER_EXECUTE_MESSAGE_HANDLER,
+    /*! Platform already handled a domain-local request; do not notify agents. */
+    MOD_SCMI_SYS_POWER_HANDLED,
 };
 
 /*!
