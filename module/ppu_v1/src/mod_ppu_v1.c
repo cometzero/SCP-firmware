@@ -18,6 +18,7 @@
 #endif
 
 #include <fwk_assert.h>
+#include <fwk_core.h>
 #include <fwk_event.h>
 #include <fwk_id.h>
 #include <fwk_interrupt.h>
@@ -39,6 +40,13 @@ struct ppu_v1_pd_ctx {
 
     /* PPU register sets */
     struct ppu_v1_regs ppu;
+
+    /* Bound the number of unprocessed dynamic observations to one per PPU. */
+    fwk_id_t id;
+    unsigned int observed_state;
+    unsigned int reported_state;
+    bool reported_state_valid;
+    bool report_pending;
 
     /* Identifier of the entity bound to the power domain driver API */
     fwk_id_t bound_id;
@@ -96,6 +104,63 @@ struct ppu_v1_ctx {
  */
 
 static struct ppu_v1_ctx ppu_v1_ctx;
+
+/* Command completions remain unconditional; cache only accepted reports. */
+static int report_power_state_now(
+    struct ppu_v1_pd_ctx *pd_ctx, unsigned int state)
+{
+    int status = pd_ctx->pd_driver_input_api->report_power_state_transition(
+        pd_ctx->bound_id, state);
+    if (status == FWK_SUCCESS) {
+        unsigned int flags = fwk_interrupt_global_disable();
+        pd_ctx->reported_state = state;
+        pd_ctx->reported_state_valid = true;
+        fwk_interrupt_global_enable(flags);
+    }
+    return status;
+}
+
+static int report_power_state(
+    struct ppu_v1_pd_ctx *pd_ctx, unsigned int state, bool defer)
+{
+    unsigned int flags = fwk_interrupt_global_disable();
+    pd_ctx->observed_state = state;
+    if (!defer || pd_ctx->report_pending) {
+        fwk_interrupt_global_enable(flags);
+        return defer ? FWK_SUCCESS : report_power_state_now(pd_ctx, state);
+    }
+    pd_ctx->report_pending = true;
+    fwk_interrupt_global_enable(flags);
+
+    struct fwk_event event = {
+        .id = FWK_ID_EVENT(FWK_MODULE_IDX_PPU_V1, 0),
+        .source_id = pd_ctx->id,
+        .target_id = pd_ctx->id,
+    };
+    int status = fwk_put_event(&event);
+    if (status != FWK_SUCCESS) {
+        flags = fwk_interrupt_global_disable();
+        pd_ctx->report_pending = false;
+        fwk_interrupt_global_enable(flags);
+    }
+    return status;
+}
+
+static int ppu_v1_process_event(
+    const struct fwk_event *event, struct fwk_event *response)
+{
+    struct ppu_v1_pd_ctx *pd_ctx =
+        &ppu_v1_ctx.pd_ctx_table[fwk_id_get_element_idx(event->target_id)];
+    unsigned int flags = fwk_interrupt_global_disable();
+    unsigned int state = pd_ctx->observed_state;
+    pd_ctx->report_pending = false;
+    bool unchanged = pd_ctx->reported_state_valid &&
+        pd_ctx->reported_state == state;
+    fwk_interrupt_global_enable(flags);
+
+    return unchanged ? FWK_SUCCESS : report_power_state_now(pd_ctx, state);
+}
+
 
 #define MODE_UNSUPPORTED        ~0U
 static const uint8_t ppu_mode_to_power_state[] = {
@@ -194,8 +259,7 @@ static int ppu_v1_pd_set_state(fwk_id_t pd_id, unsigned int state)
             get_state(&pd_ctx->ppu, &pd_mod_state);
         }
 
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, pd_mod_state);
+        status = report_power_state(pd_ctx, pd_mod_state, false);
         fwk_assert(status == FWK_SUCCESS);
         break;
 
@@ -208,8 +272,7 @@ static int ppu_v1_pd_set_state(fwk_id_t pd_id, unsigned int state)
             get_state(&pd_ctx->ppu, &pd_mod_state);
         }
 
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, pd_mod_state);
+        status = report_power_state(pd_ctx, pd_mod_state, false);
         fwk_assert(status == FWK_SUCCESS);
         break;
 
@@ -309,8 +372,7 @@ static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state)
         }
         ppu_v1_lock_off_disable(ppu);
         ppu_v1_off_unlock(ppu);
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, MOD_PD_STATE_OFF);
+        status = report_power_state(pd_ctx, MOD_PD_STATE_OFF, false);
         fwk_assert(status == FWK_SUCCESS);
         break;
 
@@ -326,8 +388,7 @@ static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state)
             return status;
         }
         ppu_v1_dynamic_enable(ppu, PPU_V1_MODE_OFF);
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, MOD_PD_STATE_ON);
+        status = report_power_state(pd_ctx, MOD_PD_STATE_ON, false);
         fwk_assert(status == FWK_SUCCESS);
         break;
 
@@ -384,8 +445,7 @@ static void suspend_poll_callback(uintptr_t param)
     if (status == FWK_SUCCESS && state == MOD_PD_STATE_OFF) {
         pd_ctx->suspend_polls_left = 0;
         FWK_LOG_INFO("[PPU TEST] Last AP core PWSR OFF observed");
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, MOD_PD_STATE_OFF);
+        status = report_power_state(pd_ctx, MOD_PD_STATE_OFF, false);
         if (status != FWK_SUCCESS)
             FWK_LOG_ERR("[PPU TEST] OFF report failed: %d", status);
         return;
@@ -450,8 +510,7 @@ static void core_pd_ppu_interrupt_handler(struct ppu_v1_pd_ctx *pd_ctx)
                                           PPU_V1_EDGE_SENSITIVITY_MASKED);
         ppu_v1_interrupt_unmask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
 
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, MOD_PD_STATE_ON);
+        status = report_power_state(pd_ctx, MOD_PD_STATE_ON, true);
         fwk_assert(status == FWK_SUCCESS);
         (void)status;
     /* Minimum policy reached interrupt */
@@ -459,8 +518,7 @@ static void core_pd_ppu_interrupt_handler(struct ppu_v1_pd_ctx *pd_ctx)
         ppu_v1_ack_interrupt(ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
         ppu_v1_interrupt_mask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
 
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, MOD_PD_STATE_SLEEP);
+        status = report_power_state(pd_ctx, MOD_PD_STATE_SLEEP, true);
         fwk_assert(status == FWK_SUCCESS);
         (void)status;
 
@@ -479,8 +537,8 @@ static void core_pd_ppu_interrupt_handler(struct ppu_v1_pd_ctx *pd_ctx)
          * Enable the core PACTIVE ON signal rising edge interrupt then check if
          * the PACTIVE ON signal is high. If it is high, we may have missed the
          * transition from low to high. In that case, just disable the interrupt
-         * and acknowledge it in case it is pending. There is no need to send an
-         * update request as one has already been queued.
+         * and acknowledge it in case it is pending. There is no need to send a
+         * separate event: replace the queued observation with the ON state.
          */
         ppu_v1_set_input_edge_sensitivity(ppu,
                                           PPU_V1_MODE_ON,
@@ -491,6 +549,9 @@ static void core_pd_ppu_interrupt_handler(struct ppu_v1_pd_ctx *pd_ctx)
                                               PPU_V1_EDGE_SENSITIVITY_MASKED);
             ppu_v1_ack_power_active_edge_interrupt(ppu, PPU_V1_MODE_ON);
             ppu_v1_interrupt_unmask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+            status = report_power_state(pd_ctx, MOD_PD_STATE_ON, true);
+            fwk_assert(status == FWK_SUCCESS);
+            (void)status;
         }
     }
 }
@@ -605,7 +666,7 @@ static bool cluster_off(struct ppu_v1_pd_ctx *pd_ctx)
     return true;
 }
 
-static int cluster_on(struct ppu_v1_pd_ctx *pd_ctx)
+static int cluster_on(struct ppu_v1_pd_ctx *pd_ctx, bool defer_report)
 {
     int status;
     struct ppu_v1_regs *ppu;
@@ -633,13 +694,18 @@ static int cluster_on(struct ppu_v1_pd_ctx *pd_ctx)
         }
     }
 
-    status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-        pd_ctx->bound_id, MOD_PD_STATE_ON);
+    status = report_power_state(pd_ctx, MOD_PD_STATE_ON, defer_report);
     fwk_assert(status == FWK_SUCCESS);
     (void)status;
 
     if (pd_ctx->observer_api != NULL) {
         pd_ctx->observer_api->post_ppu_on(pd_ctx->config->post_ppu_on_param);
+    }
+
+    if (!ppu_v1_ctx.is_cluster_ppu_dynamic_mode_configured) {
+        /* Arm idle detection for explicit ON requests as well as wake IRQs. */
+        ppu_v1_set_input_edge_sensitivity(ppu,
+            PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_FALLING_EDGE);
     }
 
     unlock_all_cores(pd_ctx);
@@ -688,7 +754,7 @@ static int ppu_v1_cluster_pd_set_state(fwk_id_t cluster_pd_id,
 
     switch (state) {
     case MOD_PD_STATE_ON:
-        return cluster_on(pd_ctx);
+        return cluster_on(pd_ctx, false);
 
     case MOD_PD_STATE_OFF:
         if (!cluster_off(pd_ctx)) {
@@ -696,8 +762,7 @@ static int ppu_v1_cluster_pd_set_state(fwk_id_t cluster_pd_id,
 
             return FWK_E_STATE;
         }
-        status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-            pd_ctx->bound_id, MOD_PD_STATE_OFF);
+        status = report_power_state(pd_ctx, MOD_PD_STATE_OFF, false);
         fwk_assert(status == FWK_SUCCESS);
         return status;
 
@@ -717,8 +782,7 @@ static void cluster_pd_ppu_dyn_policy_min_int_handler(
     ppu_v1_ack_interrupt(&pd_ctx->ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
     ppu_v1_interrupt_mask(&pd_ctx->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
 
-    status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-        pd_ctx->bound_id, MOD_PD_STATE_SLEEP);
+    status = report_power_state(pd_ctx, MOD_PD_STATE_SLEEP, true);
     fwk_assert(status == FWK_SUCCESS);
     (void)status;
     return;
@@ -742,12 +806,9 @@ static void cluster_pd_ppu_normal_mode_int_handler(struct ppu_v1_pd_ctx *pd_ctx)
     switch (current_mode) {
     case PPU_V1_MODE_OFF:
         /* Cluster has to be powered on */
-        status = cluster_on(pd_ctx);
+        status = cluster_on(pd_ctx, true);
         if (status != FWK_SUCCESS)
             return;
-        ppu_v1_set_input_edge_sensitivity(ppu,
-                                          PPU_V1_MODE_ON,
-                                          PPU_V1_EDGE_SENSITIVITY_FALLING_EDGE);
         return;
 
     case PPU_V1_MODE_ON:
@@ -766,10 +827,16 @@ static void cluster_pd_ppu_normal_mode_int_handler(struct ppu_v1_pd_ctx *pd_ctx)
             /* Cluster successfuly transitioned to off */
             ppu_v1_set_input_edge_sensitivity(ppu,
                 PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_RISING_EDGE);
-            status = pd_ctx->pd_driver_input_api->report_power_state_transition(
-                pd_ctx->bound_id, MOD_PD_STATE_SLEEP);
+            status = report_power_state(pd_ctx, MOD_PD_STATE_SLEEP, true);
             fwk_assert(status == FWK_SUCCESS);
             (void)status;
+            /* Wake may arrive while cluster_off() masks edge detection. */
+            if (ppu_v1_is_power_devactive_high(ppu, PPU_V1_MODE_ON)) {
+                ppu_v1_ack_power_active_edge_interrupt(ppu, PPU_V1_MODE_ON);
+                status = cluster_on(pd_ctx, true);
+                if (status != FWK_SUCCESS)
+                    return;
+            }
         } else {
             /* Cluster did not transition to off */
             ppu_v1_set_input_edge_sensitivity(ppu,
@@ -894,6 +961,7 @@ static int ppu_v1_pd_init(fwk_id_t pd_id, unsigned int unused, const void *data)
 
     pd_ctx = ppu_v1_ctx.pd_ctx_table + fwk_id_get_element_idx(pd_id);
     pd_ctx->config = config;
+    pd_ctx->id = pd_id;
     pd_ctx->ppu.ppu_reg = (struct ppu_v1_ppu_reg *)(config->ppu.reg_base);
 #ifdef BUILD_HAS_AE_EXTENSION
     pd_ctx->ppu.cluster_ae_reg =
@@ -1293,6 +1361,8 @@ static int ppu_v1_process_notification(
 const struct fwk_module module_ppu_v1 = {
     .type = FWK_MODULE_TYPE_DRIVER,
     .api_count = MOD_PPU_V1_API_IDX_COUNT,
+    .event_count = 1,
+    .process_event = ppu_v1_process_event,
     .init = ppu_v1_mod_init,
     .element_init = ppu_v1_pd_init,
     .post_init = ppu_v1_post_init,

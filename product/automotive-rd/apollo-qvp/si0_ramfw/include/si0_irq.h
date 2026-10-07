@@ -22,6 +22,10 @@ typedef enum IRQn {
     CL0_MHU3_CL12CL0_IRQ = 107,
     CL0_FMU_CRITICAL = 128,
     CL0_FMU_NON_CRITICAL = 129,
+    /* AP PPU expansion interrupt IDs; each cluster has four core PPUs. */
+    CL0_AP_CLUSTER0_PPU_IRQ = 260,
+    CL0_AP_CLUSTER0_CORE0_PPU_IRQ = 261,
+    CL0_AP_CLUSTER1_PPU_IRQ = 265,
     CL0_SMCF_SMD_MGI_IRQ_OUT = 288,
     CL0_SMCF_SMD_MGI_TRIG_OUT = 289,
     CL0_AP_NS_WDOG_WS1_IRQ = 321,

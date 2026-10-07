@@ -1,6 +1,6 @@
 /*
  * Arm SCP/MCP Software
- * Copyright (c) 2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2025-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -10,6 +10,7 @@
 
 #include "platform_core.h"
 #include "si0_cfgd_power_domain.h"
+#include "si0_irq.h"
 #include "si0_mmap.h"
 #include "si_scr_info.h"
 
@@ -229,7 +230,10 @@ static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
             pd_config->pd_type = MOD_PD_TYPE_CORE;
             pd_config->ppu.reg_base =
                 cluster_utility_core_ppu_base(cluster_idx, core_idx);
-            pd_config->ppu.irq = FWK_INTERRUPT_NONE;
+            pd_config->ppu.irq = CL0_AP_CLUSTER0_CORE0_PPU_IRQ +
+                cluster_idx * (CL0_AP_CLUSTER1_PPU_IRQ -
+                               CL0_AP_CLUSTER0_PPU_IRQ) +
+                core_idx;
             pd_config->cluster_id = FWK_ID_ELEMENT(
                 FWK_MODULE_IDX_PPU_V1, (core_count + cluster_idx));
             pd_config->observer_id = FWK_ID_NONE;
@@ -253,7 +257,8 @@ static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
         element->data = pd_config;
 
         pd_config->pd_type = MOD_PD_TYPE_CLUSTER;
-        pd_config->ppu.irq = FWK_INTERRUPT_NONE;
+        pd_config->ppu.irq = CL0_AP_CLUSTER0_PPU_IRQ +
+            cluster_idx * (CL0_AP_CLUSTER1_PPU_IRQ - CL0_AP_CLUSTER0_PPU_IRQ);
         pd_config->observer_id = FWK_ID_NONE;
         pd_config->observer_api = FWK_ID_NONE;
         pd_config->ppu.reg_base = cluster_utility_cluster_ppu_base(cluster_idx);
