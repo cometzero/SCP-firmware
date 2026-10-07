@@ -439,7 +439,9 @@ static int smcf_client_start(fwk_id_t id)
 #ifdef BUILD_HAS_NOTIFICATION
     /* Subscribe to PD transition notification */
     pd_transition_source_id = fwk_id_build_element_id(
-        fwk_module_id_power_domain, PD_STATIC_DEV_IDX_SYSTOP);
+        fwk_module_id_power_domain,
+        platform_get_core_count() + platform_get_cluster_count() +
+            PD_STATIC_DEV_IDX_SYSTOP);
     status = fwk_notification_subscribe(
         pd_transition_notification_id, pd_transition_source_id, id);
     if (status != FWK_SUCCESS) {

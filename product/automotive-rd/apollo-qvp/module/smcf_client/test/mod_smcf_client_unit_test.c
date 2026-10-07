@@ -1564,9 +1564,11 @@ void test_smcf_client_start_pd_transition_subscribe_fail(void)
     fwk_module_get_element_count_ExpectAnyArgsAndReturn(FWK_SUCCESS);
     fwk_module_get_element_count_ReturnThruPtr_mod_elem_count(&element_count);
 
-    /* Build PD source ID (exact value doesn't matter for this test) */
+    /* SYSTOP follows all 16 core and 4 cluster domains. */
     fwk_id_build_element_id_ExpectAndReturn(
-        fwk_module_id_power_domain, PD_STATIC_DEV_IDX_SYSTOP, FWK_ID_NONE);
+        fwk_module_id_power_domain,
+        20 + PD_STATIC_DEV_IDX_SYSTOP,
+        FWK_ID_NONE);
 
     /* Fail the PD subscription */
     fwk_notification_subscribe_ExpectAndReturn(
@@ -1604,7 +1606,9 @@ void test_smcf_client_start_mgi_subscribe_fail(void)
     ctx.mgi_count = 2;
 
     fwk_id_build_element_id_ExpectAndReturn(
-        fwk_module_id_power_domain, PD_STATIC_DEV_IDX_SYSTOP, FWK_ID_NONE);
+        fwk_module_id_power_domain,
+        20 + PD_STATIC_DEV_IDX_SYSTOP,
+        FWK_ID_NONE);
 
     /*
      * Subscribe sequence:
@@ -1654,7 +1658,9 @@ void test_smcf_client_start_success_subscribes_all(void)
     ctx.mgi_count = 2;
 
     fwk_id_build_element_id_ExpectAndReturn(
-        fwk_module_id_power_domain, PD_STATIC_DEV_IDX_SYSTOP, FWK_ID_NONE);
+        fwk_module_id_power_domain,
+        20 + PD_STATIC_DEV_IDX_SYSTOP,
+        FWK_ID_NONE);
 
     /* 1 PD + 2 MGIs */
     fwk_notification_subscribe_ExpectAndReturn(
