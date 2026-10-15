@@ -55,8 +55,8 @@ resetting replay protection. PMIC rail reads use `mod_pmic`; fault reads use
 are configuration values, not measured power-good or voltage. No fault bits are
 cleared and no rails are switched by these commands.
 
-AP recovery reuses the existing coordinated watchdog recovery path: core PPUs
-off, RSE authenticated BL2 reload/acknowledgement, AP PFDI generation reset,
+AP recovery reuses the existing coordinated watchdog recovery path: core and
+cluster PPUs explicitly off, RSE authenticated BL2 reload/acknowledgement, AP PFDI generation reset,
 AP context/mailbox reset, boot CPU release and watchdog IRQ rearm. COMPLETE
 means firmware handoff and IRQ rearm, not verified Linux/PFDI service recovery.
 The latter must be verified separately. The recovery transaction is bounded to
@@ -66,8 +66,10 @@ Orderly AP-only poweroff requires the MCU to arm SI CL0 before asking the AP
 management service to drain its UART response, sync filesystems and issue Linux
 kernel poweroff. Only the trusted PSCI SCMI shutdown channel completes an armed
 request. A platform-HANDLED response suppresses global RSE shutdown notification
-and avoids the ordinary whole-system power-off path. SI verifies every AP core
-PPU is OFF before reporting completion. Arm expires after 30 simulation seconds;
+and avoids the ordinary whole-system power-off path. SI verifies every AP core and cluster
+PPU is OFF before reporting completion. Core OFF requests include the cluster
+level so an autonomously sleeping cluster cannot retain a cached ON request and
+block the next composite ON. SYSTOP and the SI domains remain powered. Arm expires after 30 simulation seconds;
 AP off confirmation has a 10-second bound. A timeout remains a failure, never
 an inferred completion. Ordinary unarmed shutdown retains its existing behavior.
 
@@ -77,7 +79,7 @@ IST_DONE_N goes low only after verified AP core OFF. Inputs 3/4 are SOC_RESET_N
 and MCU_SOC_WAKE. A wake rising edge while AP_OFF starts coordinated recovery.
 Disabling periodic UART reports leaves PFDI and GPIO active.
 
-This is AP core power management with retained SYSTOP, SI, RSE and PMIC rails.
+This is AP core/cluster power management with retained SYSTOP, SI, RSE and PMIC rails.
 It does not implement SC7, PMIC rail power cycling or physical electrical timing.
 Raw SOC_RESET_N and coordinated AP recovery remain distinct operations.
 

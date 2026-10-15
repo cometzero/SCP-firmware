@@ -892,7 +892,10 @@ static int power_off_all_cores(void)
         status = mod_pd_restricted_api->set_state(
             FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, pd_idx),
             false,
-            MOD_PD_COMPOSITE_STATE(MOD_PD_LEVEL_0, 0, 0, 0, MOD_PD_STATE_OFF));
+            /* Commit cluster OFF as well: autonomous SLEEP leaves its
+             * requested ON state cached and can block the next CPU ON. */
+            MOD_PD_COMPOSITE_STATE(MOD_PD_LEVEL_1, 0, 0,
+                MOD_PD_STATE_OFF, MOD_PD_STATE_OFF));
 
         if (status != FWK_SUCCESS) {
             FWK_LOG_ERR(
@@ -908,17 +911,17 @@ static int power_off_all_cores(void)
 
 static int check_power_off_all_cores(void)
 {
-    unsigned int core_count;
+    unsigned int domain_count;
     unsigned int power_state;
     unsigned int pd_idx;
     int status = 0;
     struct mod_pd_restricted_api *mod_pd_restricted_api =
         si0_platform_ctx.mod_pd_restricted_api;
 
-    core_count = platform_get_core_count();
+    domain_count = platform_get_core_count() + platform_get_cluster_count();
 
-    /* Check if all the CPU power domain are powered down */
-    for (pd_idx = 0; pd_idx < core_count; pd_idx++) {
+    /* Require confirmed core and cluster OFF; retain SYSTOP and SI domains. */
+    for (pd_idx = 0; pd_idx < domain_count; pd_idx++) {
         status = mod_pd_restricted_api->get_state(
             FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, pd_idx), &power_state);
         if (status != FWK_SUCCESS) {

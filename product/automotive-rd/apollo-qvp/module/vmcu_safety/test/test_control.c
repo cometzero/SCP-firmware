@@ -4,7 +4,9 @@
 #include "../../si0_platform/src/mod_si0_platform.c"
 static uint64_t ticks;
 static unsigned int requests, reloads, irq_enables, completions;
-static bool cores_off, fail_state, retrigger_on_enable;
+static bool cores_off, clusters_off, fail_state, retrigger_on_enable;
+static uint32_t off_requests;
+static bool boot_parent_off;
 static struct fwk_event queued;
 static unsigned int alarm_starts;
 static uint64_t alarm_due;
@@ -54,9 +56,32 @@ static int alarm_start(fwk_id_t id, unsigned int us, enum mod_timer_alarm_type t
 }
 static int stop(fwk_id_t id) { (void)id; return 0; }
 static int set_state(fwk_id_t id, bool response, unsigned int state)
-{ (void)id; (void)response; (void)state; requests++; return fail_state ? FWK_E_DEVICE : 0; }
+{
+    unsigned int index = fwk_id_get_element_idx(id);
+    (void)response;
+    requests++;
+    if (fail_state) return FWK_E_DEVICE;
+    if (state == MOD_PD_COMPOSITE_STATE(MOD_PD_LEVEL_2,
+            MOD_PD_STATE_ON, MOD_PD_STATE_ON, MOD_PD_STATE_ON, MOD_PD_STATE_ON)) {
+        assert(index == 0 && clusters_off && (off_requests & 15) == 15);
+        boot_parent_off = true;
+    } else {
+        assert(index < platform_get_core_count());
+        assert(state == MOD_PD_COMPOSITE_STATE(MOD_PD_LEVEL_1,
+            0, 0, MOD_PD_STATE_OFF, MOD_PD_STATE_OFF));
+        off_requests |= 1U << index;
+    }
+    return 0;
+}
 static int get_state(fwk_id_t id, unsigned int *state)
-{ (void)id; *state = cores_off ? MOD_PD_STATE_OFF : MOD_PD_STATE_ON; return 0; }
+{
+    unsigned int index = fwk_id_get_element_idx(id);
+    assert(index < platform_get_core_count() + platform_get_cluster_count());
+    *state = index < platform_get_core_count() ?
+        (cores_off ? MOD_PD_STATE_OFF : MOD_PD_STATE_ON) :
+        (clusters_off ? MOD_PD_STATE_OFF : MOD_PD_STATE_SLEEP);
+    return 0;
+}
 static const struct mod_timer_api timer = { .get_counter = counter, .time_to_timestamp = duration };
 static const struct mod_timer_alarm_api alarms = { .start = alarm_start, .stop = stop };
 static struct mod_pd_restricted_api pd = { .get_state = get_state, .set_state = set_state };
@@ -85,6 +110,9 @@ int main(void)
     assert(ap_power_state == SI0_AP_QUIESCING);
     assert(control_poll(control.generation) == 0 && ap_power_state == SI0_AP_QUIESCING);
     cores_off = true;
+    assert(control_poll(control.generation) == 0 && ap_power_state == SI0_AP_QUIESCING);
+    assert(reloads == 0 && control.active); /* Autonomous cluster SLEEP is not OFF. */
+    clusters_off = true;
     assert(control_poll(control.generation) == 0 && ap_power_state == SI0_AP_OFF);
     assert(!control.active && recovery_state == SI0_RECOVERY_OFF);
     assert(wake_ap() == 0 && recovery_state == SI0_RECOVERY_PENDING);
@@ -93,6 +121,8 @@ int main(void)
     assert(control_start(30000000) == 0);
     assert(control_poll(control.generation) == 0 && reloads == 1);
     assert(recovery_state == SI0_RECOVERY_RELOAD);
+    boot_primary_core();
+    assert(boot_parent_off); /* Composite ON follows explicitly requested cluster OFF. */
     ticks = control.deadline;
     assert(control_poll(control.generation) == 0);
     assert(ap_power_state == SI0_AP_FAILED && recovery_state == SI0_RECOVERY_FAILED);
@@ -162,6 +192,6 @@ int main(void)
     assert(si0_platform_process_event(&queued, NULL) == 0);
     assert(ap_power_state == SI0_AP_FAILED && !control.active && cores_off);
     assert(alarm_starts == before);
-    puts("SI control PASS: caller gate, arm/cancel, verified AP OFF, wake/recovery, bounded failure, late completion/rearm rejection");
+    puts("SI control PASS: caller gate, arm/cancel, verified core+cluster OFF, composite ON, wake/recovery, bounded failure, late completion/rearm rejection");
     return 0;
 }
