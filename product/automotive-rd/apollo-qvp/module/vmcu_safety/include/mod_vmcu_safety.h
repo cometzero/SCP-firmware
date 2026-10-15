@@ -10,5 +10,7 @@ struct mod_vmcu_safety_config {
     unsigned int first_ap;
     unsigned int ap_count;
     uintptr_t gpio_base;
+    uintptr_t spi_base;
+    unsigned int spi_irq;
 };
 #endif

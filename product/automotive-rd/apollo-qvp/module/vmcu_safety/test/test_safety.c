@@ -4,6 +4,7 @@
 #include "../src/mod_vmcu_safety.c"
 static struct mod_pfdi_monitor_status cores[16];
 static uint32_t gpio[0x500 / 4];
+static uint32_t spi[0x2c / 4];
 static uint64_t ticks;
 static unsigned int alarm_starts, poll_events;
 static uint64_t alarm_due;
@@ -158,6 +159,53 @@ int main(void)
     assert(alarm_starts == before + 1 && alarm_due == 30010 && !event_pending);
     for (i = 0; i < 100; i++) enqueue(bytes);
     assert(tx_used <= TX_SIZE); /* Busy UART remains bounded. */
+    /* SPI keeps its queue head until the exact firmware ACK, not bus completion. */
+    config.spi_base = (uintptr_t)spi;
+    spi_enabled = true; tx_head = TX_SIZE - 10; tx_used = 0;
+    send_health();
+    spi_publish(); assert(!spi_pending && !spi_request && !spi[0x24 / 4]);
+    spi_synced = true;
+    spi[8 / 4] = 4; spi_publish(); assert(!spi_pending && !spi[0x24 / 4]);
+    spi[8 / 4] = 0; spi_publish();
+    assert(spi_pending && tx_used == 28 && gpio[0x080 / 4] == 32);
+    assert(spi[0x24 / 4] == FRAME_SIZE);
+    bool level = spi_request;
+    send_health(); spi_publish();
+    assert(tx_used == 56 && spi_request == level);
+    frame(bytes, 8, 0, sequence - 1, 7, 0); bytes[6] = 2;
+    bytes[8] ^= 1; spi_control(bytes);
+    assert(tx_used == 56 && spi_pending); /* Stale epoch. */
+    bytes[8] ^= 1; write32(bytes + 16, 6); spi_control(bytes);
+    assert(tx_used == 56); /* Reply cannot acknowledge health with same sequence. */
+    write32(bytes + 16, 7); spi_control(bytes);
+    assert(tx_used == 28 && !spi_pending && spi_acks == 1);
+    spi_control(bytes); assert(tx_used == 28 && spi_acks == 1);
+    spi_publish(); assert(spi_pending && spi_request != level);
+    spi_control(bytes); assert(tx_used == 28 && spi_acks == 1);
+    uint32_t cursor = last_transaction;
+    frame(bytes, 9, 0, 0, 0, 0); bytes[6] = 2; write32(bytes + 8, 0);
+    spi_control(bytes);
+    assert(!spi_pending && tx_used == 28 && spi[4 / 4] == 3);
+    assert(last_transaction == cursor && have_command);
+    spi_publish(); assert(spi_pending && tx_used == 28);
+    frame(bytes, 8, 0, sequence, 7, 0); bytes[6] = 2;
+    write32(bytes + 24, crc32(bytes, 24));
+    rx_used = 0;
+    for (i = 0; i < FRAME_SIZE; i++) receive(bytes[i]);
+    assert(!spi_pending && !tx_used && spi_acks == 2);
+    frame(bytes, 9, 0, 0, 0, 0); bytes[6] = 2; write32(bytes + 8, 0);
+    reporting = false;
+    for (i = 0; i < 4; i++) {
+        spi_control(bytes); spi_publish();
+        assert(!tx_used && !spi_pending); /* Recovery cannot bypass report-off. */
+    }
+    reporting = true;
+    spi_control(bytes); assert(tx_used == 28); /* Empty SYNC returns current health. */
+    spi_publish();
+    unsigned int queued = tx_used;
+    for (i = 0; i < 100; i++) enqueue(bytes);
+    assert(tx_used <= TX_SIZE && spi_pending && queued == 28);
+    puts("SI SPI PASS: CS gating, preload/toggle, bounded pending queue, exact ACK, duplicate/stale ACK, SYNC replay/cursor, wrapped queue");
     puts("SI safety PASS: wire CRC, PFDI masks, 5s cadence, immediate flag transitions/retry/report-off, RPC epoch/duplicate/stale, GPIO, RX resync, bounded TX");
     return 0;
 }

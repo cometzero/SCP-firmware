@@ -13,5 +13,7 @@ static const struct mod_vmcu_safety_config cfg = {
     .first_ap = SI0_CFGD_MOD_PFDI_MONITOR_EIDX_AP_CLUSTER_0_CORE_0,
     .ap_count = PC_CONFIGURED_CORES_COUNT,
     .gpio_base = SI0_VMCU_GPIO_BASE,
+    .spi_base = 0x2a840000, /* QVP extension, independent of AP reset. */
+    .spi_irq = 43,
 };
 const struct fwk_module_config config_vmcu_safety = { .data = &cfg };

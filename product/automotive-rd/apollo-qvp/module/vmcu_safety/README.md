@@ -93,3 +93,44 @@ Tests exercise PFDI state transitions, UART protocol, timer cadence, bounded
 queues, PMIC dispatch and control-policy state transitions with host fixtures.
 Signed-image boot, live PMIC traffic, AP recovery, shutdown/wake and CAN/SIL Kit
 paths require separate full-system runtime evidence.
+
+## SPI safety profile
+
+The QVP extension slave at `0x2a840000` (ID `0x53504931`) selects SPI when
+capability register `0x28` bit 0 is set by the configured endpoint. Otherwise
+this image uses the existing UART. An active SPI profile never falls back to
+UART on disconnect. The QBox platform must map this register bank in both
+profiles; this is not a hardware DW SSI or TC397 register interface.
+
+GPIO output 5 (`SOC_SPI_REQ`) toggles only after the next 28-byte frame is
+staged through DATA `0x14` and published with TX_COMMIT `0x24` = 28. The
+controller latches the published byte budget at CS BEGIN: a master command that
+begins during preload sees idle filler for that entire CS, leaving newly
+committed bytes for the next transaction. This is an explicit QVP controller
+contract, not a claim that a firmware delay synchronizes the two simulators.
+The first publish waits for a valid MCU SYNC,
+so boot cannot toggle once before SYNC and toggle back before GPIO is observed. One frame remains at the software queue head
+until ACK; later frames stay in the bounded 256-byte queue. Queue full is logged
+and health transitions retry without advancing their reported state. COMPLETE
+IRQ INTID 43 schedules bounded event-loop receive work after CS deassertion;
+the 10 ms poll also services completion. This preserves PFDI policy and AP reset
+independence. Empty MISO clocks during master ACK/command produce idle filler
+and the expected underrun flag is cleared; they are not application responses.
+
+Type 8 / sender 2 is an ACK: SI epoch, original sequence, original frame type
+in `progress`, zero flags and argument. Stale/nonmatching ACKs cannot release
+the queue. Type 9 / sender 2 is SYNC with all fields/flags zero. SYNC resets
+controller FIFOs and republishes the unacknowledged head, or a new health report
+when empty and reporting is enabled. Automatic SYNC cannot bypass report-off:
+the existing freshness deadline must still expire. Like the UART profile, a
+fresh MCU cannot discover the SI safety epoch while reports remain disabled;
+report off/on recovery is supported within the same MCU session. SYNC never
+clears command replay protection. The MCU must still
+query operation 7 before choosing a new command transaction after reboot.
+CRC and the existing v1 28-byte envelope apply to both new types. The receiver
+must wait for the new request toggle after SYNC before clocking its read.
+
+Native SPI checks cover CS gating, FIFO preload intent, GPIO toggles, wrapped
+queue handling, ACK mismatch/duplicate rejection, and SYNC cursor preservation.
+The host register fixture does not prove FIFO side effects, interrupts, or boot;
+those require the paired QBox/TC397 guest validation.

@@ -8,6 +8,7 @@
 #include <mod_si0_platform.h>
 #include <fwk_core.h>
 #include <fwk_io.h>
+#include <fwk_interrupt.h>
 #include <fwk_log.h>
 #include <fwk_module.h>
 #include <fwk_module_idx.h>
@@ -38,6 +39,37 @@ static uint32_t epoch, sequence, last_transaction, frequency;
 static uint64_t next_report, next_gpio;
 static bool reporting = true, have_command, event_pending, have_report;
 static uint8_t previous_inputs, reported_flags;
+static bool spi_enabled, spi_pending, spi_request, spi_synced;
+static uint32_t spi_irqs, spi_acks;
+
+static uint32_t spi_read(unsigned int offset)
+{
+    return *(volatile uint32_t *)(cfg->spi_base + offset);
+}
+
+static void spi_write(unsigned int offset, uint32_t value)
+{
+    *(volatile uint32_t *)(cfg->spi_base + offset) = value;
+}
+
+static void spi_publish(void)
+{
+    unsigned int i;
+    uint32_t queued_sequence = 0;
+    if (!spi_synced || spi_pending || tx_used < FRAME_SIZE || (spi_read(8) & 4))
+        return;
+    for (i = 0; i < FRAME_SIZE; i++)
+        spi_write(0x14, tx[(tx_head + i) % TX_SIZE]);
+    /* Publication is atomic even if master CS begins during the DATA writes. */
+    spi_write(0x24, FRAME_SIZE);
+    for (i = 0; i < 4; i++)
+        queued_sequence |= (uint32_t)tx[(tx_head + 12 + i) % TX_SIZE] << (8 * i);
+    spi_pending = true;
+    spi_request = !spi_request;
+    *(volatile uint32_t *)(cfg->gpio_base + 0x080) = spi_request ? 32 : 0;
+    FWK_LOG_INFO("[VMCU_SPI] READY type=%u seq=%u req=%u",
+        tx[(tx_head + 3) % TX_SIZE], queued_sequence, spi_request);
+}
 
 static uint32_t read32(const uint8_t *p)
 {
@@ -80,8 +112,10 @@ static bool enqueue(const uint8_t *p)
 {
     unsigned int i;
     /* A slow/disconnected peer must never block the PFDI event loop. */
-    if (TX_SIZE - tx_used < FRAME_SIZE)
+    if (TX_SIZE - tx_used < FRAME_SIZE) {
+        FWK_LOG_ERR("[VMCU_SAFETY] TX queue full");
         return false;
+    }
     for (i = 0; i < FRAME_SIZE; i++) {
         tx[(tx_head + tx_used) % TX_SIZE] = p[i];
         tx_used++;
@@ -257,6 +291,37 @@ static void command(const uint8_t *p)
     enqueue(reply);
 }
 
+static void spi_control(const uint8_t *p)
+{
+    uint8_t head[FRAME_SIZE];
+    unsigned int i;
+    if (p[6] != 2 || p[7])
+        return;
+    if (p[3] == 9 && !read32(p + 8) && !read32(p + 12) &&
+        !read32(p + 16) && !read32(p + 20)) {
+        /* SYNC never clears command replay protection or the unacknowledged head. */
+        spi_write(4, 3);
+        spi_synced = true;
+        spi_pending = false;
+        if (!tx_used && reporting)
+            send_health();
+        FWK_LOG_INFO("[VMCU_SPI] SYNC epoch=%u queued=%u", epoch, tx_used);
+    } else if (p[3] == 8 && spi_pending && !read32(p + 20)) {
+        for (i = 0; i < FRAME_SIZE; i++)
+            head[i] = tx[(tx_head + i) % TX_SIZE];
+        if (read32(p + 8) != read32(head + 8) ||
+            read32(p + 12) != read32(head + 12) ||
+            read32(p + 16) != head[3])
+            return;
+        tx_head = (tx_head + FRAME_SIZE) % TX_SIZE;
+        tx_used -= FRAME_SIZE;
+        spi_pending = false;
+        spi_acks++;
+        FWK_LOG_INFO("[VMCU_SPI] ACK seq=%u count=%u irq=%u",
+            read32(p + 12), spi_acks, spi_irqs);
+    }
+}
+
 static void receive(uint8_t byte)
 {
     rx[rx_used++] = byte;
@@ -269,7 +334,10 @@ static void receive(uint8_t byte)
     if (rx_used != FRAME_SIZE)
         return;
     if (read32(rx + 24) == crc32(rx, 24)) {
-        command(rx);
+        if (spi_enabled && (rx[3] == 8 || rx[3] == 9))
+            spi_control(rx);
+        else
+            command(rx);
         rx_used = 0;
     } else {
         memmove(rx, rx + 1, --rx_used);
@@ -290,6 +358,13 @@ static void poll_callback(uintptr_t unused)
         FWK_LOG_ERR("[VMCU_SAFETY] Poll enqueue failed; safety link will time out");
 }
 
+static void spi_isr(void)
+{
+    spi_write(0x1c, 0);
+    spi_irqs++;
+    poll_callback(0);
+}
+
 static int process_event(const struct fwk_event *event,
     struct fwk_event *response_event)
 {
@@ -301,10 +376,21 @@ static int process_event(const struct fwk_event *event,
     (void)event;
     (void)response_event;
     event_pending = false;
-    for (i = 0; i < 64; i++) {
-        if (fwk_io_getch(&uart, &ch) != FWK_SUCCESS)
-            break;
-        receive((uint8_t)ch);
+    if (spi_enabled) {
+        /* A partial CS frame cannot trigger SYNC/reset or publish new MISO. */
+        if (spi_read(0x18) & 8) {
+            spi_write(0x18, 8);
+            for (i = 0; i < 64 && spi_read(0x10); i++)
+                receive((uint8_t)spi_read(0x14));
+            spi_write(0x20, 1); /* Empty MISO during ACK/command is idle filler. */
+        }
+        spi_write(0x1c, 8);
+    } else {
+        for (i = 0; i < 64; i++) {
+            if (fwk_io_getch(&uart, &ch) != FWK_SUCCESS)
+                break;
+            receive((uint8_t)ch);
+        }
     }
     if (timer_api->get_counter(cfg->timer_id, &now) != FWK_SUCCESS)
         return FWK_E_DEVICE;
@@ -336,7 +422,9 @@ static int process_event(const struct fwk_event *event,
         next_report = now + (uint64_t)frequency * REPORT_MS / 1000;
     if (reporting && (periodic || !have_report || flags != reported_flags))
         send_health();
-    for (i = 0; i < 64 && tx_used; i++) {
+    if (spi_enabled)
+        spi_publish();
+    for (i = 0; !spi_enabled && i < 64 && tx_used; i++) {
         if (uart.adapter->putch(&uart, (char)tx[tx_head]) != FWK_SUCCESS)
             break;
         tx_head = (tx_head + 1) % TX_SIZE;
@@ -386,10 +474,23 @@ static int start(fwk_id_t id)
     uint64_t now;
     int status;
     (void)id;
-    status = fwk_io_open(&uart, cfg->uart_id,
-        FWK_IO_MODE_READ | FWK_IO_MODE_WRITE | FWK_IO_MODE_BINARY);
-    if (status != FWK_SUCCESS)
-        return status;
+    spi_enabled = cfg->spi_base && spi_read(0) == 0x53504931 &&
+        (spi_read(0x28) & 1);
+    if (spi_enabled) {
+        spi_write(4, 3);
+        status = fwk_interrupt_set_isr(cfg->spi_irq, spi_isr);
+        if (status != FWK_SUCCESS)
+            return status;
+        status = fwk_interrupt_enable(cfg->spi_irq);
+        if (status != FWK_SUCCESS)
+            return status;
+        spi_write(0x1c, 8);
+    } else {
+        status = fwk_io_open(&uart, cfg->uart_id,
+            FWK_IO_MODE_READ | FWK_IO_MODE_WRITE | FWK_IO_MODE_BINARY);
+        if (status != FWK_SUCCESS)
+            return status;
+    }
     status = timer_api->get_frequency(cfg->timer_id, &frequency);
     if (status != FWK_SUCCESS || frequency < 2)
         return FWK_E_DEVICE;
@@ -401,10 +502,13 @@ static int start(fwk_id_t id)
         epoch = 1;
     /* Set output latch before directions: IST_DONE_N must stay inactive. */
     *(volatile uint32_t *)(cfg->gpio_base + 0x01c) = 4;
-    *(volatile uint32_t *)(cfg->gpio_base + 0x400) = 7;
+    if (spi_enabled)
+        *(volatile uint32_t *)(cfg->gpio_base + 0x080) = 0;
+    *(volatile uint32_t *)(cfg->gpio_base + 0x400) = spi_enabled ? 0x27 : 7;
     previous_inputs = gpio_read() & 0x18;
     next_report = now;
     next_gpio = now;
+    FWK_LOG_INFO("[VMCU_SAFETY] transport=%s", spi_enabled ? "spi" : "uart");
     FWK_LOG_INFO("[VMCU_SAFETY] INIT uart=0x2a820000 gpio=0x2a830000 "
         "period_ms=5000 source=PFDI epoch=%u", epoch);
     return alarm_api->start(cfg->alarm_id, POLL_US,
