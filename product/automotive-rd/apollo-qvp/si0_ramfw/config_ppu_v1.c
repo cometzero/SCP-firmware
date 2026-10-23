@@ -228,6 +228,7 @@ static const struct fwk_element *ppu_v1_get_element_table(fwk_id_t module_id)
             element->data = pd_config;
 
             pd_config->pd_type = MOD_PD_TYPE_CORE;
+            pd_config->graceful_core_off = true;
             pd_config->ppu.reg_base =
                 cluster_utility_core_ppu_base(cluster_idx, core_idx);
             pd_config->ppu.irq = CL0_AP_CLUSTER0_CORE0_PPU_IRQ +

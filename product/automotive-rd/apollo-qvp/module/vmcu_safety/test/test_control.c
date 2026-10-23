@@ -5,7 +5,8 @@
 static uint64_t ticks;
 static unsigned int requests, reloads, irq_enables, completions;
 static bool cores_off, clusters_off, fail_state, retrigger_on_enable;
-static uint32_t off_requests;
+static uint32_t off_requests, forced_off;
+static bool fail_force;
 static bool boot_parent_off;
 static struct fwk_event queued;
 static unsigned int alarm_starts;
@@ -55,6 +56,16 @@ static int alarm_start(fwk_id_t id, unsigned int us, enum mod_timer_alarm_type t
     alarm_starts++; alarm_due = ticks + us; return 0;
 }
 static int stop(fwk_id_t id) { (void)id; return 0; }
+static int force_off(fwk_id_t id)
+{
+    assert(fwk_id_get_module_idx(id) == FWK_MODULE_IDX_PPU_V1);
+    unsigned int index = fwk_id_get_element_idx(id);
+    assert(index < platform_get_core_count());
+    if (fail_force) return FWK_E_DEVICE;
+    assert(off_requests & (1U << index));
+    forced_off |= 1U << index;
+    return 0;
+}
 static int set_state(fwk_id_t id, bool response, unsigned int state)
 {
     unsigned int index = fwk_id_get_element_idx(id);
@@ -84,6 +95,7 @@ static int get_state(fwk_id_t id, unsigned int *state)
 }
 static const struct mod_timer_api timer = { .get_counter = counter, .time_to_timestamp = duration };
 static const struct mod_timer_alarm_api alarms = { .start = alarm_start, .stop = stop };
+static const struct mod_ppu_v1_recovery_api ppu = { .force_core_off = force_off };
 static struct mod_pd_restricted_api pd = { .get_state = get_state, .set_state = set_state };
 int main(void)
 {
@@ -92,6 +104,7 @@ int main(void)
     si0_platform_ctx.config = &config;
     si0_platform_ctx.rearm_timer_api = &timer;
     si0_platform_ctx.mod_pd_restricted_api = &pd;
+    si0_platform_ctx.ppu_recovery_api = &ppu;
     control.alarm = &alarms;
     assert(si0_platform_process_bind_request(FWK_ID_MODULE(FWK_MODULE_IDX_TIMER),
         FWK_ID_MODULE(FWK_MODULE_IDX_SI0_PLATFORM),
@@ -192,6 +205,14 @@ int main(void)
     assert(si0_platform_process_event(&queued, NULL) == 0);
     assert(ap_power_state == SI0_AP_FAILED && !control.active && cores_off);
     assert(alarm_starts == before);
-    puts("SI control PASS: caller gate, arm/cancel, verified core+cluster OFF, composite ON, wake/recovery, bounded failure, late completion/rearm rejection");
+    /* The queued policy does not hide a failed forced stop. */
+    ap_watchdog_recovery = false; ap_power_state = SI0_AP_RUN;
+    assert(power_arm(true) == 0);
+    fail_state = false; fail_force = true;
+    saved_requests = requests;
+    assert(si0_vmcu_accept_shutdown() == FWK_E_DEVICE);
+    assert(ap_power_state == SI0_AP_FAILED && !control.active);
+    assert(requests == saved_requests + 1);
+    puts("SI control PASS: policy-before-report and failed force, caller gate, arm/cancel, verified core+cluster OFF, composite ON, wake/recovery, bounded failure, late completion/rearm rejection");
     return 0;
 }

@@ -59,6 +59,7 @@ static const fwk_id_t sds_reset_syndrome_id = FWK_ID_ELEMENT_INIT(
 struct si0_platform_ctx {
     /* Pointer to the Interrupt Service Routine API of the PPU_V1 module */
     const struct ppu_v1_isr_api *ppu_v1_isr_api;
+    const struct mod_ppu_v1_recovery_api *ppu_recovery_api;
 
     /* Power domain module restricted API pointer */
     struct mod_pd_restricted_api *mod_pd_restricted_api;
@@ -719,6 +720,13 @@ static int si0_platform_bind(fwk_id_t id, unsigned int round)
     }
 
     status = fwk_module_bind(
+        FWK_ID_MODULE(FWK_MODULE_IDX_PPU_V1),
+        FWK_ID_API(FWK_MODULE_IDX_PPU_V1, MOD_PPU_V1_API_IDX_RECOVERY),
+        &si0_platform_ctx.ppu_recovery_api);
+    if (status != FWK_SUCCESS)
+        return status;
+
+    status = fwk_module_bind(
         FWK_ID_MODULE(FWK_MODULE_IDX_SDS),
         FWK_ID_API(FWK_MODULE_IDX_SDS, 0),
         &si0_platform_ctx.sds_api);
@@ -889,6 +897,7 @@ static int power_off_all_cores(void)
             fwk_module_get_element_name(
                 FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, pd_idx)));
 
+        /* Queue policy before completion; set_state does not stop the core. */
         status = mod_pd_restricted_api->set_state(
             FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, pd_idx),
             false,
@@ -903,6 +912,11 @@ static int power_off_all_cores(void)
                 fwk_module_get_element_name(
                     FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, pd_idx)));
         }
+        if (status != FWK_SUCCESS)
+            return status;
+
+        status = si0_platform_ctx.ppu_recovery_api->force_core_off(
+            FWK_ID_ELEMENT(FWK_MODULE_IDX_PPU_V1, pd_idx));
         if (status != FWK_SUCCESS)
             return status;
     }

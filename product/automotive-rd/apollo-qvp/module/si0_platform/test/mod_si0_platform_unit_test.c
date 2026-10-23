@@ -48,6 +48,12 @@ static int mock_sds_struct_write(
 
 void setUp(void)
 {
+    Mockfwk_id_Init();
+    Mockfwk_module_Init();
+    Mockfwk_notification_Init();
+    Mockfwk_interrupt_Init();
+    Mockfwk_core_internal_Init();
+    Mocksi0_platform_Init();
     mock_sds_struct_write_status = FWK_SUCCESS;
     mock_sds_struct_write_structure_id = 0U;
     mock_sds_struct_write_offset = 0U;
@@ -84,6 +90,7 @@ int notify_rse_and_wait_for_response(bool platform_origin)
 }
 
 int start_rse_recovery(void) { return FWK_SUCCESS; }
+void poll_rse_recovery(unsigned int generation) { (void)generation; }
 int complete_rse_recovery(const struct fwk_event *event) { return FWK_E_TIMEOUT; }
 
 void test_failed_rse_recovery_does_not_boot_or_rearm(void)
@@ -480,6 +487,11 @@ static void setup_rearm_poll(void)
     si0_platform_ctx.rearm_timer_api = &timer;
     si0_platform_ctx.rearm_alarm_api = &alarm;
     rearm_ctx.pending = false;
+    control.active = true;
+    control.alarm_armed = false;
+    control.deadline = 1000000;
+    recovery_state = SI0_RECOVERY_BOOT;
+    ap_power_state = SI0_AP_WAKING;
     rearm_clock = rearm_alarms = rearm_events = 0;
     ap_watchdog_recovery = true;
 }
@@ -675,6 +687,73 @@ void test_context_reset_precedes_boot_and_failure_blocks_boot(void)
     ap_watchdog_recovery = false;
 }
 
+
+static unsigned int forced_cores;
+static unsigned int policy_updates;
+static bool force_failure, policy_failure;
+
+static int force_recovery_core_off(fwk_id_t id)
+{
+    fwk_id_t expected = FWK_ID_ELEMENT(FWK_MODULE_IDX_PPU_V1, forced_cores);
+    TEST_ASSERT_EQUAL_MEMORY(&expected, &id, sizeof(id));
+    TEST_ASSERT_EQUAL(policy_updates, forced_cores + 1);
+    forced_cores++;
+    return force_failure ? FWK_E_DEVICE : FWK_SUCCESS;
+}
+
+static int record_recovery_policy(fwk_id_t id, bool response, unsigned int state)
+{
+    fwk_id_t expected = FWK_ID_ELEMENT(FWK_MODULE_IDX_POWER_DOMAIN, policy_updates);
+    TEST_ASSERT_EQUAL_MEMORY(&expected, &id, sizeof(id));
+    TEST_ASSERT_FALSE(response);
+    TEST_ASSERT_EQUAL(policy_updates, forced_cores);
+    TEST_ASSERT_EQUAL(MOD_PD_COMPOSITE_STATE(MOD_PD_LEVEL_1, 0, 0,
+        MOD_PD_STATE_OFF, MOD_PD_STATE_OFF), state);
+    policy_updates++;
+    return policy_failure ? FWK_E_BUSY : FWK_SUCCESS;
+}
+
+static void recovery_apis(void)
+{
+    static const struct mod_ppu_v1_recovery_api ppu = {
+        .force_core_off = force_recovery_core_off,
+    };
+    static struct mod_pd_restricted_api pd = {
+        .set_state = record_recovery_policy,
+    };
+    forced_cores = policy_updates = 0;
+    force_failure = policy_failure = false;
+    si0_platform_ctx.ppu_recovery_api = &ppu;
+    si0_platform_ctx.mod_pd_restricted_api = &pd;
+    fwk_module_get_element_name_IgnoreAndReturn("cpu");
+}
+
+void test_recovery_queues_policy_before_forced_off_report(void)
+{
+    recovery_apis();
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, power_off_all_cores());
+    TEST_ASSERT_EQUAL(platform_get_core_count(), forced_cores);
+    TEST_ASSERT_EQUAL(forced_cores, policy_updates);
+}
+
+void test_failed_force_off_stops_recovery_after_queued_policy(void)
+{
+    recovery_apis();
+    force_failure = true;
+    TEST_ASSERT_EQUAL(FWK_E_DEVICE, power_off_all_cores());
+    TEST_ASSERT_EQUAL(1, forced_cores);
+    TEST_ASSERT_EQUAL(1, policy_updates);
+}
+
+void test_failed_policy_enqueue_does_not_force_core_off(void)
+{
+    recovery_apis();
+    policy_failure = true;
+    TEST_ASSERT_EQUAL(FWK_E_BUSY, power_off_all_cores());
+    TEST_ASSERT_EQUAL(0, forced_cores);
+    TEST_ASSERT_EQUAL(1, policy_updates);
+}
+
 int si0_platform_test_main(void)
 {
     UNITY_BEGIN();
@@ -698,6 +777,11 @@ int si0_platform_test_main(void)
     RUN_TEST(test_async_rearm_clear_failure_stays_masked);
     RUN_TEST(test_rearm_readback_error_and_mask_failure_are_reported);
     RUN_TEST(test_context_reset_precedes_boot_and_failure_blocks_boot);
+
+    RUN_TEST(test_recovery_queues_policy_before_forced_off_report);
+    RUN_TEST(test_failed_force_off_stops_recovery_after_queued_policy);
+
+    RUN_TEST(test_failed_policy_enqueue_does_not_force_core_off);
 
     return UNITY_END();
 }
