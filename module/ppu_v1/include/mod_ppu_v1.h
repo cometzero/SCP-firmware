@@ -44,6 +44,8 @@ enum mod_ppu_v1_api_idx {
     MOD_PPU_V1_API_IDX_ISR,
     /*! System boot API */
     MOD_PPU_V1_API_IDX_BOOT,
+    /*! Forced core shutdown for platform recovery */
+    MOD_PPU_V1_API_IDX_RECOVERY,
     /*! Number of exposed interfaces */
     MOD_PPU_V1_API_IDX_COUNT,
 };
@@ -168,6 +170,14 @@ struct mod_ppu_v1_pd_config {
     bool defer_power_on_until_start;
 
     /*!
+     * Complete a core OFF request after dynamic OFF reaches its minimum.
+     * This lets firmware publish its CPU_OFF state before entering WFI.
+     * Platform recovery must use force_core_off() to stop an unresponsive core.
+     * The default (false) retains synchronous static OFF.
+     */
+    bool graceful_core_off;
+
+    /*!
      * \brief Identifier of an entity wishing to be notified when the PPU
      *     transitions out of the OFF state.
      *
@@ -251,6 +261,19 @@ struct ppu_v1_boot_api {
      * \return One of the standard framework error codes.
      */
     int (*power_mode_on)(fwk_id_t pd_id);
+};
+
+/*!
+ * \brief Platform recovery API for a core bound to the power domain module.
+ */
+struct mod_ppu_v1_recovery_api {
+    /*!
+     * Cancel pending core transitions, request static OFF and report completion.
+     * The caller must also update the power domain module's requested policy.
+     * This bypasses graceful OFF and must only be used for forced recovery.
+     * Call from framework event context, never from an interrupt handler.
+     */
+    int (*force_core_off)(fwk_id_t pd_id);
 };
 
 /*!

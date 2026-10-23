@@ -33,8 +33,23 @@ static struct mod_timer_alarm_api alarm_api_driver = {
     .stop = stop_alarm_api,
 };
 
+static unsigned int event_index(fwk_id_t id, int call_count)
+{
+    (void)call_count;
+    return id.event.event_idx;
+}
+
 void setUp(void)
 {
+    Mockfwk_id_Init();
+    Mockfwk_mm_Init();
+    Mockfwk_module_Init();
+    Mockfwk_notification_Init();
+    Mockmod_ppu_v1_extra_Init();
+    Mockfwk_core_internal_Init();
+
+    memset(pd_table, 0, sizeof(pd_table));
+    fwk_id_get_event_idx_StubWithCallback(event_index);
     memset(&ppu_v1_ctx, 0, sizeof(ppu_v1_ctx));
     ppu_v1_ctx.pd_ctx_table_size = PD_COUNT;
 
@@ -52,6 +67,12 @@ void setUp(void)
 
 void tearDown(void)
 {
+    Mockfwk_id_Verify();
+    Mockfwk_mm_Verify();
+    Mockfwk_module_Verify();
+    Mockfwk_notification_Verify();
+    Mockmod_ppu_v1_extra_Verify();
+    Mockfwk_core_internal_Verify();
 }
 
 void test_ppu_v1_pd_init_error(void)
@@ -119,8 +140,6 @@ void test_ppu_v1_mod_init(void)
     ppu_v1_ctx.pd_ctx_table_size = 0;
     ppu_v1_ctx.max_num_cores_per_cluster = 0;
 
-    fwk_id_build_module_id_ExpectAnyArgsAndReturn(mod_id);
-
     status = ppu_v1_mod_init(mod_id, PD_COUNT, &ppu_v1_config_data_ut);
     TEST_ASSERT_EQUAL(status, FWK_SUCCESS);
     TEST_ASSERT_EQUAL(ppu_v1_ctx.pd_ctx_table_size, PD_COUNT);
@@ -136,10 +155,7 @@ void test_ppu_v1_core_pd_set_state_sleep(void)
     pd_ctx_temp = &ppu_v1_ctx.pd_ctx_table[0];
 
     fwk_id_get_element_idx_ExpectAnyArgsAndReturn(0);
-    ppu_v1_is_dynamic_enabled_ExpectAnyArgsAndReturn(false);
     ppu_v1_dynamic_enable_ExpectAnyArgs();
-    ppu_v1_set_input_edge_sensitivity_Expect(
-        &pd_ctx_temp->ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
     ppu_v1_lock_off_enable_ExpectAnyArgs();
     ppu_v1_interrupt_unmask_ExpectAnyArgs();
     ppu_v1_set_input_edge_sensitivity_Expect(
@@ -277,11 +293,14 @@ void test_suspend_poll_rearms_with_bounded_remaining_count(void)
 
 static unsigned int cluster_reports;
 static unsigned int captured_state;
+static unsigned int captured_states[8];
 
 static int capture_cluster_report(fwk_id_t id, unsigned int state)
 {
     (void)id;
     (void)state;
+    if (cluster_reports < FWK_ARRAY_SIZE(captured_states))
+        captured_states[cluster_reports] = state;
     cluster_reports++;
     captured_state = state;
     return FWK_SUCCESS;
@@ -370,7 +389,10 @@ static void check_core_transition_result(unsigned int state, int result)
     struct mod_pd_driver_input_api input = {
         .report_power_state_transition = capture_cluster_report,
     };
-    struct ppu_v1_pd_ctx pd = { .pd_driver_input_api = &input };
+    const struct mod_ppu_v1_pd_config config = { 0 };
+    struct ppu_v1_pd_ctx pd = {
+        .config = &config, .pd_driver_input_api = &input,
+    };
 
     ppu_v1_ctx.pd_ctx_table = &pd;
     cluster_reports = 0;
@@ -379,8 +401,10 @@ static void check_core_transition_result(unsigned int state, int result)
         ppu_v1_interrupt_unmask_Expect(&pd.ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
     ppu_v1_set_input_edge_sensitivity_Expect(&pd.ppu, PPU_V1_MODE_ON,
         PPU_V1_EDGE_SENSITIVITY_MASKED);
-    if (state == MOD_PD_STATE_OFF)
+    if (state == MOD_PD_STATE_OFF) {
         ppu_v1_interrupt_mask_Expect(&pd.ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+        ppu_v1_ack_interrupt_Expect(&pd.ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
+    }
     ppu_v1_set_power_mode_ExpectAndReturn(&pd.ppu,
         state == MOD_PD_STATE_ON ? PPU_V1_MODE_ON : PPU_V1_MODE_OFF,
         NULL, result);
@@ -593,9 +617,287 @@ void test_cluster_wake_while_edges_masked_restores_on(void)
     TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, captured_state);
 }
 
+
+static struct ppu_v1_pd_ctx *graceful_core(void)
+{
+    static const struct mod_ppu_v1_pd_config config = {
+        .pd_type = MOD_PD_TYPE_CORE,
+        .graceful_core_off = true,
+    };
+    static struct mod_pd_driver_input_api input = {
+        .report_power_state_transition = capture_cluster_report,
+    };
+    struct ppu_v1_pd_ctx *pd = &pd_table[0];
+
+    pd->id = FWK_ID_ELEMENT(FWK_MODULE_IDX_PPU_V1, 0);
+    pd->config = &config;
+    pd->pd_driver_input_api = &input;
+    pd->alarm_api = NULL;
+    cluster_reports = queued_reports = 0;
+    fwk_id_get_element_idx_IgnoreAndReturn(0);
+    __fwk_put_event_StubWithCallback(capture_queued_report);
+    return pd;
+}
+
+static void expect_off_mask(struct ppu_v1_pd_ctx *pd)
+{
+    ppu_v1_set_input_edge_sensitivity_Expect(
+        &pd->ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
+    ppu_v1_interrupt_mask_Expect(&pd->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    ppu_v1_ack_interrupt_Expect(&pd->ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
+}
+
+static void expect_static_off(struct ppu_v1_pd_ctx *pd)
+{
+    expect_off_mask(pd);
+    ppu_v1_set_power_mode_ExpectAndReturn(
+        &pd->ppu, PPU_V1_MODE_OFF, NULL, FWK_SUCCESS);
+    ppu_v1_lock_off_disable_Expect(&pd->ppu);
+    ppu_v1_off_unlock_Expect(&pd->ppu);
+}
+
+static void request_graceful_off(struct ppu_v1_pd_ctx *pd)
+{
+    expect_off_mask(pd);
+    ppu_v1_get_power_mode_ExpectAndReturn(&pd->ppu, PPU_V1_MODE_ON);
+    ppu_v1_lock_off_enable_Expect(&pd->ppu);
+    ppu_v1_dynamic_enable_Expect(&pd->ppu, PPU_V1_MODE_OFF);
+    ppu_v1_interrupt_unmask_Expect(&pd->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_OFF));
+    TEST_ASSERT_TRUE(pd->off_pending);
+}
+
+static void complete_off_irq(struct ppu_v1_pd_ctx *pd)
+{
+    ppu_v1_is_dyn_policy_min_interrupt_ExpectAndReturn(&pd->ppu, true);
+    ppu_v1_ack_interrupt_Expect(&pd->ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
+    ppu_v1_get_power_mode_ExpectAndReturn(&pd->ppu, PPU_V1_MODE_OFF);
+    ppu_v1_interrupt_mask_Expect(&pd->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    ppu_v1_set_power_mode_ExpectAndReturn(
+        &pd->ppu, PPU_V1_MODE_OFF, NULL, FWK_SUCCESS);
+    ppu_v1_lock_off_disable_Expect(&pd->ppu);
+    ppu_v1_off_unlock_Expect(&pd->ppu);
+    core_pd_ppu_interrupt_handler(pd);
+    TEST_ASSERT_TRUE(pd->off_pending);
+}
+
+static void expect_core_on(struct ppu_v1_pd_ctx *pd)
+{
+    ppu_v1_interrupt_unmask_Expect(&pd->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    ppu_v1_set_input_edge_sensitivity_Expect(
+        &pd->ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
+    ppu_v1_set_power_mode_ExpectAndReturn(
+        &pd->ppu, PPU_V1_MODE_ON, NULL, FWK_SUCCESS);
+    ppu_v1_dynamic_enable_Expect(&pd->ppu, PPU_V1_MODE_OFF);
+}
+
+void test_graceful_off_waits_for_wfi_and_rejects_stale_min_irq(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    request_graceful_off(pd);
+    TEST_ASSERT_EQUAL(0, cluster_reports);
+    TEST_ASSERT_EQUAL(0, queued_reports);
+
+    /* A previous idle interrupt cannot complete a still-powered core. */
+    ppu_v1_is_dyn_policy_min_interrupt_ExpectAndReturn(&pd->ppu, true);
+    ppu_v1_ack_interrupt_Expect(&pd->ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
+    ppu_v1_get_power_mode_ExpectAndReturn(&pd->ppu, PPU_V1_MODE_ON);
+    core_pd_ppu_interrupt_handler(pd);
+    TEST_ASSERT_EQUAL(0, cluster_reports);
+    TEST_ASSERT_EQUAL(0, queued_reports);
+
+    complete_off_irq(pd);
+    TEST_ASSERT_EQUAL(0, cluster_reports);
+    TEST_ASSERT_EQUAL(1, queued_reports);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, ppu_v1_process_event(&queued_report, NULL));
+    TEST_ASSERT_FALSE(pd->off_pending);
+    TEST_ASSERT_EQUAL(1, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_state);
+}
+
+void test_on_during_graceful_off_is_reported_after_off(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    request_graceful_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_ON));
+    TEST_ASSERT_TRUE(pd->on_pending);
+    complete_off_irq(pd);
+    /* Normal-queue ON must also wait while the IRQ completion is queued. */
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_ON));
+    TEST_ASSERT_EQUAL(0, cluster_reports);
+    expect_core_on(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, ppu_v1_process_event(&queued_report, NULL));
+    TEST_ASSERT_FALSE(pd->off_pending);
+    TEST_ASSERT_FALSE(pd->on_pending);
+    TEST_ASSERT_EQUAL(2, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_states[0]);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, captured_states[1]);
+}
+
+void test_repeated_off_cancels_deferred_on(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    request_graceful_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_ON));
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_OFF));
+    TEST_ASSERT_FALSE(pd->on_pending);
+    complete_off_irq(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, ppu_v1_process_event(&queued_report, NULL));
+    TEST_ASSERT_EQUAL(1, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_state);
+}
+
+void test_force_off_cancels_stale_completion_across_new_off(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    request_graceful_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_ON));
+    complete_off_irq(pd);
+    struct fwk_event old_completion = queued_report;
+
+    /* Recovery precedes the old ISR event, so it must invalidate that event. */
+    fwk_module_is_valid_element_id_ExpectAndReturn(pd->id, true);
+    fwk_id_get_module_idx_ExpectAndReturn(pd->id, FWK_MODULE_IDX_PPU_V1);
+    expect_static_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, recovery_api.force_core_off(pd->id));
+    TEST_ASSERT_FALSE(pd->off_pending);
+    TEST_ASSERT_FALSE(pd->on_pending);
+    TEST_ASSERT_EQUAL(1, cluster_reports);
+
+    request_graceful_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_ON));
+    complete_off_irq(pd);
+    struct fwk_event new_completion = queued_report;
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, ppu_v1_process_event(&old_completion, NULL));
+    TEST_ASSERT_TRUE(pd->off_pending);
+    TEST_ASSERT_TRUE(pd->on_pending);
+    TEST_ASSERT_EQUAL(1, cluster_reports);
+    expect_core_on(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, ppu_v1_process_event(&new_completion, NULL));
+    TEST_ASSERT_EQUAL(3, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_states[1]);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, captured_states[2]);
+}
+
+void test_core_reset_uses_static_off_without_waiting_for_wfi(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    expect_static_off(pd);
+    expect_core_on(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, ppu_v1_core_pd_reset(pd->id));
+    TEST_ASSERT_FALSE(pd->off_pending);
+    TEST_ASSERT_EQUAL(2, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_states[0]);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_ON, captured_states[1]);
+}
+
+static bool minimum_acknowledged;
+
+static void acknowledge_minimum(struct ppu_v1_regs *ppu, unsigned int mask,
+    int call_count)
+{
+    (void)ppu;
+    (void)call_count;
+    TEST_ASSERT_EQUAL(PPU_V1_ISR_DYN_POLICY_MIN_IRQ, mask);
+    minimum_acknowledged = true;
+}
+
+static enum ppu_v1_mode off_during_ack(struct ppu_v1_regs *ppu, int call_count)
+{
+    (void)ppu;
+    (void)call_count;
+    TEST_ASSERT_TRUE_MESSAGE(minimum_acknowledged,
+        "Sampling before ack can lose a WFI OFF interrupt");
+    return PPU_V1_MODE_OFF;
+}
+
+void test_wfi_during_minimum_ack_completes_without_another_irq(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    minimum_acknowledged = false;
+    ppu_v1_ack_interrupt_StubWithCallback(acknowledge_minimum);
+    ppu_v1_get_power_mode_StubWithCallback(off_during_ack);
+    ppu_v1_set_input_edge_sensitivity_Expect(
+        &pd->ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
+    ppu_v1_interrupt_mask_Expect(&pd->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    expect_static_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_OFF));
+    TEST_ASSERT_FALSE(pd->off_pending);
+    TEST_ASSERT_EQUAL(0, queued_reports);
+    TEST_ASSERT_EQUAL(1, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_state);
+}
+
+void test_graceful_off_lock_survives_cluster_wake_and_idle_alarm(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    struct ppu_v1_pd_ctx *cores[] = { pd };
+    struct ppu_v1_cluster_pd_ctx cluster = {
+        .core_count = 1, .core_pd_ctx_table = cores,
+    };
+    struct ppu_v1_pd_ctx cluster_pd = { .data = &cluster };
+    pd->off_pending = true;
+    unlock_all_cores(&cluster_pd);
+    deeper_locking_alarm_callback(0);
+    TEST_ASSERT_TRUE(pd->off_pending);
+}
+
+
+void test_graceful_off_report_failure_does_not_release_deferred_on(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    struct mod_pd_driver_input_api input = {
+        .report_power_state_transition = fail_first_report,
+    };
+    pd->pd_driver_input_api = &input;
+    request_graceful_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_ON));
+    complete_off_irq(pd);
+    TEST_ASSERT_EQUAL(FWK_E_BUSY, ppu_v1_process_event(&queued_report, NULL));
+    TEST_ASSERT_TRUE(pd->off_pending);
+    TEST_ASSERT_TRUE(pd->on_pending);
+    TEST_ASSERT_FALSE(pd->reported_state_valid);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_state);
+}
+
+void test_deferred_on_failure_does_not_report_on(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    request_graceful_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_ON));
+    complete_off_irq(pd);
+    ppu_v1_interrupt_unmask_Expect(&pd->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    ppu_v1_set_input_edge_sensitivity_Expect(
+        &pd->ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
+    ppu_v1_set_power_mode_ExpectAndReturn(
+        &pd->ppu, PPU_V1_MODE_ON, NULL, FWK_E_TIMEOUT);
+    TEST_ASSERT_EQUAL(FWK_E_TIMEOUT, ppu_v1_process_event(&queued_report, NULL));
+    TEST_ASSERT_EQUAL(1, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, pd->reported_state);
+}
+
 int mod_ppu_v1_test_main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_graceful_off_waits_for_wfi_and_rejects_stale_min_irq);
+    RUN_TEST(test_on_during_graceful_off_is_reported_after_off);
+    RUN_TEST(test_repeated_off_cancels_deferred_on);
+    RUN_TEST(test_force_off_cancels_stale_completion_across_new_off);
+    RUN_TEST(test_core_reset_uses_static_off_without_waiting_for_wfi);
+    RUN_TEST(test_wfi_during_minimum_ack_completes_without_another_irq);
+    RUN_TEST(test_graceful_off_lock_survives_cluster_wake_and_idle_alarm);
+    RUN_TEST(test_graceful_off_report_failure_does_not_release_deferred_on);
+    RUN_TEST(test_deferred_on_failure_does_not_report_on);
     RUN_TEST(test_dynamic_reports_skip_duplicates_but_preserve_transitions);
     RUN_TEST(test_failed_dynamic_report_is_not_cached);
     RUN_TEST(test_cluster_wake_while_edges_masked_restores_on);

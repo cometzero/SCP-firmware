@@ -48,6 +48,11 @@ struct ppu_v1_pd_ctx {
     bool reported_state_valid;
     bool report_pending;
 
+    /* A commanded OFF must finish before a later ON can change the policy. */
+    bool off_pending;
+    bool on_pending;
+    unsigned int off_generation;
+
     /* Identifier of the entity bound to the power domain driver API */
     fwk_id_t bound_id;
 
@@ -105,6 +110,16 @@ struct ppu_v1_ctx {
 
 static struct ppu_v1_ctx ppu_v1_ctx;
 
+enum ppu_v1_event_idx {
+    PPU_V1_EVENT_OBSERVATION,
+    PPU_V1_EVENT_CORE_OFF_COMPLETE,
+    PPU_V1_EVENT_COUNT,
+};
+
+#ifdef BUILD_HAS_MOD_POWER_DOMAIN
+static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state);
+#endif
+
 /* Command completions remain unconditional; cache only accepted reports. */
 static int report_power_state_now(
     struct ppu_v1_pd_ctx *pd_ctx, unsigned int state)
@@ -133,7 +148,7 @@ static int report_power_state(
     fwk_interrupt_global_enable(flags);
 
     struct fwk_event event = {
-        .id = FWK_ID_EVENT(FWK_MODULE_IDX_PPU_V1, 0),
+        .id = FWK_ID_EVENT(FWK_MODULE_IDX_PPU_V1, PPU_V1_EVENT_OBSERVATION),
         .source_id = pd_ctx->id,
         .target_id = pd_ctx->id,
     };
@@ -151,6 +166,24 @@ static int ppu_v1_process_event(
 {
     struct ppu_v1_pd_ctx *pd_ctx =
         &ppu_v1_ctx.pd_ctx_table[fwk_id_get_element_idx(event->target_id)];
+#ifdef BUILD_HAS_MOD_POWER_DOMAIN
+    if (fwk_id_get_event_idx(event->id) == PPU_V1_EVENT_CORE_OFF_COMPLETE) {
+        int status;
+
+        if (!pd_ctx->off_pending ||
+            *(const unsigned int *)event->params != pd_ctx->off_generation)
+            return FWK_SUCCESS;
+
+        /* Queue OFF and ON reports together so ISR priority cannot reorder them. */
+        status = report_power_state(pd_ctx, MOD_PD_STATE_OFF, false);
+        if (status != FWK_SUCCESS)
+            return status;
+        pd_ctx->off_pending = false;
+        if (pd_ctx->on_pending)
+            return ppu_v1_core_pd_set_state(pd_ctx->id, MOD_PD_STATE_ON);
+        return FWK_SUCCESS;
+    }
+#endif
     unsigned int flags = fwk_interrupt_global_disable();
     unsigned int state = pd_ctx->observed_state;
     pd_ctx->report_pending = false;
@@ -189,6 +222,9 @@ static void deeper_locking_alarm_callback(uintptr_t param)
 
     pd_ctx = ppu_v1_ctx.pd_ctx_table + pd_id;
     ppu = &pd_ctx->ppu;
+
+    if (pd_ctx->off_pending)
+        return;
 
     /* Disable the lock at off and unlock */
     ppu_v1_lock_off_disable(ppu);
@@ -350,6 +386,27 @@ static int ppu_v1_core_pd_init(struct ppu_v1_pd_ctx *pd_ctx)
 }
 
 #ifdef BUILD_HAS_MOD_POWER_DOMAIN
+/* Static OFF is also the recovery path: it does not require CPU quiescence. */
+static int core_force_off(struct ppu_v1_pd_ctx *pd_ctx)
+{
+    struct ppu_v1_regs *ppu = &pd_ctx->ppu;
+    int status;
+
+    pd_ctx->off_generation++;
+    pd_ctx->off_pending = false;
+    pd_ctx->on_pending = false;
+    ppu_v1_set_input_edge_sensitivity(
+        ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
+    ppu_v1_interrupt_mask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+    ppu_v1_ack_interrupt(ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
+    status = ppu_v1_set_power_mode(ppu, PPU_V1_MODE_OFF, pd_ctx->timer_ctx);
+    if (status != FWK_SUCCESS)
+        return status;
+    ppu_v1_lock_off_disable(ppu);
+    ppu_v1_off_unlock(ppu);
+    return report_power_state(pd_ctx, MOD_PD_STATE_OFF, false);
+}
+
 static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state)
 {
     int status;
@@ -361,22 +418,39 @@ static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state)
 
     switch (state) {
     case MOD_PD_STATE_OFF:
-        ppu_v1_set_input_edge_sensitivity(ppu,
-                                          PPU_V1_MODE_ON,
-                                          PPU_V1_EDGE_SENSITIVITY_MASKED);
-        ppu_v1_interrupt_mask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
-        status = ppu_v1_set_power_mode(ppu, PPU_V1_MODE_OFF, pd_ctx->timer_ctx);
-        if (status != FWK_SUCCESS) {
-            FWK_LOG_ERR("[PPU_V1] Core OFF failed: %d", status);
-            return status;
+        pd_ctx->on_pending = false;
+        if (pd_ctx->off_pending)
+            return FWK_SUCCESS;
+        if (pd_ctx->config->graceful_core_off) {
+            unsigned int flags = fwk_interrupt_global_disable();
+
+            ppu_v1_set_input_edge_sensitivity(
+                ppu, PPU_V1_MODE_ON, PPU_V1_EDGE_SENSITIVITY_MASKED);
+            ppu_v1_interrupt_mask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+            /* Clear old idle observations before sampling PWSR. A new OFF
+             * after the sample must retain its completion interrupt. */
+            ppu_v1_ack_interrupt(ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
+            if (ppu_v1_get_power_mode(ppu) == PPU_V1_MODE_ON) {
+                pd_ctx->off_generation++;
+                pd_ctx->off_pending = true;
+                ppu_v1_lock_off_enable(ppu);
+                ppu_v1_dynamic_enable(ppu, PPU_V1_MODE_OFF);
+                ppu_v1_interrupt_unmask(
+                    ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+                fwk_interrupt_global_enable(flags);
+                return FWK_SUCCESS;
+            }
+            fwk_interrupt_global_enable(flags);
         }
-        ppu_v1_lock_off_disable(ppu);
-        ppu_v1_off_unlock(ppu);
-        status = report_power_state(pd_ctx, MOD_PD_STATE_OFF, false);
-        fwk_assert(status == FWK_SUCCESS);
+        status = core_force_off(pd_ctx);
         break;
 
     case MOD_PD_STATE_ON:
+        if (pd_ctx->off_pending) {
+            pd_ctx->on_pending = true;
+            return FWK_SUCCESS;
+        }
+        pd_ctx->on_pending = false;
         ppu_v1_interrupt_unmask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
 
         ppu_v1_set_input_edge_sensitivity(
@@ -393,6 +467,8 @@ static int ppu_v1_core_pd_set_state(fwk_id_t core_pd_id, unsigned int state)
         break;
 
     case MOD_PD_STATE_SLEEP:
+        if (pd_ctx->off_pending)
+            return FWK_E_BUSY;
 
         /* Enable the lock at off */
         /*
@@ -424,7 +500,8 @@ static int ppu_v1_core_pd_reset(fwk_id_t core_pd_id)
 {
     int status;
 
-    status = ppu_v1_core_pd_set_state(core_pd_id, MOD_PD_STATE_OFF);
+    status = core_force_off(
+        &ppu_v1_ctx.pd_ctx_table[fwk_id_get_element_idx(core_pd_id)]);
     if (status == FWK_SUCCESS) {
         status = ppu_v1_core_pd_set_state(core_pd_id, MOD_PD_STATE_ON);
     }
@@ -501,6 +578,34 @@ static void core_pd_ppu_interrupt_handler(struct ppu_v1_pd_ctx *pd_ctx)
     struct ppu_v1_regs *ppu;
 
     ppu = &pd_ctx->ppu;
+
+#ifdef BUILD_HAS_MOD_POWER_DOMAIN
+    if (pd_ctx->off_pending) {
+        struct fwk_event event = {
+            .id = FWK_ID_EVENT(
+                FWK_MODULE_IDX_PPU_V1, PPU_V1_EVENT_CORE_OFF_COMPLETE),
+            .source_id = pd_ctx->id,
+            .target_id = pd_ctx->id,
+        };
+
+        if (!ppu_v1_is_dyn_policy_min_interrupt(ppu))
+            return;
+        ppu_v1_ack_interrupt(ppu, PPU_V1_ISR_DYN_POLICY_MIN_IRQ);
+        if (ppu_v1_get_power_mode(ppu) != PPU_V1_MODE_OFF)
+            return;
+        ppu_v1_interrupt_mask(ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+        status = ppu_v1_set_power_mode(ppu, PPU_V1_MODE_OFF, pd_ctx->timer_ctx);
+        fwk_assert(status == FWK_SUCCESS);
+        if (status != FWK_SUCCESS)
+            return;
+        ppu_v1_lock_off_disable(ppu);
+        ppu_v1_off_unlock(ppu);
+        *(unsigned int *)event.params = pd_ctx->off_generation;
+        status = fwk_put_event(&event);
+        fwk_assert(status == FWK_SUCCESS);
+        return;
+    }
+#endif
 
     /* ON request interrupt */
     if (ppu_v1_is_power_active_edge_interrupt(ppu, PPU_V1_MODE_ON)) {
@@ -582,6 +687,8 @@ static void unlock_all_cores(struct ppu_v1_pd_ctx *pd_ctx)
     cluster_pd_ctx = pd_ctx->data;
 
     for (core_idx = 0; core_idx < cluster_pd_ctx->core_count; ++core_idx) {
+        if (cluster_pd_ctx->core_pd_ctx_table[core_idx]->off_pending)
+            continue;
         core_ppu = &cluster_pd_ctx->core_pd_ctx_table[core_idx]->ppu;
         ppu_v1_lock_off_disable(core_ppu);
         ppu_v1_off_unlock(core_ppu);
@@ -919,6 +1026,30 @@ static const struct ppu_v1_boot_api boot_api = {
     .power_mode_on = ppu_power_mode_on,
 };
 
+#ifdef BUILD_HAS_MOD_POWER_DOMAIN
+static int ppu_force_core_off(fwk_id_t pd_id)
+{
+    struct ppu_v1_pd_ctx *pd_ctx;
+    unsigned int index;
+
+    if (!fwk_module_is_valid_element_id(pd_id) ||
+        fwk_id_get_module_idx(pd_id) != FWK_MODULE_IDX_PPU_V1)
+        return FWK_E_PARAM;
+    index = fwk_id_get_element_idx(pd_id);
+    if (index >= ppu_v1_ctx.pd_ctx_table_size)
+        return FWK_E_PARAM;
+    pd_ctx = &ppu_v1_ctx.pd_ctx_table[index];
+    if (pd_ctx->config->pd_type != MOD_PD_TYPE_CORE ||
+        pd_ctx->pd_driver_input_api == NULL)
+        return FWK_E_SUPPORT;
+    return core_force_off(pd_ctx);
+}
+
+static const struct mod_ppu_v1_recovery_api recovery_api = {
+    .force_core_off = ppu_force_core_off,
+};
+#endif
+
 /*
  * Framework handlers
  */
@@ -1196,6 +1327,13 @@ static int ppu_v1_process_bind_request(fwk_id_t source_id,
         return FWK_SUCCESS;
     }
 
+#ifdef BUILD_HAS_MOD_POWER_DOMAIN
+    if (api_idx == MOD_PPU_V1_API_IDX_RECOVERY) {
+        *api = &recovery_api;
+        return FWK_SUCCESS;
+    }
+#endif
+
     if (api_idx != MOD_PPU_V1_API_IDX_POWER_DOMAIN_DRIVER) {
         return FWK_E_SUPPORT;
     }
@@ -1361,7 +1499,7 @@ static int ppu_v1_process_notification(
 const struct fwk_module module_ppu_v1 = {
     .type = FWK_MODULE_TYPE_DRIVER,
     .api_count = MOD_PPU_V1_API_IDX_COUNT,
-    .event_count = 1,
+    .event_count = PPU_V1_EVENT_COUNT,
     .process_event = ppu_v1_process_event,
     .init = ppu_v1_mod_init,
     .element_init = ppu_v1_pd_init,
