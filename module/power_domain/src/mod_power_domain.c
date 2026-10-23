@@ -686,6 +686,9 @@ static void process_power_state_transition_report(
 #ifdef BUILD_HAS_NOTIFICATION
     if (pd->power_state_transition_notification_ctx.pending_responses == 0 &&
         pd->config->disable_state_transition_notifications == false) {
+        /* Preserve the first transition until pending notifications complete. */
+        pd->power_state_transition_notification_ctx.previous_state =
+            previous_state;
         params = (struct mod_pd_power_state_transition_notification_params *)
                      notification_event.params;
         params->state = new_state;
@@ -737,14 +740,6 @@ static void process_power_state_transition_report(
      * the state change notifications responses have arrived.
      */
     if (pd->power_state_transition_notification_ctx.pending_responses > 0) {
-        /*
-         * Save previous state which will be used once all the notifications
-         * have arrived to continue for deeper or shallower state for the next
-         * power domain.
-         */
-        pd->power_state_transition_notification_ctx.previous_state =
-            previous_state;
-
         return;
     }
 #endif

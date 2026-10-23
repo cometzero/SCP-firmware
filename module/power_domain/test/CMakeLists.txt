@@ -79,3 +79,17 @@ list(APPEND MOCK_REPLACEMENTS fwk_mm)
 list(APPEND MOCK_REPLACEMENTS fwk_notification)
 
 include(${SCP_ROOT}/unit_test/module_common.cmake)
+
+# Exercise real PD request/report/notification handlers with a FIFO dispatcher.
+set(TEST_SRC mod_power_domain)
+set(TEST_FILE power_domain_recovery)
+set(UNIT_TEST_TARGET mod_power_domain_recovery_unit_test)
+set(MODULE_SRC ${MODULE_ROOT}/${TEST_MODULE}/src)
+set(MODULE_INC ${MODULE_ROOT}/${TEST_MODULE}/include)
+set(MODULE_UT_SRC ${CMAKE_CURRENT_LIST_DIR})
+set(MODULE_UT_INC ${CMAKE_CURRENT_LIST_DIR})
+set(MODULE_UT_MOCK_SRC ${CMAKE_CURRENT_LIST_DIR}/mocks)
+set(MOCK_REPLACEMENTS fwk_module fwk_mm fwk_core fwk_notification)
+include(${SCP_ROOT}/unit_test/module_common.cmake)
+target_compile_definitions(${UNIT_TEST_TARGET} PUBLIC
+    BUILD_HAS_NOTIFICATION BUILD_HAS_MOD_POWER_DOMAIN)
