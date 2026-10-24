@@ -206,6 +206,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .parent_cr_index = 3,
             .parent_ncr_index = 1,
             .implementation = MOD_FMU_NI710AE_IMPL,
+            .has_parent_sources = true,
+            .parent_source = { 1, 2, 3 },
         }),
     },
 
@@ -217,6 +219,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .parent_cr_index = 18,
             .parent_ncr_index = 16,
             .implementation = MOD_FMU_NI710AE_IMPL,
+            .has_parent_sources = true,
+            .parent_source = { 16, 17, 18 },
         }),
     },
     [AP_CL2_NI710AE_FMU] = {
@@ -227,6 +231,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .parent_cr_index = 33,
             .parent_ncr_index = 31,
             .implementation = MOD_FMU_NI710AE_IMPL,
+            .has_parent_sources = true,
+            .parent_source = { 31, 32, 33 },
         }),
     },
     [AP_CL3_NI710AE_FMU] = {
@@ -237,6 +243,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .parent_cr_index = 48,
             .parent_ncr_index = 46,
             .implementation = MOD_FMU_NI710AE_IMPL,
+            .has_parent_sources = true,
+            .parent_source = { 46, 47, 48 },
         }),
     },
     [INT_SYS_CTL_NI710AE_FMU] = {
@@ -247,6 +255,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .parent_cr_index = 68,
             .parent_ncr_index = 66,
             .implementation = MOD_FMU_NI710AE_IMPL,
+            .has_parent_sources = true,
+            .parent_source = { 66, 67, 68 },
         }),
     },
     [SMB_NI710AE_FMU] = {
@@ -257,6 +267,8 @@ static const struct fwk_element fmu_devices[SI0_FMU_COUNT + 1] = {
             .parent_cr_index = 167,
             .parent_ncr_index = 165,
             .implementation = MOD_FMU_NI710AE_IMPL,
+            .has_parent_sources = true,
+            .parent_source = { 165, 166, 167 },
         }),
     },
     [SI0_FMU_COUNT] = {0},

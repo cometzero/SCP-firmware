@@ -75,8 +75,33 @@ static bool fmu_inject_flag = false;
 struct fmu_event_packet {
     uint8_t suite_idx;
     uint8_t step_idx;
-    struct mod_fmu_fault_notification_params *fmu_params;
+    struct mod_fmu_fault_notification_params fmu_params;
 };
+
+#ifdef MOD_FMU_HAS_PARENT_SOURCES
+static struct {
+    bool valid;
+    fwk_id_t device;
+    uint16_t node;
+    uint8_t count, threshold;
+    bool enabled;
+} saved_upgrade;
+
+static void save_upgrade_policy(fwk_id_t device, uint16_t node)
+{
+    if (saved_upgrade.valid)
+        return;
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        fmu_api->get_count(device, node, &saved_upgrade.count));
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        fmu_api->get_threshold(device, node, &saved_upgrade.threshold));
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        fmu_api->get_upgrade_enabled(device, node, &saved_upgrade.enabled));
+    saved_upgrade.device = device;
+    saved_upgrade.node = node;
+    saved_upgrade.valid = true;
+}
+#endif
 
 static int test_inject(unsigned int step_idx, const struct fwk_event *event)
 {
@@ -105,7 +130,7 @@ static int test_inject(unsigned int step_idx, const struct fwk_event *event)
         /* Validate the received fault */
         event_params = (const struct fmu_event_packet *)event->params;
         params = (const struct mod_fmu_fault_notification_params *)
-                     event_params->fmu_params;
+                     &event_params->fmu_params;
         TEST_ASSERT_EQUAL(
             fwk_id_get_element_idx(root_fmu), params->fault.device_idx);
         TEST_ASSERT_EQUAL(1, params->fault.node_idx);
@@ -127,7 +152,7 @@ static int test_inject(unsigned int step_idx, const struct fwk_event *event)
         /* Validate the received fault */
         event_params = (const struct fmu_event_packet *)event->params;
         params = (const struct mod_fmu_fault_notification_params *)
-                     event_params->fmu_params;
+                     &event_params->fmu_params;
         TEST_ASSERT_EQUAL(
             fwk_id_get_element_idx(root_fmu), params->fault.device_idx);
         TEST_ASSERT_EQUAL(0, params->fault.node_idx);
@@ -149,7 +174,7 @@ static int test_inject(unsigned int step_idx, const struct fwk_event *event)
         /* Validate the received fault */
         event_params = (const struct fmu_event_packet *)event->params;
         params = (const struct mod_fmu_fault_notification_params *)
-                     event_params->fmu_params;
+                     &event_params->fmu_params;
         TEST_ASSERT_EQUAL(
             fwk_id_get_element_idx(fmu1), params->fault.device_idx);
         TEST_ASSERT_EQUAL(0, params->fault.node_idx);
@@ -174,7 +199,7 @@ static void validate_fault(
 
     event_params = (const struct fmu_event_packet *)event->params;
     params = (const struct mod_fmu_fault_notification_params *)
-                 event_params->fmu_params;
+                 &event_params->fmu_params;
 
     TEST_ASSERT_EQUAL(
         fwk_id_get_element_idx(device_id), params->fault.device_idx);
@@ -236,7 +261,13 @@ static int inject_fault_ni710ae(
                                    .sm_idx = NI710AE_CRITICAL_SMID };
     switch (step_idx) {
     case STEP_START:
+#ifdef MOD_FMU_HAS_PARENT_SOURCES
+        /* NI criticality is fixed by integration. The System ERI input
+         * upgrade configured below supplies this test's root severity. */
+        enable_and_inject(&fault, false);
+#else
         enable_and_inject(&fault, true);
+#endif
         return FWK_PENDING;
     case STEP_INJECT_0:
         validate_fault(fmu_id, node_idx, NI710AE_CRITICAL_SMID, true, event);
@@ -245,7 +276,9 @@ static int inject_fault_ni710ae(
                                              .node_idx = node_idx,
                                              .sm_idx =
                                                  NI710AE_NON_CRITICAL_CR_SMID };
+#ifndef MOD_FMU_HAS_PARENT_SOURCES
         fmu_api->set_critical(&nc_cr_fault, false);
+#endif
         enable_and_inject(&nc_cr_fault, false);
         return FWK_PENDING;
     case STEP_INJECT_1:
@@ -256,7 +289,9 @@ static int inject_fault_ni710ae(
                                           .node_idx = node_idx,
                                           .sm_idx =
                                               NI710AE_NON_CRITICAL_UCR_SMID };
+#ifndef MOD_FMU_HAS_PARENT_SOURCES
         fmu_api->set_critical(&nc_fault, false);
+#endif
         enable_and_inject(&nc_fault, false);
         return FWK_PENDING;
     case STEP_INJECT_2:
@@ -360,7 +395,19 @@ static void upgrade_fault(struct mod_fmu_fault *fault, uint16_t idx)
     uint32_t status;
 
     fault->device_idx = fwk_id_get_element_idx(fmu1);
+#ifdef MOD_FMU_HAS_PARENT_SOURCES
+    /* The QVP ERI/FHI/CRI triplet ends at the legacy CRI index. */
+    fault->node_idx = idx - 2;
+    if (!saved_upgrade.valid) {
+        save_upgrade_policy(fmu1, fault->node_idx);
+        TEST_ASSERT_EQUAL(FWK_SUCCESS,
+            fmu_api->set_count(fmu1, fault->node_idx, 0));
+        TEST_ASSERT_EQUAL(FWK_SUCCESS,
+            fmu_api->set_threshold(fmu1, fault->node_idx, 0));
+    }
+#else
     fault->node_idx = idx;
+#endif
     fault->sm_idx = NI710AE_CRITICAL_SMID;
 
     status = fmu_api->set_upgrade_enabled(fmu1, fault->node_idx, true);
@@ -488,7 +535,7 @@ static int test_set_enabled(
     case STEP_ENABLED:
         event_params = (const struct fmu_event_packet *)event->params;
         params = (const struct mod_fmu_fault_notification_params *)
-                     event_params->fmu_params;
+                     &event_params->fmu_params;
         TEST_ASSERT_EQUAL(0, params->fault.device_idx);
         TEST_ASSERT_EQUAL(0, params->fault.node_idx);
         TEST_ASSERT_EQUAL(MOD_FMU_SM_SYSTEM_INPUT_ERROR, params->fault.sm_idx);
@@ -521,6 +568,9 @@ static int test_upgrade(unsigned int step_idx, const struct fwk_event *event)
         fault.device_idx = 0;
         fault.node_idx = 1;
         fault.sm_idx = MOD_FMU_SM_SYSTEM_INPUT_ERROR;
+#ifdef MOD_FMU_HAS_PARENT_SOURCES
+        save_upgrade_policy(root_fmu, fault.node_idx);
+#endif
         /* Configure fault upgrade after 2 occurrences */
         status = fmu_api->set_upgrade_enabled(root_fmu, fault.node_idx, true);
         TEST_ASSERT_EQUAL(FWK_SUCCESS, status);
@@ -550,7 +600,7 @@ static int test_upgrade(unsigned int step_idx, const struct fwk_event *event)
         /* Validate the received fault */
         event_params = (const struct fmu_event_packet *)event->params;
         params = (const struct mod_fmu_fault_notification_params *)
-                     event_params->fmu_params;
+                     &event_params->fmu_params;
         TEST_ASSERT_EQUAL(1, params->fault.node_idx);
         TEST_ASSERT_FALSE(params->critical);
 
@@ -571,7 +621,7 @@ static int test_upgrade(unsigned int step_idx, const struct fwk_event *event)
         /* Validate the received fault */
         event_params = (const struct fmu_event_packet *)event->params;
         params = (const struct mod_fmu_fault_notification_params *)
-                     event_params->fmu_params;
+                     &event_params->fmu_params;
         TEST_ASSERT_EQUAL(1, params->fault.node_idx);
         TEST_ASSERT_FALSE(params->critical);
 
@@ -591,7 +641,7 @@ static int test_upgrade(unsigned int step_idx, const struct fwk_event *event)
     case STEP_INJECT_2:
         event_params = (const struct fmu_event_packet *)event->params;
         params = (const struct mod_fmu_fault_notification_params *)
-                     event_params->fmu_params;
+                     &event_params->fmu_params;
         TEST_ASSERT_EQUAL(1, params->fault.node_idx);
         TEST_ASSERT_TRUE(params->critical);
 
@@ -736,10 +786,29 @@ static int run(
 
 void test_fmu_setup(void)
 {
+    fmu_inject_flag = true;
+#ifdef MOD_FMU_HAS_PARENT_SOURCES
+    saved_upgrade.valid = false;
+#endif
 }
 void test_fmu_teardown(void)
 {
     test_fmu_step_idx = 0;
+    fmu_inject_flag = false;
+#ifdef MOD_FMU_HAS_PARENT_SOURCES
+    if (saved_upgrade.valid) {
+        int count_status = fmu_api->set_count(
+            saved_upgrade.device, saved_upgrade.node, saved_upgrade.count);
+        int threshold_status = fmu_api->set_threshold(
+            saved_upgrade.device, saved_upgrade.node, saved_upgrade.threshold);
+        int enabled_status = fmu_api->set_upgrade_enabled(
+            saved_upgrade.device, saved_upgrade.node, saved_upgrade.enabled);
+        saved_upgrade.valid = false;
+        TEST_ASSERT_EQUAL(FWK_SUCCESS, count_status);
+        TEST_ASSERT_EQUAL(FWK_SUCCESS, threshold_status);
+        TEST_ASSERT_EQUAL(FWK_SUCCESS, enabled_status);
+    }
+#endif
 }
 
 static const struct mod_integration_test_api test_api = {
@@ -843,7 +912,7 @@ static int test_fmu_process_notification(
         struct fmu_event_packet payload = {
             .suite_idx = 0,
             .step_idx = test_fmu_step_idx,
-            .fmu_params = fmu_notify_params,
+            .fmu_params = *fmu_notify_params,
         };
 
         memcpy((void *)step_event.params, (void *)&payload, sizeof(payload));

@@ -26,6 +26,14 @@
 
 #define FMU_ERR_FR_ED_MASK FWK_GEN_MASK(1, 0)
 
+#define FMU_ERR_STATUS_CI_MASK FWK_BIT(19)
+#define FMU_ERR_STATUS_V_MASK FWK_BIT(30)
+#define FMU_ERR_STATUS_W1C_MASK \
+    (FMU_ERR_STATUS_V_MASK | FWK_BIT(29) | FWK_BIT(27) | \
+     FWK_GEN_MASK(25, 24) | FMU_ERR_STATUS_CI_MASK)
+#define FMU_RECORD_COUNT 384U
+#define FMU_INTERNAL_RECORD (FMU_RECORD_COUNT - 1)
+
 #define FMU_ERR_STATUS_IERR_MASK               FWK_GEN_MASK(12, 8)
 #define FMU_ERR_STATUS_IERR_SHIFT              8
 #define FMU_ERR_STATUS_IERR_APB_SW_MASK        FWK_BIT(8)
@@ -71,7 +79,8 @@ static inline void fmu_write_32(
     fwk_mmio_write_32(base + offset, value);
 }
 
-static unsigned int find_active_node(const struct mod_fmu_dev_config *config)
+static unsigned int find_active_node(
+    const struct mod_fmu_dev_config *config, bool critical)
 {
     uint64_t errgsr;
     unsigned int errgsr_idx;
@@ -84,9 +93,16 @@ static unsigned int find_active_node(const struct mod_fmu_dev_config *config)
             ((uint64_t)fmu_read_32(config->base, FMU_FIELD_ERRGSR_H(errgsr_idx))
              << FMU_ERRGSR_NUM_BITS);
 
-        if (errgsr != 0) {
-            return (errgsr_idx * FMU_ERRGSR_NUM_BITS * 2) +
+        while (errgsr != 0) {
+            unsigned int node = (errgsr_idx * FMU_ERRGSR_NUM_BITS * 2) +
                 fwk_math_log2(LSB_GET(errgsr));
+            uint32_t status =
+                fmu_read_32(config->base, FMU_FIELD_ERR_STATUS(node));
+            if ((status & FMU_ERR_STATUS_V_MASK) &&
+                !!(status & FMU_ERR_STATUS_CI_MASK) == critical) {
+                return node;
+            }
+            errgsr &= errgsr - 1;
         }
     }
 
@@ -95,6 +111,7 @@ static unsigned int find_active_node(const struct mod_fmu_dev_config *config)
 
 static bool fault_peek(
     const struct mod_fmu_dev_config *config,
+    bool critical,
     unsigned int *node_idx)
 {
     unsigned int next_node_idx;
@@ -103,7 +120,7 @@ static bool fault_peek(
     fwk_assert(node_idx != NULL);
 
     /* If current FMU has an active fault record */
-    next_node_idx = find_active_node(config);
+    next_node_idx = find_active_node(config, critical);
     if (next_node_idx == MOD_FMU_PARENT_NONE) {
         return false;
     }
@@ -112,31 +129,76 @@ static bool fault_peek(
     return true;
 }
 
-static void fault_ack(
+static bool fault_peek_source(
+    const struct mod_fmu_dev_config *config,
+    unsigned int parent_node,
+    unsigned int *node_idx)
+{
+    /* A parent can upgrade the NC summary input. Follow the selected wire,
+     * not the severity observed at the root of the hierarchy. */
+    if (parent_node == config->parent_cr_index)
+        return fault_peek(config, true, node_idx);
+    if (parent_node == config->parent_ncr_index)
+        return fault_peek(config, false, node_idx);
+    return false;
+}
+
+static int fault_ack(
     const struct mod_fmu_dev_config *config,
     struct mod_fmu_fault *fault,
     unsigned int node_idx,
-    bool *fault_tracked)
+    bool *fault_tracked,
+    struct mod_fmu_ack_state *state)
 {
     uint32_t val;
 
+    if (state->acknowledged) {
+        return FWK_SUCCESS;
+    }
     fwk_assert(config != NULL);
     fwk_assert(fault != NULL);
     fwk_assert(fault_tracked != NULL);
 
-    /* Acknowledge the fault */
-    val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_idx));
-    val |= FMU_ERRIMPDEF_IC_MASK;
-    fmu_write_32(config->base, FMU_FIELD_ERRIMPDEF(node_idx), val);
-
+    if (node_idx >= FMU_RECORD_COUNT) {
+        return FWK_E_PARAM;
+    }
+    uint32_t status = fmu_read_32(config->base, FMU_FIELD_ERR_STATUS(node_idx));
+    if (!(status & FMU_ERR_STATUS_V_MASK)) {
+        /* Another output of the same leaf may already have cleared this
+         * ancestor. An empty leaf itself is not a valid fault snapshot. */
+        if (*fault_tracked) {
+            state->acknowledged = true;
+            return FWK_SUCCESS;
+        }
+        return FWK_E_DATA;
+    }
     if (!(*fault_tracked)) {
         fault->node_idx = node_idx;
-        fault->sm_idx =
-            (fmu_read_32(config->base, FMU_FIELD_ERR_STATUS(node_idx)) &
-             FMU_ERR_STATUS_IERR_MASK) >>
+        fault->block_id = 0;
+        fault->injected = false;
+        fault->sm_idx = (status & FMU_ERR_STATUS_IERR_MASK) >>
             FMU_ERR_STATUS_IERR_SHIFT;
         *fault_tracked = true;
     }
+    /* IC clears the input source; it is RES0 for the internal record.
+     * The RAS status requires a separate observed-bits W1C acknowledgement. */
+    if (node_idx != FMU_INTERNAL_RECORD) {
+        uint32_t clear = 0;
+        if (status & FMU_ERR_STATUS_IERR_ERR_IN_MASK)
+            clear |= FWK_BIT(3);
+        if (status & FMU_ERR_STATUS_IERR_ERR_IN_PARITY_MASK)
+            clear |= FWK_BIT(2);
+        if (clear != 0) {
+            val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_idx));
+            val &= ~(FMU_ERRIMPDEF_IC_MASK | FMU_ERRIMPDEF_IE_MASK);
+            fmu_write_32(config->base, FMU_FIELD_ERRIMPDEF(node_idx), val | clear);
+        }
+    }
+    fmu_write_32(config->base, FMU_FIELD_ERR_STATUS(node_idx),
+                 status & FMU_ERR_STATUS_W1C_MASK);
+
+    state->acknowledged = true;
+    return FWK_SUCCESS;
 }
 
 /*
@@ -151,7 +213,14 @@ static int inject(
     fwk_assert(config != NULL);
     fwk_assert(fault != NULL);
 
+    uint32_t allowed = fault->node_idx == FMU_INTERNAL_RECORD ? 0x7 : 0x18;
+    if (fault->node_idx >= FMU_RECORD_COUNT || fault->block_id != 0 ||
+        fault->sm_idx == 0 || (fault->sm_idx & ~allowed) != 0) {
+        return FWK_E_PARAM;
+    }
+
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(fault->node_idx));
+    val &= ~FMU_ERRIMPDEF_IE_MASK;
     val |= ((uint32_t)fault->sm_idx << FMU_ERRIMPDEF_IE_SHIFT) &
         FMU_ERRIMPDEF_IE_MASK;
     /* Ensure injection ack bits are cleared */
@@ -173,6 +242,10 @@ static int get_enabled(
     fwk_assert(fault != NULL);
     fwk_assert(enabled != NULL);
 
+    if (fault->node_idx >= FMU_RECORD_COUNT || fault->block_id != 0) {
+        return FWK_E_PARAM;
+    }
+
     if (fault->sm_idx != MOD_FMU_SM_ALL) {
         return FWK_E_SUPPORT;
     }
@@ -192,6 +265,10 @@ static int set_enabled(
 
     fwk_assert(config != NULL);
     fwk_assert(fault != NULL);
+
+    if (fault->node_idx >= FMU_RECORD_COUNT || fault->block_id != 0) {
+        return FWK_E_PARAM;
+    }
 
     if (fault->sm_idx != MOD_FMU_SM_ALL) {
         return FWK_E_SUPPORT;
@@ -218,6 +295,10 @@ static int get_count(
     fwk_assert(config != NULL);
     fwk_assert(count != NULL);
 
+    if (node_id >= FMU_RECORD_COUNT) {
+        return FWK_E_PARAM;
+    }
+
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_id));
     *count = (val & FMU_ERRIMPDEF_CNT_MASK) >> FMU_ERRIMPDEF_CNT_SHIFT;
 
@@ -232,6 +313,10 @@ static int set_count(
     uint32_t val;
 
     fwk_assert(config != NULL);
+
+    if (node_id >= FMU_RECORD_COUNT) {
+        return FWK_E_PARAM;
+    }
 
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_id));
     val &= ~FMU_ERRIMPDEF_CNT_MASK;
@@ -251,6 +336,10 @@ static int get_threshold(
     fwk_assert(config != NULL);
     fwk_assert(threshold != NULL);
 
+    if (node_id >= FMU_RECORD_COUNT) {
+        return FWK_E_PARAM;
+    }
+
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_id));
     *threshold = (val & FMU_ERRIMPDEF_THR_MASK) >> FMU_ERRIMPDEF_THR_SHIFT;
 
@@ -265,6 +354,10 @@ static int set_threshold(
     uint32_t val;
 
     fwk_assert(config != NULL);
+
+    if (node_id >= FMU_RECORD_COUNT) {
+        return FWK_E_PARAM;
+    }
 
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_id));
     val &= ~FMU_ERRIMPDEF_THR_MASK;
@@ -284,6 +377,10 @@ static int get_upgrade_enabled(
     fwk_assert(config != NULL);
     fwk_assert(enabled != NULL);
 
+    if (node_id >= FMU_RECORD_COUNT) {
+        return FWK_E_PARAM;
+    }
+
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_id));
     *enabled = (val & FMU_ERRIMPDEF_UE_MASK) != 0;
 
@@ -299,6 +396,10 @@ static int set_upgrade_enabled(
 
     fwk_assert(config != NULL);
 
+    if (node_id >= FMU_RECORD_COUNT) {
+        return FWK_E_PARAM;
+    }
+
     val = fmu_read_32(config->base, FMU_FIELD_ERRIMPDEF(node_id));
     if (enabled) {
         val |= FMU_ERRIMPDEF_UE_MASK;
@@ -312,6 +413,7 @@ static int set_upgrade_enabled(
 
 struct mod_fmu_impl_api mod_fmu_system_api = {
     .fault_peek = fault_peek,
+    .fault_peek_source = fault_peek_source,
     .fault_ack = fault_ack,
     .inject = inject,
     .get_enabled = get_enabled,

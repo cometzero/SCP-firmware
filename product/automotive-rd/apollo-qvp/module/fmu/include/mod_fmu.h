@@ -34,6 +34,19 @@ struct mod_fmu_fault {
 
     /*! Safety mechanism index, the possible values of which are FMU-specific */
     uint8_t sm_idx;
+
+    /*! GIC/MHU block instance within node_idx (BLKTYPE); zero for other FMUs. */
+    uint16_t block_id;
+
+    /*! GIC/MHU ERRSTATUS.INJ: true for software insertion, false for detectors.
+     * System/NI have no origin flag; false there means unavailable. */
+    bool injected;
+};
+
+struct mod_fmu_drain_status {
+    bool masked;
+    int last_error;
+    unsigned int drained;
 };
 
 /*!
@@ -75,6 +88,11 @@ struct mod_fmu_api {
 
     /*! Configure the criticality of a safety mechanism */
     int (*set_critical)(const struct mod_fmu_fault *fault, bool critical);
+
+    /*! Retry a failed drain after the platform has repaired the fault source. */
+    int (*recover)(bool critical);
+
+    int (*get_drain_status)(bool critical, struct mod_fmu_drain_status *status);
 };
 
 #ifdef BUILD_HAS_NOTIFICATION
@@ -112,6 +130,15 @@ enum mod_fmu_implementation {
 /*!
  * \brief FMU device configuration
  */
+#define MOD_FMU_HAS_PARENT_SOURCES 1
+
+enum mod_fmu_parent_source {
+    MOD_FMU_SOURCE_ERI,
+    MOD_FMU_SOURCE_FHI,
+    MOD_FMU_SOURCE_CRI,
+    MOD_FMU_SOURCE_COUNT,
+};
+
 struct mod_fmu_dev_config {
     /*! Base address */
     uintptr_t base;
@@ -126,6 +153,10 @@ struct mod_fmu_dev_config {
 
     /*! Node index to which the non-critical fault signal is connected */
     uint32_t parent_ncr_index;
+
+    /*! NI has independent ERI/FHI/CRI outputs, not two severity outputs. */
+    bool has_parent_sources;
+    uint32_t parent_source[MOD_FMU_SOURCE_COUNT];
 };
 
 /**

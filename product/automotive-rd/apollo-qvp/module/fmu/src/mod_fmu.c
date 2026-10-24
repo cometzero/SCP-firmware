@@ -9,6 +9,7 @@
 #include <mod_fmu.h>
 
 #include <fwk_assert.h>
+#include <fwk_core.h>
 #include <fwk_id.h>
 #include <fwk_interrupt.h>
 #include <fwk_log.h>
@@ -20,11 +21,36 @@
 
 #define FMU_ROOT_IDX       0
 #define FMU_MAX_TREE_DEPTH 4
+#define FMU_DRAIN_BUDGET 16
+
+enum fmu_event_idx { FMU_EVENT_DRAIN, FMU_EVENT_COUNT };
+
+struct fault_entry {
+    uint32_t dev;
+    uint32_t node;
+    struct mod_fmu_ack_state ack;
+    struct mod_fmu_ack_state upstream_ack[FMU_MAX_TREE_DEPTH * MOD_FMU_SOURCE_COUNT];
+};
+
+struct drain_state {
+    struct mod_fmu_drain_status status;
+    bool queued;
+    bool waiting_critical;
+    struct fault_entry path[FMU_MAX_TREE_DEPTH];
+    unsigned int depth;
+    bool fault_tracked;
+    struct mod_fmu_fault pending_fault;
+#ifdef BUILD_HAS_NOTIFICATION
+    bool notification_pending;
+#endif
+};
 
 static struct {
     const struct mod_fmu_dev_config **device_config;
     const struct mod_fmu_impl_api **impl_apis;
     unsigned int num_devices;
+    const struct mod_fmu_config *config;
+    struct drain_state drain[2];
 } ctx;
 
 static unsigned int find_next_fmu(
@@ -40,9 +66,15 @@ static unsigned int find_next_fmu(
 
     for (idx = 0; idx < ctx.num_devices; idx++) {
         device_config = ctx.device_config[idx];
-        if (device_config->parent == device_idx &&
-            (device_config->parent_cr_index == node_idx ||
-             device_config->parent_ncr_index == node_idx)) {
+        if (device_config->parent != device_idx)
+            continue;
+        if (device_config->has_parent_sources) {
+            for (unsigned int source = 0; source < MOD_FMU_SOURCE_COUNT; source++) {
+                if (device_config->parent_source[source] == node_idx)
+                    return idx;
+            }
+        } else if (device_config->parent_cr_index == node_idx ||
+                   device_config->parent_ncr_index == node_idx) {
             return idx;
         }
     }
@@ -50,127 +82,275 @@ static unsigned int find_next_fmu(
     return MOD_FMU_PARENT_NONE;
 }
 
-/*!
- * \brief Structure to store a discovered fault entry
- */
-struct fault_entry {
-    uint32_t dev;
-    uint32_t node;
-};
-
-static bool next_fault(bool critical)
+#ifdef BUILD_HAS_NOTIFICATION
+static int notify_pending_fault(bool critical)
 {
-    const struct mod_fmu_dev_config *cfg;
-    struct mod_fmu_fault fault = { 0 };
-    bool (*peek_funct)(const struct mod_fmu_dev_config *, unsigned int *);
-    void (*ack_funct)(
-        const struct mod_fmu_dev_config *,
-        struct mod_fmu_fault *,
-        unsigned int,
-        bool *);
-    unsigned int depth = 0;
-    unsigned int dev = FMU_ROOT_IDX;
-    unsigned int node;
-    unsigned int notifications_sent;
-    struct fault_entry fault_entry_stack[FMU_MAX_TREE_DEPTH] = { 0 };
-    bool fault_tracked = false;
-#ifdef BUILD_HAS_NOTIFICATION
-    struct mod_fmu_fault_notification_params *params;
-#endif
-
-    /* Traverse through the tree root-first and push fault (device + node) onto
-     * the fault stack*/
-    while (dev != MOD_FMU_PARENT_NONE) {
-        /* Check if maximum tree depth reached */
-        if (depth >= FMU_MAX_TREE_DEPTH) {
-            FWK_LOG_ERR(MOD_NAME "Maximum tree depth reached");
-            fwk_trap();
-        }
-
-        /* Find fault entry in this device */
-        cfg = ctx.device_config[dev];
-        peek_funct = ctx.impl_apis[dev]->fault_peek;
-        fwk_assert(peek_funct != NULL);
-
-        /* Check if errors in this FMU and stop if not */
-        if (!peek_funct(cfg, &node)) {
-            break;
-        }
-
-        /* Push next fault entry onto stack */
-        fault_entry_stack[depth++] =
-            (struct fault_entry){ .dev = dev, .node = node };
-
-        /* Get next device */
-        dev = find_next_fmu(dev, node);
-    }
-
-    /* Return false if no fault found at the root FMU */
-    if (depth == 0) {
-        return false;
-    }
-
-    /* Set device of fault to last discovered fault */
-    fault.device_idx = fault_entry_stack[depth - 1].dev;
-
-    /* Pop entries one by one from the fault stack and acknowledge them */
-    do {
-        depth--;
-
-        /* Pop entry */
-        cfg = ctx.device_config[fault_entry_stack[depth].dev];
-        ack_funct = ctx.impl_apis[fault_entry_stack[depth].dev]->fault_ack;
-        fwk_assert(ack_funct != NULL);
-
-        /* Acknowledge fault */
-        ack_funct(cfg, &fault, fault_entry_stack[depth].node, &fault_tracked);
-
-    } while (depth != 0);
-
-    /* Log details and raise event */
-    FWK_LOG_INFO(
-        MOD_NAME "%s fault received: Device: 0x%x, Node 0x%x, SM 0x%x",
-        critical ? "Critical" : "Non-critical",
-        fault.device_idx,
-        fault.node_idx,
-        fault.sm_idx);
-
-#ifdef BUILD_HAS_NOTIFICATION
+    struct drain_state *state = &ctx.drain[critical];
+    unsigned int count;
     struct fwk_event event = {
         .id = mod_fmu_notification_id_fault,
         .source_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_FMU),
     };
-    params = (struct mod_fmu_fault_notification_params *)event.params;
+    struct mod_fmu_fault_notification_params *params = (void *)event.params;
     params->critical = critical;
-    params->fault.device_idx = fault.device_idx;
-    params->fault.node_idx = fault.node_idx;
-    params->fault.sm_idx = fault.sm_idx;
+    params->fault = state->pending_fault;
+    int status = fwk_notification_notify_atomic(&event, &count);
+    if (status == FWK_SUCCESS) {
+        state->notification_pending = false;
+    }
+    return status;
+}
+#endif
 
-    if (fwk_notification_notify(&event, &notifications_sent) != FWK_SUCCESS) {
-        FWK_LOG_ERR(MOD_NAME "Error raising notification");
-        fwk_trap();
+/* One NI RAS record can assert several outputs. Once its snapshot is ACKed,
+ * clear the corresponding parent latches and both upstream summary classes.
+ * Remaining source levels re-latch naturally; no discarded syndrome is replayed.
+ * Each acknowledgement has retained progress so recovery cannot ACK twice. */
+static int clear_upstream_routes(
+    struct drain_state *state, struct fault_entry *entry)
+{
+    const struct mod_fmu_dev_config *child = ctx.device_config[entry->dev];
+    if (!child->has_parent_sources)
+        return FWK_SUCCESS;
+    for (unsigned int depth = 0; child->parent != MOD_FMU_PARENT_NONE; depth++) {
+        if (depth >= FMU_MAX_TREE_DEPTH)
+            return FWK_E_DATA;
+        unsigned int parent = child->parent;
+        unsigned int count = child->has_parent_sources ? MOD_FMU_SOURCE_COUNT : 2;
+        for (unsigned int source = 0; source < count; source++) {
+            if (depth == 0 && !(entry->ack.parent_clear_mask & (1U << source)))
+                continue;
+            unsigned int node = child->has_parent_sources ?
+                child->parent_source[source] :
+                (source == 0 ? child->parent_cr_index : child->parent_ncr_index);
+            struct mod_fmu_ack_state *ack =
+                &entry->upstream_ack[depth * MOD_FMU_SOURCE_COUNT + source];
+            /* The original walk will visit these ancestors again. Share its
+             * progress so a new fault arriving after this ACK is retained. */
+            for (unsigned int index = 0; index < state->depth; index++) {
+                if (state->path[index].dev == parent &&
+                    state->path[index].node == node) {
+                    ack = &state->path[index].ack;
+                    break;
+                }
+            }
+            int status = ctx.impl_apis[parent]->fault_ack(
+                ctx.device_config[parent], &state->pending_fault, node,
+                &state->fault_tracked, ack);
+            if (status != FWK_SUCCESS)
+                return status;
+        }
+        child = ctx.device_config[parent];
+    }
+    return FWK_SUCCESS;
+}
+
+static int next_fault(bool critical)
+{
+    struct drain_state *state = &ctx.drain[critical];
+    const struct mod_fmu_dev_config *cfg;
+    unsigned int dev = FMU_ROOT_IDX;
+    unsigned int node;
+    unsigned int parent_node = MOD_FMU_PARENT_NONE;
+    int status;
+#ifdef BUILD_HAS_NOTIFICATION
+    if (state->notification_pending) {
+        return notify_pending_fault(critical);
     }
 #endif
 
-    return true;
+    if (state->depth == 0) {
+        state->waiting_critical = false;
+        /* ERI and FHI can refer to one NI snapshot. An older queued NC
+         * event must not consume it before a currently pending C event. */
+        if (!critical && ctx.impl_apis[FMU_ROOT_IDX]->fault_peek(
+                ctx.device_config[FMU_ROOT_IDX], true, &node)) {
+            state->waiting_critical = true;
+            state->status.last_error = FWK_SUCCESS;
+            return FWK_PENDING;
+        }
+        state->pending_fault = (struct mod_fmu_fault){ 0 };
+        state->fault_tracked = false;
+        /* Save the path so a failed leaf refresh or ancestor ACK can resume
+         * without selecting a new fault or acknowledging the leaf twice. */
+        while (dev != MOD_FMU_PARENT_NONE) {
+            if (state->depth >= FMU_MAX_TREE_DEPTH) {
+                return FWK_E_DATA;
+            }
+            cfg = ctx.device_config[dev];
+            bool present = parent_node != MOD_FMU_PARENT_NONE &&
+                ctx.impl_apis[dev]->fault_peek_source != NULL ?
+                ctx.impl_apis[dev]->fault_peek_source(cfg, parent_node, &node) :
+                ctx.impl_apis[dev]->fault_peek(cfg, critical, &node);
+            if (!present)
+                break;
+            state->path[state->depth++] =
+                (struct fault_entry){ .dev = dev, .node = node };
+            parent_node = node;
+            dev = find_next_fmu(dev, node);
+        }
+        if (state->depth == 0) {
+            return FWK_PENDING;
+        }
+        state->pending_fault.device_idx = state->path[state->depth - 1].dev;
+    }
+
+    while (state->depth != 0) {
+        struct fault_entry *entry = &state->path[state->depth - 1];
+        cfg = ctx.device_config[entry->dev];
+        status = ctx.impl_apis[entry->dev]->fault_ack(
+            cfg, &state->pending_fault, entry->node, &state->fault_tracked,
+            &entry->ack);
+        if (status != FWK_SUCCESS) {
+            return status;
+        }
+        status = clear_upstream_routes(state, entry);
+        if (status != FWK_SUCCESS)
+            return status;
+        state->depth--;
+    }
+
+    FWK_LOG_INFO(
+        MOD_NAME "%s fault received: Device: 0x%x, Node 0x%x, SM 0x%x, Block 0x%x, INJ %u",
+        critical ? "Critical" : "Non-critical",
+        state->pending_fault.device_idx,
+        state->pending_fault.node_idx,
+        state->pending_fault.sm_idx,
+        state->pending_fault.block_id,
+        state->pending_fault.injected);
+#ifdef BUILD_HAS_NOTIFICATION
+    state->notification_pending = true;
+    return notify_pending_fault(critical);
+#else
+    return FWK_SUCCESS;
+#endif
 }
 
 /*
  * Common interrupt handler
  */
+static void drain_failed(bool critical, int status)
+{
+    ctx.drain[critical].status.last_error = status;
+    FWK_LOG_ERR("FMU_DRAIN_FAIL critical=%u status=%d", critical, status);
+}
+
+static int queue_drain(bool critical)
+{
+    struct fwk_event event = {
+        .id = FWK_ID_EVENT(FWK_MODULE_IDX_FMU, FMU_EVENT_DRAIN),
+        .source_id = FWK_ID_MODULE(FWK_MODULE_IDX_FMU),
+        .target_id = FWK_ID_MODULE(FWK_MODULE_IDX_FMU),
+        .params = { critical },
+    };
+    int status;
+
+    if (ctx.drain[critical].queued) {
+        return FWK_SUCCESS;
+    }
+    status = fwk_put_event(&event);
+    if (status == FWK_SUCCESS) {
+        ctx.drain[critical].queued = true;
+    } else {
+        drain_failed(critical, status);
+    }
+    return status;
+}
+
 static void fmu_isr(bool critical)
 {
-    unsigned int i;
+    unsigned int irq = critical ? ctx.config->irq_critical :
+                                 ctx.config->irq_non_critical;
+    int status = fwk_interrupt_disable(irq);
 
-    /* Discover all active fault records */
-    for (i = 0; next_fault(critical); i++) {
-        continue;
+    ctx.drain[critical].status.masked = true;
+    if (status != FWK_SUCCESS) {
+        drain_failed(critical, status);
+        return;
     }
+    (void)queue_drain(critical);
+}
 
-    if (i == 0) {
-        FWK_LOG_ERR(MOD_NAME "No error record found");
-        fwk_trap();
+static void rearm_irq(bool critical)
+{
+    struct drain_state *state = &ctx.drain[critical];
+    unsigned int irq = critical ? ctx.config->irq_critical :
+                                 ctx.config->irq_non_critical;
+    int status;
+
+    /* A pending level may enter the ISR as soon as the IRQ is enabled.
+     * Publish first, then preserve any masked/queued state set by that ISR. */
+    state->status.masked = false;
+    state->status.last_error = FWK_SUCCESS;
+    state->waiting_critical = false;
+    status = fwk_interrupt_enable(irq);
+    if (status != FWK_SUCCESS) {
+        state->status.masked = true;
+        drain_failed(critical, status);
     }
+}
+
+static void release_noncritical_if_ready(void)
+{
+    unsigned int node;
+    if (ctx.drain[false].waiting_critical &&
+        !ctx.impl_apis[FMU_ROOT_IDX]->fault_peek(
+            ctx.device_config[FMU_ROOT_IDX], true, &node))
+        rearm_irq(false);
+}
+
+static int process_event(const struct fwk_event *event,
+                         struct fwk_event *response)
+{
+    bool critical = event->params[0] != 0;
+    struct drain_state *state = &ctx.drain[critical];
+    int status;
+
+    state->queued = false;
+    for (unsigned int i = 0; i < FMU_DRAIN_BUDGET; i++) {
+        status = next_fault(critical);
+        if (status == FWK_PENDING) {
+            /* Keep a deferred NC level masked until C has drained. Re-arming
+             * it here would spin on NC IRQs while a failed C ACK awaits repair. */
+            if (state->waiting_critical)
+                return FWK_SUCCESS;
+            /* The final peek observed no matching root GSR. A new level fault
+             * after that observation retriggers as soon as the IRQ is enabled. */
+            rearm_irq(critical);
+            if (critical)
+                release_noncritical_if_ready();
+            return FWK_SUCCESS;
+        }
+        if (status != FWK_SUCCESS) {
+            drain_failed(critical, status);
+            return FWK_SUCCESS;
+        }
+        state->status.drained++;
+    }
+    /* Remaining faults keep the level asserted. Re-arm so the next batch is
+     * queued by the ISR, behind other ISR work such as SCMI requests. Directly
+     * requeueing here would keep the normal queue nonempty and starve ISR work. */
+    rearm_irq(critical);
+    if (critical)
+        release_noncritical_if_ready();
+    return FWK_SUCCESS;
+}
+
+static int recover(bool critical)
+{
+    if (!ctx.drain[critical].status.masked) {
+        return FWK_E_STATE;
+    }
+    return queue_drain(critical);
+}
+
+static int get_drain_status(bool critical, struct mod_fmu_drain_status *status)
+{
+    if (status == NULL) {
+        return FWK_E_PARAM;
+    }
+    *status = ctx.drain[critical].status;
+    return FWK_SUCCESS;
 }
 
 /*
@@ -425,6 +605,8 @@ struct mod_fmu_api fmu_api = {
     .get_upgrade_enabled = get_upgrade_enabled,
     .set_upgrade_enabled = set_upgrade_enabled,
     .set_critical = set_critical,
+    .recover = recover,
+    .get_drain_status = get_drain_status,
 };
 
 /*
@@ -438,6 +620,7 @@ static int fmu_init(
     fwk_assert(data != NULL);
     fwk_assert(element_count > 0);
 
+    ctx.config = data;
     ctx.num_devices = element_count;
     ctx.device_config =
         fwk_mm_calloc(element_count, sizeof(struct mod_fmu_dev_config *));
@@ -566,6 +749,8 @@ const struct fwk_module module_fmu = {
     .start = fmu_start,
     .bind = fmu_bind,
     .api_count = MOD_FMU_API_COUNT,
+    .event_count = FMU_EVENT_COUNT,
+    .process_event = process_event,
     .process_bind_request = fmu_process_bind_request,
 #ifdef BUILD_HAS_NOTIFICATION
     .notification_count = (unsigned int)MOD_FMU_NOTIFICATION_IDX_COUNT,
