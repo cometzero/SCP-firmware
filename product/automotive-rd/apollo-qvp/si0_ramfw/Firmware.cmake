@@ -186,13 +186,15 @@ endif()
 
 if(SCP_ENABLE_DEBUGGER)
     list(APPEND SCP_MODULE_PATHS
-        "${CMAKE_CURRENT_LIST_DIR}/../module/test_mhu_fce")
+        "${CMAKE_CURRENT_LIST_DIR}/../module/test_mhu_fce"
+        "${CMAKE_CURRENT_LIST_DIR}/../module/test_ae")
     list(APPEND SCP_MODULES "debugger-cli"
         "integration-test"
         "test-fmu"
         "test-ssu"
         "test-sbistc"
-        "test-mhu-fce")
+        "test-mhu-fce"
+        "test-ae")
     if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
         list(APPEND SCP_MODULES
             "test-smcf")

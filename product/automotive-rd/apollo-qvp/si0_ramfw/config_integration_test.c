@@ -14,6 +14,9 @@ enum integration_test {
     TEST_SBISTC,
     TEST_SMCF,
     TEST_MHU_FCE,
+    TEST_AE,
+    TEST_AE_RAM,
+    TEST_FMU_HIERARCHY,
 #ifdef BUILD_HAS_MOD_TEST_GIC_POWER
     TEST_GIC_POWER,
 #endif
@@ -25,6 +28,30 @@ static const struct fwk_element config_integration_test_elements[] = {
         .name = "mhu_fce",
         .data = &(struct mod_integration_test_config){
             .test_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_MHU_FCE),
+            .run_at_start = false,
+            .num_test_cases = 2,
+        },
+    },
+    [TEST_AE] = {
+        .name = "ae",
+        .data = &(struct mod_integration_test_config){
+            .test_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_AE),
+            .run_at_start = false,
+            .num_test_cases = 3,
+        },
+    },
+    [TEST_AE_RAM] = {
+        .name = "ae_ram",
+        .data = &(struct mod_integration_test_config){
+            .test_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TEST_AE, 0),
+            .run_at_start = false,
+            .num_test_cases = 3,
+        },
+    },
+    [TEST_FMU_HIERARCHY] = {
+        .name = "fmu_hierarchy",
+        .data = &(struct mod_integration_test_config){
+            .test_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TEST_AE, 1),
             .run_at_start = false,
             .num_test_cases = 2,
         },
