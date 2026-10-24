@@ -87,8 +87,13 @@ bool __wrap_fwk_is_interrupt_context(void)
 
 static struct fwk_event notification_event_table[4];
 static unsigned int notification_event_count;
+static bool use_real_notification_queue;
+int __real___fwk_put_notification(struct fwk_event *event);
 int __wrap___fwk_put_notification(struct fwk_event *event)
 {
+    if (use_real_notification_queue) {
+        return __real___fwk_put_notification(event);
+    }
     assert(notification_event_count < FWK_ARRAY_SIZE(notification_event_table));
 
     notification_event_table[notification_event_count++] = *event;
@@ -112,6 +117,7 @@ static void test_case_setup(void)
     fwk_mm_calloc_return_val = true;
     get_current_event_return_val = NULL;
     notification_event_count = 0;
+    use_real_notification_queue = false;
 
     for (i = 0; i < FWK_ARRAY_SIZE(fake_module_dlist_table); i++)
         fwk_list_init(&fake_module_dlist_table[i]);
@@ -356,10 +362,72 @@ static void test_fwk_notification_notify(void)
     notification_event_count = 0;
 }
 
+static void test_fwk_notification_atomic_capacity_and_retry(void)
+{
+    unsigned int count = 99;
+    struct fwk_event event = {
+        .id = FWK_ID_NOTIFICATION_INIT(2, 1),
+        .source_id = FWK_ID_MODULE_INIT(2),
+        .params = { 0xA5, 1, 17 },
+    };
+    struct __fwk_ctx *core = __fwk_get_ctx();
+    assert(fwk_notification_subscribe(event.id, event.source_id,
+                                      FWK_ID_MODULE(3)) == FWK_SUCCESS);
+    assert(fwk_notification_subscribe(event.id, event.source_id,
+                                      FWK_ID_MODULE(4)) == FWK_SUCCESS);
+    /* One free slot cannot partially deliver a two-subscriber notification. */
+    assert(__fwk_init(2) == FWK_SUCCESS);
+    void *pool = fwk_mm_calloc_val;
+    struct fwk_slist_node *reserved = fwk_list_pop_head(&core->free_event_queue);
+    use_real_notification_queue = true;
+    assert(fwk_notification_notify_atomic(&event, &count) == FWK_E_NOMEM);
+    assert(count == 0);
+    assert(fwk_list_is_empty(&core->event_queue));
+    assert(fwk_list_is_empty(&core->isr_event_queue));
+    assert(__fwk_has_free_events(1));
+    assert(!__fwk_has_free_events(2));
+
+    /* Release capacity and retry exactly the same value-owned event. */
+    fwk_list_push_tail(&core->free_event_queue, reserved);
+    assert(fwk_notification_notify_atomic(&event, &count) == FWK_SUCCESS);
+    assert(count == 2);
+    assert(!__fwk_has_free_events(1));
+    struct fwk_event *first = FWK_LIST_GET(
+        fwk_list_pop_head(&core->event_queue), struct fwk_event, slist_node);
+    struct fwk_event *second = FWK_LIST_GET(
+        fwk_list_pop_head(&core->event_queue), struct fwk_event, slist_node);
+    assert(first != NULL && second != NULL && first != second);
+    assert(fwk_id_is_equal(first->target_id, FWK_ID_MODULE(3)));
+    assert(fwk_id_is_equal(second->target_id, FWK_ID_MODULE(4)));
+    assert(first->is_notification && second->is_notification);
+    assert(first->params[0] == 0xA5 && second->params[2] == 17);
+    assert(fwk_list_is_empty(&core->event_queue));
+    fwk_list_init(&core->free_event_queue);
+    free(pool);
+}
+
+static void test_fwk_notification_atomic_rejects_unsafe_context(void)
+{
+    unsigned int count = 99;
+    struct fwk_event event = {
+        .id = FWK_ID_NOTIFICATION_INIT(2, 1),
+        .source_id = FWK_ID_MODULE_INIT(2),
+    };
+    interrupt_get_current_return_val = true;
+    assert(fwk_notification_notify_atomic(&event, &count) == FWK_E_HANDLER);
+    assert(count == 0);
+    interrupt_get_current_return_val = false;
+    event.is_delayed_response = true;
+    assert(fwk_notification_notify_atomic(&event, &count) == FWK_E_PARAM);
+    assert(fwk_notification_notify_atomic(NULL, &count) == FWK_E_PARAM);
+}
+
 static const struct fwk_test_case_desc test_case_table[] = {
     FWK_TEST_CASE(test_fwk_notification_subscribe),
     FWK_TEST_CASE(test_fwk_notification_unsubscribe),
-    FWK_TEST_CASE(test_fwk_notification_notify)
+    FWK_TEST_CASE(test_fwk_notification_notify),
+    FWK_TEST_CASE(test_fwk_notification_atomic_capacity_and_retry),
+    FWK_TEST_CASE(test_fwk_notification_atomic_rejects_unsafe_context)
 };
 
 struct fwk_test_suite_desc test_suite = {

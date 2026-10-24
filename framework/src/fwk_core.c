@@ -366,6 +366,17 @@ const struct fwk_event *__fwk_get_current_event(void)
 }
 
 #ifdef BUILD_HAS_NOTIFICATION
+bool __fwk_has_free_events(unsigned int count)
+{
+    struct fwk_slist_node *node = fwk_list_head(&ctx.free_event_queue);
+
+    while (count != 0 && node != NULL) {
+        count--;
+        node = fwk_list_next(&ctx.free_event_queue, node);
+    }
+    return count == 0;
+}
+
 int __fwk_put_notification(struct fwk_event *event)
 {
     event->is_response = false;

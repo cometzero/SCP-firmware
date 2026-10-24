@@ -59,6 +59,12 @@ const struct fwk_event *__fwk_get_current_event(void);
  */
 int __fwk_put_notification(struct fwk_event *event);
 
+/*
+ * Check event pool capacity without allocating. The caller must keep interrupts
+ * disabled until the corresponding events have been queued.
+ */
+bool __fwk_has_free_events(unsigned int count);
+
 /*!
  * \brief Put an event in one of the event queues.
  *

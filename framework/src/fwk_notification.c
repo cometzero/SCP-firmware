@@ -315,3 +315,48 @@ error:
     FWK_LOG_CRIT(err_msg_func, status, __func__);
     return status;
 }
+
+int fwk_notification_notify_atomic(struct fwk_event *event, unsigned int *count)
+{
+    struct fwk_dlist *subscriptions;
+    struct fwk_dlist_node *node;
+    unsigned int required = 0;
+    unsigned int flags;
+
+    if (event == NULL || count == NULL) {
+        return FWK_E_PARAM;
+    }
+    *count = 0;
+    if (fwk_is_interrupt_context()) {
+        return FWK_E_HANDLER;
+    }
+    if (event->is_delayed_response ||
+        !fwk_module_is_valid_entity_id(event->source_id) ||
+        !fwk_module_is_valid_notification_id(event->id) ||
+        fwk_id_get_module_idx(event->id) !=
+            fwk_id_get_module_idx(event->source_id)) {
+        return FWK_E_PARAM;
+    }
+
+    flags = fwk_interrupt_global_disable();
+    subscriptions = get_subscription_dlist(event->id, event->source_id);
+    for (node = fwk_list_head(subscriptions); node != NULL;
+         node = fwk_list_next(subscriptions, node)) {
+        const struct __fwk_notification_subscription *subscription =
+            FWK_LIST_GET(node, struct __fwk_notification_subscription, dlist_node);
+        if (fwk_id_is_equal(subscription->source_id, event->source_id)) {
+            required++;
+        }
+    }
+    if (!__fwk_has_free_events(required)) {
+        fwk_interrupt_global_enable(flags);
+        return FWK_E_NOMEM;
+    }
+    /* No other event producer can consume the checked capacity while IRQs
+     * are excluded in the cooperative framework. No delayed response lookup
+     * is possible, so each enqueue is now guaranteed to succeed. */
+    send_notifications(event, count);
+    fwk_assert(*count == required);
+    fwk_interrupt_global_enable(flags);
+    return FWK_SUCCESS;
+}

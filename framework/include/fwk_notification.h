@@ -93,6 +93,17 @@ int fwk_notification_notify(struct fwk_event *notification_event,
                             unsigned int *count);
 
 /*!
+ * \brief Queue a notification for all current subscribers, or queue none.
+ *
+ * Unlike fwk_notification_notify(), a valid explicit source_id is required.
+ * May only be called outside interrupt context and must not be a delayed
+ * response. On FWK_E_NOMEM, count is zero and the caller can retain the event
+ * by value and retry without duplicating delivery to any subscriber.
+ * Interrupts are excluded during the bounded capacity check and enqueue.
+ */
+int fwk_notification_notify_atomic(struct fwk_event *event, unsigned int *count);
+
+/*!
  * \}
  */
 
