@@ -185,11 +185,14 @@ list(APPEND SCP_MODULES
 endif()
 
 if(SCP_ENABLE_DEBUGGER)
+    list(APPEND SCP_MODULE_PATHS
+        "${CMAKE_CURRENT_LIST_DIR}/../module/test_mhu_fce")
     list(APPEND SCP_MODULES "debugger-cli"
         "integration-test"
         "test-fmu"
         "test-ssu"
-        "test-sbistc")
+        "test-sbistc"
+        "test-mhu-fce")
     if(SCP_PLATFORM_VARIANT STREQUAL "fvp")
         list(APPEND SCP_MODULES
             "test-smcf")

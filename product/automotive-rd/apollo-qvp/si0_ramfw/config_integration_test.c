@@ -13,6 +13,7 @@ enum integration_test {
     TEST_SSU,
     TEST_SBISTC,
     TEST_SMCF,
+    TEST_MHU_FCE,
 #ifdef BUILD_HAS_MOD_TEST_GIC_POWER
     TEST_GIC_POWER,
 #endif
@@ -20,6 +21,14 @@ enum integration_test {
 };
 
 static const struct fwk_element config_integration_test_elements[] = {
+    [TEST_MHU_FCE] = {
+        .name = "mhu_fce",
+        .data = &(struct mod_integration_test_config){
+            .test_id = FWK_ID_MODULE_INIT(FWK_MODULE_IDX_TEST_MHU_FCE),
+            .run_at_start = false,
+            .num_test_cases = 2,
+        },
+    },
     [TEST_FMU] = {
         .name = "fmu",
         .data = &(struct mod_integration_test_config){

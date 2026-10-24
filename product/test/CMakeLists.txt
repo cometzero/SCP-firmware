@@ -199,3 +199,23 @@ foreach(TEST_SRC mod_fmu fmu_system fmu_gic_mhu fmu_ni710ae)
     include(${SCP_ROOT}/unit_test/module_common.cmake)
     target_compile_definitions(${UNIT_TEST_TARGET} PUBLIC BUILD_HAS_NOTIFICATION)
 endforeach()
+
+foreach(TEST_SRC mod_test_mhu_fce)
+    string(REPLACE "mod_" "" AE_MODULE ${TEST_SRC})
+    set(TEST_FILE ${TEST_SRC})
+    set(UNIT_TEST_TARGET apollo_qvp_${TEST_SRC}_unit_test)
+    set(MODULE_SRC ${PRODUCT_ROOT}/automotive-rd/apollo-qvp/module/${AE_MODULE}/src)
+    set(MODULE_INC ${PRODUCT_ROOT}/automotive-rd/apollo-qvp/module/fmu/include)
+    set(MODULE_UT_SRC ${PRODUCT_ROOT}/automotive-rd/apollo-qvp/module/test_ae/test)
+    set(MODULE_UT_INC ${MODULE_UT_SRC})
+    set(MODULE_UT_MOCK_SRC ${MODULE_UT_SRC}/mocks)
+    set(OTHER_MODULE_INC
+        ${MODULE_ROOT}/timer/include ${MODULE_ROOT}/mhu3/include
+        ${MODULE_ROOT}/transport/include ${MODULE_ROOT}/integration_test/include
+        ${PRODUCT_ROOT}/automotive-rd/apollo-qvp/si0_ramfw/include)
+    set(MOCK_REPLACEMENTS fwk_module fwk_core fwk_interrupt fwk_notification)
+    include(${SCP_ROOT}/unit_test/module_common.cmake)
+    target_compile_definitions(${UNIT_TEST_TARGET} PUBLIC BUILD_HAS_NOTIFICATION
+        BUILD_HAS_FAST_CHANNELS BUILD_HAS_MOD_TRANSPORT
+        BUILD_HAS_MOD_TEST_MHU_FCE)
+endforeach()

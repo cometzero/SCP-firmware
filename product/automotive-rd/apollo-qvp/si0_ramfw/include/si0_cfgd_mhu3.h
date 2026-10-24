@@ -28,6 +28,13 @@ enum scp_cfgd_mod_mhu3_device_ap_si0_domain1_idx {
     SI0_CFGD_MOD_MHU3_SI0_AP_DOMAIN1_S_EIDX_COUNT,
 };
 
+#ifdef BUILD_HAS_MOD_TEST_MHU_FCE
+enum scp_cfgd_mod_mhu3_device_ap_si0_ns_fce_idx {
+    SI0_CFGD_MOD_MHU3_AP_NS_FCE_IN = 3,
+    SI0_CFGD_MOD_MHU3_AP_NS_FCE_OUT,
+};
+#endif
+
 enum scp_cfgd_mod_mhu3_device_ap_si0_domain3_idx {
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_0,
     SI0_CFGD_MOD_MHU3_SI0_AP_S_EIDX_PFDI_MONITOR_AP_CLUSTER_0_CORE_1,

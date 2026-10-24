@@ -109,6 +109,10 @@ struct mod_mhu3_channel_config si02ap_ns_dbch_config[] = {
     /* PBX CH 0, FLAG 2, MBX CH 0, FLAG 2 used for SCMI performance protocol */
     [2] = MOD_MHU3_INIT_DBCH(0, 2, 0, 2),
 #endif
+#ifdef BUILD_HAS_MOD_TEST_MHU_FCE
+    [SI0_CFGD_MOD_MHU3_AP_NS_FCE_IN] = MOD_MHU3_INIT_FCH(0, 1, MOD_MHU3_FCH_DIR_IN),
+    [SI0_CFGD_MOD_MHU3_AP_NS_FCE_OUT] = MOD_MHU3_INIT_FCH(0, 1, MOD_MHU3_FCH_DIR_OUT),
+#endif
 };
 
 #if (PLATFORM_VARIANT == APOLLO_FVP_VARIANT_FVP) && (!APOLLO_FVP_VARIANT_CFG1)
@@ -174,6 +178,8 @@ static const struct fwk_element mhu_element_table[]  = {
             .irq = (unsigned int) CL0_MHU3_AP2SI0_NS_IRQ,
             .in = SI0_AP2SI0_NS_MHUV3_RCV_BASE,
             .out = SI0_SI02AP_NS_MHUV3_SEND_BASE,
+            .in_target = UINT64_C(0x400003B040000),
+            .out_target = UINT64_C(0x400003B000000),
             .channels = si02ap_ns_dbch_config,
             .timer_id = FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_TIMER, 0),
             .resp_wait_timeout_us = RESP_WAIT_TIMEOUT_US,

@@ -52,6 +52,9 @@ enum si0_cfgd_mod_timer_si0_timer_alarm_idx {
 #endif
     SI0_CFGD_VMCU_CONTROL_ALARM_IDX,
     SI0_CFGD_VMCU_SAFETY_ALARM_IDX,
+#ifdef BUILD_HAS_MOD_TEST_MHU_FCE
+    SI0_CFGD_MHU_FCE_ALARM_IDX,
+#endif
     SI0_CFGD_MOD_TIMER_SI0_TIMER_ALARM_IDX_COUNT,
 };
 
