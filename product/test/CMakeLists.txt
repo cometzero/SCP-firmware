@@ -156,6 +156,20 @@ add_test(
     NAME apollo_fvp_pcie_cmn_routes_test
     COMMAND apollo_fvp_pcie_cmn_routes_test)
 
+add_executable(apollo_qvp_gic_multiview_map_test
+    ${SCP_ROOT}/product/automotive-rd/apollo-qvp/si0_ramfw/test/test_gic_multiview_map.c)
+target_include_directories(apollo_qvp_gic_multiview_map_test PRIVATE
+    ${SCP_ROOT}/framework/include
+    ${SCP_ROOT}/framework/test/include
+    ${SCP_ROOT}/product/automotive-rd/module/gicx00_multiview/include
+    ${SCP_ROOT}/product/automotive-rd/apollo-qvp/si0_ramfw/include)
+target_compile_options(apollo_qvp_gic_multiview_map_test PRIVATE
+    ${EXTRA_COMPILE_FLAGS} -UNDEBUG)
+target_link_options(apollo_qvp_gic_multiview_map_test PRIVATE --coverage)
+add_test(
+    NAME apollo_qvp_gic_multiview_map_test
+    COMMAND apollo_qvp_gic_multiview_map_test)
+
 # cmake-lint: disable=E1120
 foreach(idx RANGE ${UNIT_PRODUCT_MAX})
     if(idx EQUAL UNIT_PRODUCT_MAX)

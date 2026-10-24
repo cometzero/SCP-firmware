@@ -11,26 +11,8 @@
 
 #include <fwk_module.h>
 
-#define AP_NS_TIMER_IRQ         81
-#define AP_NS_WDOG_IRQ          82
-#define AP_NS_UART_IRQ          84
-#define AP_RAS_FFH_NOTIFY_IRQ   89
-#define AP_SMMU_COMBINED_IRQ    97
-#define AP_MHU3_AP2SI0_NS_IRQ   144
-#define AP_MHU3_SI02AP_NS_IRQ   145
-#define AP_MHU3_AP2SI1_NS_IRQ   152
-#define AP_MHU3_SI12AP_NS_IRQ   153
-#define AP_CLUSTER0_DSU_PMU_IRQ 248
-#define AP_CLUSTER1_DSU_PMU_IRQ 249
-#define AP_CLUSTER2_DSU_PMU_IRQ 250
-#define AP_CLUSTER3_DSU_PMU_IRQ 251
-#define AP_VIRTIO_BLOCK_0_IRQ   289
-#define AP_VIRTIO_BLOCK_1_IRQ   290
-#define AP_VIRTIO_BLOCK_2_IRQ   291
-#define AP_VIRTIO_BLOCK_3_IRQ   292
-#define AP_VIRTIO_NET_IRQ       293
-#define AP_VIRTIO_RNG_IRQ       295
-#define AP_RTC_IRQ              300
+#define AP_SPI_FIRST 32U
+#define AP_SPI_COUNT 960U
 
 /* Safety Island Cluster redistributor to view mapping table */
 static const struct mod_gicx00_multiview_redistributor_map
@@ -96,58 +78,53 @@ static const struct mod_gicx00_multiview_redistributor_map
         { AP_GICR_BASE_VIEW0_3_3, MOD_GICX00_MULTIVIEW_VIEW_1 },
     };
 
-/* Application Processor SPI to view mapping table */
-static const struct mod_gicx00_multiview_spi_map ap_spi_map[] = {
-    /* Application Processor SPI for view 1 */
-    { AP_NS_TIMER_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_NS_WDOG_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_NS_UART_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_RAS_FFH_NOTIFY_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_SMMU_COMBINED_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_MHU3_AP2SI0_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_MHU3_SI02AP_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_CLUSTER0_DSU_PMU_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_CLUSTER1_DSU_PMU_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_CLUSTER2_DSU_PMU_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_CLUSTER3_DSU_PMU_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_VIRTIO_BLOCK_0_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_VIRTIO_BLOCK_1_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_VIRTIO_BLOCK_2_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_VIRTIO_BLOCK_3_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_VIRTIO_NET_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_VIRTIO_RNG_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_RTC_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_MHU3_AP2SI1_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
-    { AP_MHU3_SI12AP_NS_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
+/* QVP's AP GIC implements 960 SPIs, all owned by its single AP view. */
+static struct mod_gicx00_multiview_spi_map ap_spi_map[AP_SPI_COUNT];
+
+static const struct fwk_element element_table[] = {
+    [0] = {
+        .name = "SI",
+        .data =
+            &(struct mod_gicx00_multiview_config){
+                .gicd_base = SI0_GICD_BASE_VIEW0,
+                .redistributor_map = si_redistributor_map,
+                .redistributor_map_count = FWK_ARRAY_SIZE(si_redistributor_map),
+                .spi_map = si_spi_map,
+                .spi_map_count = FWK_ARRAY_SIZE(si_spi_map),
+                .delayed = false,
+            },
+    },
+    [1] = {
+        .name = "AP",
+        .data =
+            &(struct mod_gicx00_multiview_config){
+                .gicd_base = AP_GICD_BASE_VIEW0,
+                .redistributor_map = ap_redistributor_map,
+                .redistributor_map_count = FWK_ARRAY_SIZE(ap_redistributor_map),
+                .spi_map = ap_spi_map,
+                .spi_map_count = FWK_ARRAY_SIZE(ap_spi_map),
+                /* AP GIC configuration must follow CMN configuration. */
+                .delayed = true,
+            },
+    },
+    [2] = { 0 },
 };
 
+static const struct fwk_element *gicx00_multiview_get_element_table(
+    fwk_id_t module_id)
+{
+    unsigned int index;
+
+    (void)module_id;
+
+    for (index = 0; index < FWK_ARRAY_SIZE(ap_spi_map); index++) {
+        ap_spi_map[index].spi = AP_SPI_FIRST + index;
+        ap_spi_map[index].view = MOD_GICX00_MULTIVIEW_VIEW_1;
+    }
+
+    return element_table;
+}
+
 const struct fwk_module_config config_gicx00_multiview = {
-    .elements = FWK_MODULE_STATIC_ELEMENTS({
-        [0] = {
-            .name = "SI",
-            .data =
-                &(struct mod_gicx00_multiview_config){
-                    .gicd_base = SI0_GICD_BASE_VIEW0,
-                    .redistributor_map = si_redistributor_map,
-                    .redistributor_map_count = FWK_ARRAY_SIZE(si_redistributor_map),
-                    .spi_map = si_spi_map,
-                    .spi_map_count = FWK_ARRAY_SIZE(si_spi_map),
-                    .delayed = false,
-                },
-        },
-        [1] = {
-            .name = "AP",
-            .data =
-                &(struct mod_gicx00_multiview_config){
-                    .gicd_base = AP_GICD_BASE_VIEW0,
-                    .redistributor_map = ap_redistributor_map,
-                    .redistributor_map_count = FWK_ARRAY_SIZE(ap_redistributor_map),
-                    .spi_map = ap_spi_map,
-                    .spi_map_count = FWK_ARRAY_SIZE(ap_spi_map),
-                    /* AP GIC multiview needs to be configured after the CMN configuration */
-                    .delayed = true,
-                },
-        },
-        [2] = { 0 },
-    }),
+    .elements = FWK_MODULE_DYNAMIC_ELEMENTS(gicx00_multiview_get_element_table),
 };
