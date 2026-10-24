@@ -36,6 +36,9 @@ struct mhu3_mbx_mdbcw_reg *fake_device_1_mdbcw;
 
 void setUp(void)
 {
+    if (mhu3_ctx.device_ctx_table != NULL) {
+        mhu3_ctx.device_ctx_table[0].started = false;
+    }
 }
 
 void tearDown(void)
@@ -503,13 +506,45 @@ void test_mhu3_fch_register_callback_valid(void)
     fwk_id_t id = FWK_ID_SUB_ELEMENT_INIT(
         FWK_MODULE_IDX_MHU3,
         MHU3_DEVICE_IDX_DEVICE_1,
-        FAKE_DEVICE_1_CHANNEL_FCH_0_OUT_IDX);
+        FAKE_DEVICE_1_CHANNEL_FCH_0_IN_IDX);
 
     /* All valid params, expect success */
     fwk_module_is_valid_sub_element_id_ExpectAnyArgsAndReturn(true);
     status =
         mhu3_fch_register_callback(id, (uintptr_t)&status, fch_callback_test);
     TEST_ASSERT(status == FWK_SUCCESS);
+}
+
+void test_mhu3_fch_callback_rejects_output_and_doorbell(void)
+{
+    unsigned int indices[] = {
+        FAKE_DEVICE_1_CHANNEL_DBCH_0_IDX,
+        FAKE_DEVICE_1_CHANNEL_FCH_0_OUT_IDX,
+    };
+
+    for (unsigned int i = 0; i < FWK_ARRAY_SIZE(indices); i++) {
+        fwk_id_t id = FWK_ID_SUB_ELEMENT(FWK_MODULE_IDX_MHU3, 0, indices[i]);
+
+        fwk_module_is_valid_sub_element_id_ExpectAnyArgsAndReturn(true);
+        TEST_ASSERT_EQUAL(FWK_E_PARAM, mhu3_fch_register_callback(
+            id, (uintptr_t)&indices, fch_callback_test));
+    }
+}
+
+void test_mhu3_fch_bind_does_not_require_doorbell_transport(void)
+{
+    const void *api;
+    fwk_id_t target = FWK_ID_SUB_ELEMENT(FWK_MODULE_IDX_MHU3, 0,
+        FAKE_DEVICE_1_CHANNEL_FCH_0_IN_IDX);
+    struct mhu3_channel_ctx *context = &mhu3_ctx.device_ctx_table[0]
+        .channel_ctx_table[FAKE_DEVICE_1_CHANNEL_FCH_0_IN_IDX];
+
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, mhu3_process_bind_request(
+        FWK_ID_MODULE(FWK_MODULE_IDX_TRANSPORT), target,
+        FWK_ID_API(FWK_MODULE_IDX_MHU3, MOD_MHU3_API_IDX_TRANSPORT_DRIVER),
+        &api));
+    TEST_ASSERT_EQUAL_PTR(&mhu3_mod_transport_driver_api, api);
+    TEST_ASSERT_FALSE(context->transport_id_bound);
 }
 
 void test_mhu3_fch_register_callback_invalid_sub_element_id(void)
@@ -570,14 +605,11 @@ static int mhu3_fake_init(void)
             .data;
 
     /* Allocate some memory for MHU fake device1 PBX/MBX */
-    tmp_pbx_base = aligned_alloc(
-        sizeof(unsigned long),
-        sizeof(struct mhu3_pbx_reg) + MHU3_PBX_PDBCW_PAGE_OFFSET +
-            sizeof(struct mhu3_pbx_pdbcw_reg));
-    tmp_mbx_base = aligned_alloc(
-        sizeof(unsigned long),
-        sizeof(struct mhu3_mbx_reg) + MHU3_MBX_MDBCW_PAGE_OFFSET +
-            sizeof(struct mhu3_mbx_mdbcw_reg));
+    tmp_pbx_base = calloc(1, 0x4000);
+    tmp_mbx_base = calloc(1, 0x4000);
+    if ((tmp_pbx_base == NULL) || (tmp_mbx_base == NULL)) {
+        return -1;
+    }
 
     fake_device_1_pbx_base = (struct mhu3_pbx_reg *)tmp_pbx_base;
     fake_device_1_mbx_base = (struct mhu3_mbx_reg *)tmp_mbx_base;
@@ -588,9 +620,11 @@ static int mhu3_fake_init(void)
                                *)(tmp_mbx_base + MHU3_MBX_MDBCW_PAGE_OFFSET);
 
     feat_spt0 = (uint32_t *)(&fake_device_1_mbx_base->MBX_FEAT_SPT0);
-    *feat_spt0 |= (1U << MHU3_FEAT_SPT0_FCE_SPT_BITSTART);
+    *feat_spt0 = 1U << 8;
     feat_spt0 = (uint32_t *)(&fake_device_1_pbx_base->PBX_FEAT_SPT0);
-    *feat_spt0 |= (1U << MHU3_FEAT_SPT0_FCE_SPT_BITSTART);
+    *feat_spt0 = 1U << 8;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_CFG0 = (FCH_WS_32BIT << 21) | (1U << 10);
+    *(uint32_t *)&fake_device_1_pbx_base->PBX_FCH_CFG0 = (FCH_WS_32BIT << 21) | (1U << 10);
 
     device_config->in = (uintptr_t)fake_device_1_mbx_base;
     device_config->out = (uintptr_t)fake_device_1_pbx_base;
@@ -612,6 +646,115 @@ static int mhu3_fake_init(void)
     }
 
     return 0;
+}
+
+void test_mhu3_fch_register_offsets(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(0x470, offsetof(struct mhu3_mbx_reg, MBX_FCG_INT_ST));
+    TEST_ASSERT_EQUAL_UINT32(
+        0x480, offsetof(struct mhu3_mbx_reg, MBX_FCH_GRP_INT_ST));
+    TEST_ASSERT_EQUAL_UINT32(0xFC8, offsetof(struct mhu3_mbx_reg, IIDR));
+}
+
+void test_mhu3_get_fch_address_group_stride(void)
+{
+    struct mod_mhu3_channel_config *channel =
+        &device_1_channel_config[FAKE_DEVICE_1_CHANNEL_FCH_0_IN_IDX];
+    struct mod_mhu3_channel_config saved = *channel;
+    struct mod_transport_fast_channel_addr address;
+    uint32_t old_cfg = fake_device_1_mbx_base->MBX_FCH_CFG0;
+    fwk_id_t id = FWK_ID_SUB_ELEMENT(
+        FWK_MODULE_IDX_MHU3, 0, FAKE_DEVICE_1_CHANNEL_FCH_0_IN_IDX);
+
+    channel->fch.grp_num = 1;
+    channel->fch.idx = 1;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_CFG0 =
+        (32U << 21) | (31U << 16) | (1U << 11) | 63U;
+    fwk_module_is_valid_sub_element_id_ExpectAnyArgsAndReturn(true);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, mhu3_get_fch_address(id, &address));
+    TEST_ASSERT_EQUAL_UINT(4, address.length);
+    TEST_ASSERT_EQUAL_PTR(
+        (uintptr_t)fake_device_1_mbx_base + 0x3000 + 33 * 4,
+        address.local_view_address);
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_CFG0 =
+        (64U << 21) | (31U << 16) | (1U << 11) | 63U;
+    fwk_module_is_valid_sub_element_id_ExpectAnyArgsAndReturn(true);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, mhu3_get_fch_address(id, &address));
+    TEST_ASSERT_EQUAL_UINT(8, address.length);
+    TEST_ASSERT_EQUAL_PTR(
+        (uintptr_t)fake_device_1_mbx_base + 0x3000 + 33 * 8,
+        address.local_view_address);
+    *channel = saved;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_CFG0 = old_cfg;
+}
+
+static void check_fch_channel(uint32_t cfg, unsigned int group,
+                              unsigned int index, int expected)
+{
+    struct mhu3_device_ctx saved = mhu3_ctx.device_ctx_table[0];
+    struct mod_mhu3_device_config config = *saved.config;
+    struct mod_mhu3_channel_config channel =
+        MOD_MHU3_INIT_FCH(index, group, MOD_MHU3_FCH_DIR_IN);
+    uint32_t old_cfg = fake_device_1_mbx_base->MBX_FCH_CFG0;
+
+    config.channels = &channel;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_CFG0 = cfg | (1U << 10);
+    TEST_ASSERT_EQUAL(expected, mhu3_device_init(
+        FWK_ID_ELEMENT(FWK_MODULE_IDX_MHU3, 0), 1, &config));
+    mhu3_ctx.device_ctx_table[0] = saved;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_CFG0 = old_cfg;
+}
+
+void test_mhu3_fch_configuration_boundaries(void)
+{
+    uint32_t cfg = (32U << 21) | (31U << 16) | (1U << 11) | 32U;
+
+    check_fch_channel(cfg, 0, 31, FWK_SUCCESS);
+    check_fch_channel(cfg, 1, 0, FWK_SUCCESS);
+    check_fch_channel(cfg, 1, 1, FWK_E_PARAM);
+    check_fch_channel(cfg, 2, 0, FWK_E_PARAM);
+    check_fch_channel(cfg, 0, 32, FWK_E_PARAM);
+    cfg = (32U << 21) | (1U << 11) | 1U;
+    check_fch_channel(cfg, 1, 0, FWK_SUCCESS);
+    check_fch_channel(cfg, 0, 1, FWK_E_PARAM);
+    check_fch_channel(0, 0, 0, FWK_E_PARAM);
+    cfg = (64U << 21) | (31U << 16) | (31U << 11) | 1023U;
+    check_fch_channel(cfg, 0, 0, FWK_E_PARAM);
+}
+
+static void count_fch_callback(uintptr_t param)
+{
+    (*(unsigned int *)param)++;
+}
+
+void test_mhu3_isr_dispatches_only_inbound_fch(void)
+{
+    struct mhu3_device_ctx *device = &mhu3_ctx.device_ctx_table[0];
+    struct mhu3_device_ctx saved = *device;
+    struct mod_mhu3_device_config config = *device->config;
+    struct mod_mhu3_channel_config channels[] = {
+        MOD_MHU3_INIT_FCH(0, 1, MOD_MHU3_FCH_DIR_IN),
+        MOD_MHU3_INIT_FCH(0, 1, MOD_MHU3_FCH_DIR_OUT),
+    };
+    unsigned int inbound = 0, outbound = 0;
+    struct mhu3_channel_ctx contexts[] = {
+        { .callback = count_fch_callback, .callback_param = (uintptr_t)&inbound },
+        { .callback = count_fch_callback, .callback_param = (uintptr_t)&outbound },
+    };
+    unsigned int interrupt = config.irq;
+
+    config.channels = channels;
+    device->config = &config;
+    device->channels_count = 2;
+    device->channel_ctx_table = contexts;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_GRP_INT_ST[1] = 1;
+    fwk_interrupt_get_current_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    fwk_interrupt_get_current_ReturnThruPtr_interrupt(&interrupt);
+    mhu3_isr();
+    TEST_ASSERT_EQUAL_UINT(1, inbound);
+    TEST_ASSERT_EQUAL_UINT(0, outbound);
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_GRP_INT_ST[1] = 0;
+    *device = saved;
 }
 
 static unsigned int doorbell_callbacks;
@@ -691,6 +834,64 @@ void test_mhu3_isr_shared_channel_ignores_masked_and_inactive_flags(void)
     check_shared_doorbell_flags(0, 14, 14, 0, 0);
 }
 
+void test_mhu3_fast_channel_ownership_masks_and_drains_unregistered(void)
+{
+    struct mhu3_device_ctx saved = mhu3_ctx.device_ctx_table[0];
+    struct mod_mhu3_device_config config = *saved.config;
+    struct mod_mhu3_channel_config channel =
+        MOD_MHU3_INIT_FCH(0, 1, MOD_MHU3_FCH_DIR_IN);
+    unsigned int callbacks = 0;
+    struct mhu3_channel_ctx callback = {
+        .callback = count_fch_callback, .callback_param = (uintptr_t)&callbacks,
+    };
+    config.channels = &channel;
+    mhu3_ctx.device_ctx_table[0] = (struct mhu3_device_ctx){
+        .config = &config, .channel_ctx_table = &callback, .channels_count = 1,
+        .fch_group_size = 32, .fch_count = 64, .fch_word_bytes = 4,
+    };
+    fake_device_1_mbx_base->MBX_FCG_INT_EN = UINT32_MAX;
+    fwk_interrupt_set_isr_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    fwk_interrupt_enable_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, mhu3_start(FWK_ID_ELEMENT(FWK_MODULE_IDX_MHU3, 0)));
+    TEST_ASSERT_EQUAL_HEX32(2, fake_device_1_mbx_base->MBX_FCG_INT_EN);
+    TEST_ASSERT_EQUAL_HEX32(1, mhu3_ctx.device_ctx_table[0].owned_fch[1]);
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_GRP_INT_ST[0] = 1UL << 31;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_GRP_INT_ST[1] = 3;
+    unsigned int irq = config.irq;
+    fwk_interrupt_get_current_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    fwk_interrupt_get_current_ReturnThruPtr_interrupt(&irq);
+    mhu3_isr();
+    TEST_ASSERT_EQUAL_UINT(1, callbacks);
+    TEST_ASSERT_EQUAL_UINT(1, mhu3_ctx.device_ctx_table[0].stats.callbacks);
+    TEST_ASSERT_EQUAL_UINT(1, mhu3_ctx.device_ctx_table[0].stats.unregistered);
+    TEST_ASSERT_EQUAL_UINT(33,
+        mhu3_ctx.device_ctx_table[0].stats.last_unregistered_channel);
+    TEST_ASSERT_EQUAL_HEX32(1UL << 31,
+        fake_device_1_mbx_base->MBX_FCH_GRP_INT_ST[0]);
+    /* A channel without a callback owns no IRQ group. */
+    callback.callback = NULL;
+    fwk_interrupt_set_isr_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    fwk_interrupt_enable_ExpectAnyArgsAndReturn(FWK_SUCCESS);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, mhu3_start(FWK_ID_ELEMENT(FWK_MODULE_IDX_MHU3, 0)));
+    TEST_ASSERT_EQUAL_HEX32(0, fake_device_1_mbx_base->MBX_FCG_INT_EN);
+    TEST_ASSERT_EQUAL_HEX32(0,
+        fake_device_1_mbx_base->MBX_FCH_CTRL & SCP_MHU3_MBX_INT_EN);
+    fwk_module_is_valid_sub_element_id_ExpectAnyArgsAndReturn(true);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, mhu3_fch_register_callback(
+        FWK_ID_SUB_ELEMENT(FWK_MODULE_IDX_MHU3, 0, 0),
+        (uintptr_t)&callbacks, count_fch_callback));
+    TEST_ASSERT_EQUAL_HEX32(2, fake_device_1_mbx_base->MBX_FCG_INT_EN);
+    TEST_ASSERT_EQUAL_HEX32(1, mhu3_ctx.device_ctx_table[0].owned_fch[1]);
+    /* A globally valid foreign module ID cannot index this device table. */
+    fwk_module_is_valid_sub_element_id_ExpectAnyArgsAndReturn(true);
+    TEST_ASSERT_EQUAL(FWK_E_PARAM, mhu3_fch_register_callback(
+        FWK_ID_SUB_ELEMENT(FWK_MODULE_IDX_MHU3 + 1, 0, 0),
+        (uintptr_t)&callbacks, count_fch_callback));
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_GRP_INT_ST[0] = 0;
+    *(uint32_t *)&fake_device_1_mbx_base->MBX_FCH_GRP_INT_ST[1] = 0;
+    mhu3_ctx.device_ctx_table[0] = saved;
+}
+
 int mhu3_test_main(void)
 {
     int status;
@@ -725,9 +926,16 @@ int mhu3_test_main(void)
     RUN_TEST(test_mhu3_get_fch_interrupt_null_fch_interrupt_type);
     RUN_TEST(test_mhu3_get_fch_interrupt_type_valid);
     RUN_TEST(test_mhu3_fch_register_callback_valid);
+    RUN_TEST(test_mhu3_fch_callback_rejects_output_and_doorbell);
+    RUN_TEST(test_mhu3_fch_bind_does_not_require_doorbell_transport);
     RUN_TEST(test_mhu3_fch_register_callback_invalid_sub_element_id);
     RUN_TEST(test_mhu3_fch_register_callback_null_param);
     RUN_TEST(test_mhu3_fch_register_callback_null_callback_addr);
+    RUN_TEST(test_mhu3_fast_channel_ownership_masks_and_drains_unregistered);
+    RUN_TEST(test_mhu3_fch_register_offsets);
+    RUN_TEST(test_mhu3_get_fch_address_group_stride);
+    RUN_TEST(test_mhu3_fch_configuration_boundaries);
+    RUN_TEST(test_mhu3_isr_dispatches_only_inbound_fch);
     RUN_TEST(test_mhu3_isr_shared_channel_dispatches_only_pending_flag);
     RUN_TEST(test_mhu3_isr_shared_channel_preserves_other_w1c_flags);
     RUN_TEST(test_mhu3_isr_shared_channel_ignores_masked_and_inactive_flags);

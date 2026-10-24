@@ -32,6 +32,9 @@ set(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS_INIT FALSE)
 option(SCP_ENABLE_SCMI_PERF_FAST_CHANNELS
        "Enable the SCMI-perf Fast channels?" OFF)
 
+# Hardware MHU payload channels do not require SCMI shared-memory polling.
+set(SCP_ENABLE_MHU3_FAST_CHANNELS TRUE)
+
 set(SCP_ENABLE_EXCEPTION_SYMTAB TRUE)
 set(SCP_EXCEPTION_SYMTAB_MAX_SIZE 131072)
 

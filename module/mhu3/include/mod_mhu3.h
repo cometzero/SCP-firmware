@@ -11,9 +11,7 @@
 #ifndef MOD_MHU3_H
 #define MOD_MHU3_H
 
-#ifdef BUILD_HAS_MOD_TIMER
-#    include <fwk_id.h>
-#endif
+#include <fwk_id.h>
 
 #include <fwk_macros.h>
 
@@ -50,8 +48,20 @@ enum mod_mhu3_api_idx {
     /*! TRANSPORT driver API */
     MOD_MHU3_API_IDX_TRANSPORT_DRIVER,
 #endif
+    MOD_MHU3_API_IDX_DIAGNOSTIC,
     /*! MHU3 API count */
     MOD_MHU3_API_IDX_COUNT,
+};
+
+struct mod_mhu3_stats {
+    uint32_t irq_entries;
+    uint32_t callbacks;
+    uint32_t unregistered;
+    uint32_t last_unregistered_channel;
+};
+
+struct mod_mhu3_diagnostic_api {
+    int (*get_stats)(fwk_id_t device_id, struct mod_mhu3_stats *stats);
 };
 
 /*! \brief Doorbell channel configuration

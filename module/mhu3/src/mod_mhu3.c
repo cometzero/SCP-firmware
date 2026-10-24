@@ -64,6 +64,13 @@ struct mhu3_device_ctx {
     struct mhu3_channel_ctx *channel_ctx_table;
     /* Number of channels (represented by sub-elements) */
     unsigned int channels_count;
+    uint32_t owned_fch[32];
+    uint32_t enabled_fcg;
+    unsigned int fch_group_size;
+    unsigned int fch_count;
+    unsigned int fch_word_bytes;
+    bool started;
+    struct mod_mhu3_stats stats;
 #ifdef BUILD_HAS_MOD_TIMER
     /*! Timer API */
     const struct mod_timer_api *timer_api;
@@ -115,6 +122,10 @@ static void mhu3_isr(void)
         return;
     }
     mbx_reg = (struct mhu3_mbx_reg *)device_ctx->config->in;
+    if (mbx_reg == NULL) {
+        return;
+    }
+    device_ctx->stats.irq_entries++;
     /*
      * In case we need to use it for doorbell. This way we don't have to assign
      * it every time we have a doorbell channel inside the loop
@@ -160,9 +171,10 @@ static void mhu3_isr(void)
             break;
 
         case MOD_MHU3_CHANNEL_TYPE_FCH:
-            if (((mbx_reg->MBX_FCH_GRP_INT_ST[channel->fch.grp_num] >>
+            if ((channel->fch.direction == MOD_MHU3_FCH_DIR_IN) &&
+                (((mbx_reg->MBX_FCH_GRP_INT_ST[channel->fch.grp_num] >>
                   channel->fch.idx) &
-                 1u) != 0u) {
+                 1u) != 0u)) {
                 channel_ctx = &(device_ctx->channel_ctx_table[pending]);
                 /*
                  * We only check for whether the callback is NULL as the
@@ -171,6 +183,7 @@ static void mhu3_isr(void)
                  * cycles here.
                  */
                 if (channel_ctx->callback != NULL) {
+                    device_ctx->stats.callbacks++;
                     channel_ctx->callback(channel_ctx->callback_param);
                 }
             }
@@ -181,6 +194,33 @@ static void mhu3_isr(void)
         }
         pending++;
     }
+    /* Group IRQ masks cannot isolate a single unowned channel. Drain such
+     * payloads only in owned groups and report them instead of livelocking. */
+    for (unsigned int group = 0; group < 32; group++) {
+        if (!(device_ctx->enabled_fcg & (1UL << group))) {
+            continue;
+        }
+        uint32_t unowned = mbx_reg->MBX_FCH_GRP_INT_ST[group] &
+            ~device_ctx->owned_fch[group];
+        for (unsigned int bit = 0; bit < device_ctx->fch_group_size; bit++) {
+            unsigned int channel = group * device_ctx->fch_group_size + bit;
+            if (!(unowned & (1UL << bit)) || channel >= device_ctx->fch_count) {
+                continue;
+            }
+            uintptr_t address = device_ctx->config->in +
+                MHU3_MBX_MDFCW_PAGE_OFFSET +
+                channel * device_ctx->fch_word_bytes;
+            if (device_ctx->fch_word_bytes == sizeof(uint64_t)) {
+                (void)*(volatile uint64_t *)address;
+            } else {
+                (void)*(volatile uint32_t *)address;
+            }
+            device_ctx->stats.unregistered++;
+            device_ctx->stats.last_unregistered_channel = channel;
+            FWK_LOG_ERR("MHU_FCE_UNREGISTERED channel=%u", channel);
+        }
+    }
+
 }
 
 static bool is_channel_free(void *channel_data)
@@ -256,6 +296,15 @@ static int mhu3_raise_interrupt(fwk_id_t ch_id)
 
 #ifdef BUILD_HAS_FAST_CHANNELS
 
+static bool owns_channel(fwk_id_t id)
+{
+    unsigned int element = fwk_id_get_element_idx(id);
+    return fwk_id_get_module_idx(id) == FWK_MODULE_IDX_MHU3 &&
+        element < mhu3_ctx.device_count &&
+        fwk_id_get_sub_element_idx(id) <
+            mhu3_ctx.device_ctx_table[element].channels_count;
+}
+
 static int mhu3_get_fch_address(
     fwk_id_t fch_id,
     struct mod_transport_fast_channel_addr *fch_addr)
@@ -270,7 +319,8 @@ static int mhu3_get_fch_address(
     struct mod_mhu3_fc_config *fch_channel;
     uint32_t fch_cfg0;
 
-    if (!fwk_module_is_valid_sub_element_id(fch_id) || (fch_addr == NULL)) {
+    if (!fwk_module_is_valid_sub_element_id(fch_id) || !owns_channel(fch_id) ||
+        (fch_addr == NULL)) {
         return status;
     }
 
@@ -306,10 +356,10 @@ static int mhu3_get_fch_address(
         if (status == FWK_SUCCESS) {
             fch_offset = fch_channel->idx +
                 fch_channel->grp_num *
-                    MHU3_MASKED_RECOVER(
+                    (1u + MHU3_MASKED_RECOVER(
                         fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_PER_GRP_MASK,
                         MHU3_FCH_CFG0_NUM_FCH_PER_GRP_BITSTART,
-                        MHU3_FCH_CFG0_NUM_FCH_PER_GRP_LEN);
+                        MHU3_FCH_CFG0_NUM_FCH_PER_GRP_LEN));
             fch_addr->length = (MHU3_MASKED_RECOVER(
                                     fch_cfg0 & MHU3_FCH_CFG0_FCH_WS_MASK,
                                     MHU3_FCH_CFG0_FCH_WS_BITSTART,
@@ -338,7 +388,7 @@ static int mhu3_get_fch_interrupt_type(
     struct mod_mhu3_channel_config *channel;
     unsigned int ch_idx;
 
-    if (!fwk_module_is_valid_sub_element_id(fch_id) ||
+    if (!fwk_module_is_valid_sub_element_id(fch_id) || !owns_channel(fch_id) ||
         (fch_interrupt_type == NULL)) {
         return FWK_E_PARAM;
     }
@@ -364,21 +414,37 @@ static int mhu3_fch_register_callback(
     struct mhu3_device_ctx *device_ctx;
     unsigned int ch_idx;
     struct mhu3_channel_ctx *channel_ctx;
+    struct mod_mhu3_channel_config *channel;
 
     if ((fch_callback == NULL) || ((void *)param == NULL)) {
         return FWK_E_PARAM;
     }
 
-    if (!fwk_module_is_valid_sub_element_id(fch_id)) {
+    if (!fwk_module_is_valid_sub_element_id(fch_id) || !owns_channel(fch_id)) {
         return FWK_E_PARAM;
     }
 
     device_ctx = &mhu3_ctx.device_ctx_table[fwk_id_get_element_idx(fch_id)];
     ch_idx = fwk_id_get_sub_element_idx(fch_id);
+    channel = &device_ctx->config->channels[ch_idx];
+    if ((channel->type != MOD_MHU3_CHANNEL_TYPE_FCH) ||
+        (channel->fch.direction != MOD_MHU3_FCH_DIR_IN)) {
+        return FWK_E_PARAM;
+    }
+    /* Some transport clients register during start, after this driver starts.
+     * Publish the callback and its group ownership in one interrupt exclusion. */
+    unsigned int flags = fwk_interrupt_global_disable();
     channel_ctx = &(device_ctx->channel_ctx_table[ch_idx]);
-    channel_ctx->callback = fch_callback;
     channel_ctx->callback_param = param;
-
+    channel_ctx->callback = fch_callback;
+    if (device_ctx->started) {
+        struct mhu3_mbx_reg *mbx = (void *)device_ctx->config->in;
+        device_ctx->owned_fch[channel->fch.grp_num] |= 1UL << channel->fch.idx;
+        device_ctx->enabled_fcg |= 1UL << channel->fch.grp_num;
+        mbx->MBX_FCG_INT_EN = device_ctx->enabled_fcg;
+        mbx->MBX_FCH_CTRL |= SCP_MHU3_MBX_INT_EN;
+    }
+    fwk_interrupt_global_enable(flags);
     return FWK_SUCCESS;
 }
 
@@ -425,7 +491,8 @@ static int mhu3_device_init(
     struct mhu3_device_ctx *device_ctx;
     struct mhu3_mbx_reg *mbx_reg;
     struct mhu3_pbx_reg *pbx_reg;
-    uint32_t fch_cfg0, ext_suprt;
+    uint32_t fch_cfg0, ext_suprt, group_size, group_count, channel_count;
+    uint32_t word_bits;
     struct mod_mhu3_channel_config *channel;
     unsigned int channel_num;
 
@@ -450,68 +517,51 @@ static int mhu3_device_init(
     for (channel_num = 0u; channel_num < sub_element_count; channel_num++) {
         channel = &(device_ctx->config->channels[channel_num]);
         if (channel->type == MOD_MHU3_CHANNEL_TYPE_FCH) {
-            if (channel->fch.direction == MOD_MHU3_FCH_DIR_IN) {
+            if ((channel->fch.direction == MOD_MHU3_FCH_DIR_IN) &&
+                (mbx_reg != NULL)) {
                 fch_cfg0 = mbx_reg->MBX_FCH_CFG0;
                 ext_suprt = mbx_reg->MBX_FEAT_SPT0;
-            } else {
+            } else if ((channel->fch.direction == MOD_MHU3_FCH_DIR_OUT) &&
+                       (pbx_reg != NULL)) {
                 fch_cfg0 = pbx_reg->PBX_FCH_CFG0;
                 ext_suprt = pbx_reg->PBX_FEAT_SPT0;
-            }
-            if (((ext_suprt & MHU3_FEAT_SPT0_FCE_SPT_MASK) == 0u) ||
-                (channel->fch.grp_num >
-                 MHU3_MASKED_RECOVER(
-                     fch_cfg0 & MHU3_FCH_CFG0_NUM_FCG_MASK,
-                     MHU3_FCH_CFG0_NUM_FCG_BITSTART,
-                     MHU3_FCH_CFG0_NUM_FCG_LEN))) {
+            } else {
                 status = FWK_E_PARAM;
                 break;
             }
-            if ((fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_PER_GRP_MASK) == 0u) {
-                if (channel->fch.idx >
-                    MHU3_MASKED_RECOVER(
-                        fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_MASK,
-                        MHU3_FCH_CFG0_NUM_FCH_BITSTART,
-                        MHU3_FCH_CFG0_NUM_FCH_LEN)) {
-                    status = FWK_E_PARAM;
-                    break;
-                }
-            } else {
-                if (channel->fch.idx >
-                    MHU3_MASKED_RECOVER(
-                        fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_PER_GRP_MASK,
-                        MHU3_FCH_CFG0_NUM_FCH_PER_GRP_BITSTART,
-                        MHU3_FCH_CFG0_NUM_FCH_PER_GRP_LEN)) {
-                    status = FWK_E_PARAM;
-                    break;
-                }
-                if ((channel->fch.grp_num ==
-                     MHU3_MASKED_RECOVER(
-                         fch_cfg0 & MHU3_FCH_CFG0_NUM_FCG_MASK,
-                         MHU3_FCH_CFG0_NUM_FCG_BITSTART,
-                         MHU3_FCH_CFG0_NUM_FCG_LEN)) &&
-                    ((fch_cfg0 & MHU3_FCH_CFG0_NUM_FCG_MASK) != 0u)) {
-                    /*
-                     * Verify that the last Group contains an appropiate amounts
-                     * of Channels.
-                     */
-                    if (channel->fch.idx >=
-                        (MHU3_MASKED_RECOVER(
-                             fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_MASK,
-                             MHU3_FCH_CFG0_NUM_FCH_BITSTART,
-                             MHU3_FCH_CFG0_NUM_FCH_LEN) -
-                         (MHU3_MASKED_RECOVER(
-                              fch_cfg0 & MHU3_FCH_CFG0_NUM_FCG_MASK,
-                              MHU3_FCH_CFG0_NUM_FCG_BITSTART,
-                              MHU3_FCH_CFG0_NUM_FCG_LEN) -
-                          1u) *
-                             MHU3_MASKED_RECOVER(
-                                 fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_PER_GRP_MASK,
-                                 MHU3_FCH_CFG0_NUM_FCH_PER_GRP_BITSTART,
-                                 MHU3_FCH_CFG0_NUM_FCH_PER_GRP_LEN))) {
-                        status = FWK_E_PARAM;
-                        break;
-                    }
-                }
+            /* All three channel-count fields encode the count minus one. */
+            group_size = 1u + MHU3_MASKED_RECOVER(
+                fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_PER_GRP_MASK,
+                MHU3_FCH_CFG0_NUM_FCH_PER_GRP_BITSTART,
+                MHU3_FCH_CFG0_NUM_FCH_PER_GRP_LEN);
+            group_count = 1u + MHU3_MASKED_RECOVER(
+                fch_cfg0 & MHU3_FCH_CFG0_NUM_FCG_MASK,
+                MHU3_FCH_CFG0_NUM_FCG_BITSTART,
+                MHU3_FCH_CFG0_NUM_FCG_LEN);
+            channel_count = 1u + MHU3_MASKED_RECOVER(
+                fch_cfg0 & MHU3_FCH_CFG0_NUM_FCH_MASK,
+                MHU3_FCH_CFG0_NUM_FCH_BITSTART,
+                MHU3_FCH_CFG0_NUM_FCH_LEN);
+            word_bits = MHU3_MASKED_RECOVER(
+                fch_cfg0 & MHU3_FCH_CFG0_FCH_WS_MASK,
+                MHU3_FCH_CFG0_FCH_WS_BITSTART,
+                MHU3_FCH_CFG0_FCH_WS_LEN);
+            if ((channel->fch.direction == MOD_MHU3_FCH_DIR_IN &&
+                 !(fch_cfg0 & (1UL << 10))) ||
+                ((ext_suprt & MHU3_FEAT_SPT0_FCE_SPT_MASK) == 0u) ||
+                ((word_bits != FCH_WS_32BIT) && (word_bits != FCH_WS_64BIT)) ||
+                (channel_count * word_bits > 0x1000U * 8U) ||
+                (channel->fch.grp_num >= group_count) ||
+                (channel->fch.idx >= group_size) ||
+                (channel->fch.grp_num * group_size + channel->fch.idx >=
+                 channel_count)) {
+                status = FWK_E_PARAM;
+                break;
+            }
+            if (channel->fch.direction == MOD_MHU3_FCH_DIR_IN) {
+                device_ctx->fch_group_size = group_size;
+                device_ctx->fch_count = channel_count;
+                device_ctx->fch_word_bytes = word_bits / 8;
             }
         }
     }
@@ -567,6 +617,24 @@ static int mhu3_bind(fwk_id_t id, unsigned int round)
     return FWK_SUCCESS;
 }
 
+static int get_stats(fwk_id_t device_id, struct mod_mhu3_stats *stats)
+{
+    unsigned int element = fwk_id_get_element_idx(device_id);
+    if (stats == NULL || fwk_id_get_module_idx(device_id) != FWK_MODULE_IDX_MHU3 ||
+        !fwk_id_is_type(device_id, FWK_ID_TYPE_ELEMENT) ||
+        element >= mhu3_ctx.device_count) {
+        return FWK_E_PARAM;
+    }
+    unsigned int flags = fwk_interrupt_global_disable();
+    *stats = mhu3_ctx.device_ctx_table[element].stats;
+    fwk_interrupt_global_enable(flags);
+    return FWK_SUCCESS;
+}
+
+static const struct mod_mhu3_diagnostic_api diagnostic_api = {
+    .get_stats = get_stats,
+};
+
 static int mhu3_process_bind_request(
     fwk_id_t source_id,
     fwk_id_t target_id,
@@ -578,6 +646,11 @@ static int mhu3_process_bind_request(
     struct mhu3_channel_ctx *channel_ctx;
     unsigned int ch_idx;
 
+    if (fwk_id_get_api_idx(api_id) == MOD_MHU3_API_IDX_DIAGNOSTIC &&
+        fwk_id_is_type(target_id, FWK_ID_TYPE_ELEMENT)) {
+        *api = &diagnostic_api;
+        return FWK_SUCCESS;
+    }
     if (!fwk_id_is_type(target_id, FWK_ID_TYPE_SUB_ELEMENT)) {
         /*
          * Something tried to bind to the module or an element. Only binding to
@@ -595,8 +668,11 @@ static int mhu3_process_bind_request(
 
     switch (api_id_type) {
     case MOD_MHU3_API_IDX_TRANSPORT_DRIVER:
-        channel_ctx->transport_id = source_id;
-        channel_ctx->transport_id_bound = true;
+        if (device_ctx->config->channels[ch_idx].type ==
+            MOD_MHU3_CHANNEL_TYPE_DBCH) {
+            channel_ctx->transport_id = source_id;
+            channel_ctx->transport_id_bound = true;
+        }
         *api = &mhu3_mod_transport_driver_api;
         break;
 
@@ -632,6 +708,29 @@ static int mhu3_start(fwk_id_t id)
         mbx->MBX_CTRL |= MHU3_OP_REQ;
     }
 
+    device_ctx->enabled_fcg = 0;
+    for (i = 0; i < 32; i++) {
+        device_ctx->owned_fch[i] = 0;
+    }
+    for (i = 0; i < device_ctx->channels_count; i++) {
+        const struct mod_mhu3_channel_config *channel =
+            &device_ctx->config->channels[i];
+        if (channel->type == MOD_MHU3_CHANNEL_TYPE_FCH &&
+            channel->fch.direction == MOD_MHU3_FCH_DIR_IN &&
+            device_ctx->channel_ctx_table[i].callback != NULL) {
+            device_ctx->owned_fch[channel->fch.grp_num] |=
+                1UL << channel->fch.idx;
+            device_ctx->enabled_fcg |= 1UL << channel->fch.grp_num;
+        }
+    }
+    if (mbx != NULL && (mbx->MBX_FEAT_SPT0 & MHU3_FEAT_SPT0_FCE_SPT_MASK)) {
+        mbx->MBX_FCH_CTRL &= ~SCP_MHU3_MBX_INT_EN;
+        mbx->MBX_FCG_INT_EN = device_ctx->enabled_fcg;
+        if (device_ctx->enabled_fcg != 0) {
+            mbx->MBX_FCH_CTRL |= SCP_MHU3_MBX_INT_EN;
+        }
+    }
+
     status = fwk_interrupt_set_isr(device_ctx->config->irq, &mhu3_isr);
     if (status != FWK_SUCCESS) {
         return status;
@@ -642,13 +741,7 @@ static int mhu3_start(fwk_id_t id)
         return status;
     }
 
-    for (i = 0u; i < device_ctx->channels_count; i++) {
-        if (device_ctx->config->channels[i].type == MOD_MHU3_CHANNEL_TYPE_FCH) {
-            mbx->MBX_FCH_CTRL |= SCP_MHU3_MBX_INT_EN;
-            mbx->MBX_FCG_INT_EN |= 1u
-                << device_ctx->config->channels[i].fch.grp_num;
-        }
-    }
+    device_ctx->started = true;
 
     return FWK_SUCCESS;
 }

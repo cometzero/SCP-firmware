@@ -113,11 +113,12 @@ struct mhu3_mbx_reg {
     uint8_t RESERVED9[0x400 - 0x164];
     FWK_R uint32_t MBX_DBCH_INT_ST[(0x410 - 0x400) >> 2];
     FWK_R uint32_t MBX_FFCH_INT_ST[(0x420 - 0x410) >> 2];
+    uint8_t RESERVED10[0x470 - 0x420];
     FWK_R uint32_t MBX_FCG_INT_ST;
-    uint8_t RESERVED10[0x430 - 0x424];
-    FWK_R uint32_t MBX_FCH_GRP_INT_ST[(0x4B0 - 0x430) >> 2];
+    uint8_t RESERVED11[0x480 - 0x474];
+    FWK_R uint32_t MBX_FCH_GRP_INT_ST[(0x500 - 0x480) >> 2];
     FWK_R uint32_t MBX_DCH_INT_ST;
-    uint8_t RESERVED11[0xFC8 - 0x4B4];
+    uint8_t RESERVED12[0xFC8 - 0x504];
     FWK_R uint32_t IIDR;
     FWK_R uint32_t AIDR;
     FWK_R uint32_t IMPL_DEF_ID[4 * 11];
