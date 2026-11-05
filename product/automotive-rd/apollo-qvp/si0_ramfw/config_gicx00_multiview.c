@@ -14,6 +14,15 @@
 #define AP_SPI_FIRST 32U
 #define AP_SPI_COUNT 960U
 
+/* One cluster PPU followed by four core PPUs in each AP cluster. */
+#define AP_PPU_VIEW1(base) \
+    { (base), MOD_GICX00_MULTIVIEW_VIEW_1 }, \
+    { (base) + 1, MOD_GICX00_MULTIVIEW_VIEW_1 }, \
+    { (base) + 2, MOD_GICX00_MULTIVIEW_VIEW_1 }, \
+    { (base) + 3, MOD_GICX00_MULTIVIEW_VIEW_1 }, \
+    { (base) + 4, MOD_GICX00_MULTIVIEW_VIEW_1 }
+#define AP_PPU_IRQ_STRIDE (CL0_AP_CLUSTER1_PPU_IRQ - CL0_AP_CLUSTER0_PPU_IRQ)
+
 /* Safety Island Cluster redistributor to view mapping table */
 static const struct mod_gicx00_multiview_redistributor_map
     si_redistributor_map[] = {
@@ -37,6 +46,11 @@ static const struct mod_gicx00_multiview_spi_map si_spi_map[] = {
     { CL0_MHU3_RSE2SI0_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { CL0_FMU_CRITICAL, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { CL0_FMU_NON_CRITICAL, MOD_GICX00_MULTIVIEW_VIEW_1 },
+    /* SCP must receive dynamic OFF completion before accepting CPU_ON. */
+    AP_PPU_VIEW1(CL0_AP_CLUSTER0_PPU_IRQ),
+    AP_PPU_VIEW1(CL0_AP_CLUSTER0_PPU_IRQ + AP_PPU_IRQ_STRIDE),
+    AP_PPU_VIEW1(CL0_AP_CLUSTER0_PPU_IRQ + 2 * AP_PPU_IRQ_STRIDE),
+    AP_PPU_VIEW1(CL0_AP_CLUSTER0_PPU_IRQ + 3 * AP_PPU_IRQ_STRIDE),
     { CL0_AP_NS_WDOG_WS1_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { CL0_AP_ERR_CLUSTER0_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },
     { CL0_AP_ERR_CLUSTER1_IRQ, MOD_GICX00_MULTIVIEW_VIEW_1 },

@@ -50,7 +50,7 @@ int main(void)
 
     assert(si->gicd_base == SI0_GICD_BASE_VIEW0);
     assert(!si->delayed);
-    assert(si->spi_map_count == 26);
+    assert(si->spi_map_count == 46);
     for (index = 0; index < si->spi_map_count; index++) {
         is_cl1 = false;
         for (other = 0; other < FWK_ARRAY_SIZE(cl1_interrupts); other++)
@@ -62,12 +62,24 @@ int main(void)
             assert(si->spi_map[index].spi != si->spi_map[other].spi);
     }
     assert(cl1_count == FWK_ARRAY_SIZE(cl1_interrupts));
+    for (unsigned int irq = CL0_AP_CLUSTER0_PPU_IRQ;
+         irq < CL0_AP_CLUSTER0_PPU_IRQ + 4 * AP_PPU_IRQ_STRIDE; irq++) {
+        unsigned int owners = 0;
+        for (index = 0; index < si->spi_map_count; index++) {
+            if (si->spi_map[index].spi == irq) {
+                assert(si->spi_map[index].view == MOD_GICX00_MULTIVIEW_VIEW_1);
+                owners++;
+            }
+        }
+        assert(owners == 1);
+    }
     assert(si->redistributor_map_count == 5);
     for (index = 0; index < si->redistributor_map_count; index++)
         assert(si->redistributor_map[index].view ==
             (index == 0 ? MOD_GICX00_MULTIVIEW_VIEW_1 : MOD_GICX00_MULTIVIEW_VIEW_2));
 
     printf("PASS: AP INTIDs 32..991 own View1; SI View1/View2 preserved\n");
+    printf("PASS: AP cluster/core PPU INTIDs 260..279 own SI View1\n");
     printf("Host AP map size: %zu bytes (%zu per SPI)\n",
         sizeof(ap_spi_map), sizeof(ap_spi_map[0]));
     return 0;
