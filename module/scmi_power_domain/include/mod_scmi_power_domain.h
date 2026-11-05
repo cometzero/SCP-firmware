@@ -134,6 +134,13 @@ int scmi_pd_power_state_set_policy(
     unsigned int agent_id,
     fwk_id_t pd_id);
 
+/* Called after an asynchronous request is queued, before acknowledging it.
+ * Platforms may arm a WFI-dependent core transition without waiting for OFF.
+ * Failure must not partially arm a transition. The PD request remains queued.
+ */
+int scmi_pd_prepare_async_response(
+    uint32_t state, unsigned int agent_id, fwk_id_t pd_id);
+
 /*!
  * \}
  */

@@ -262,6 +262,14 @@ static int power_arm(bool arm)
     return status;
 }
 
+int si0_prepare_core_off(unsigned int core_idx)
+{
+    if (core_idx >= platform_get_core_count())
+        return FWK_E_PARAM;
+    return si0_platform_ctx.ppu_recovery_api->prepare_core_off(
+        FWK_ID_ELEMENT(FWK_MODULE_IDX_PPU_V1, core_idx));
+}
+
 int si0_vmcu_accept_shutdown(void)
 {
     int status;

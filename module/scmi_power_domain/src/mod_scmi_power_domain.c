@@ -685,6 +685,9 @@ static int scmi_pd_power_state_set_handler(
          * request and respond to the agent immediately.
          */
         status = scmi_pd_ctx.pd_api->set_state(pd_id, false, power_state);
+        if (status == FWK_SUCCESS)
+            status = scmi_pd_prepare_async_response(
+                power_state, agent_idx, pd_id);
         if (status == FWK_SUCCESS) {
             return_values.status = (int32_t)SCMI_SUCCESS;
             return scmi_pd_ctx.scmi_api->respond(
@@ -945,6 +948,12 @@ static int scmi_pd_power_state_change_requested_notify_handler(
 /*
  * SCMI Power Domain Policy Handlers
  */
+FWK_WEAK int scmi_pd_prepare_async_response(
+    uint32_t state, unsigned int agent_id, fwk_id_t pd_id)
+{
+    return FWK_SUCCESS;
+}
+
 FWK_WEAK int scmi_pd_power_state_set_policy(
     enum mod_scmi_pd_policy_status *policy_status,
     uint32_t *state,

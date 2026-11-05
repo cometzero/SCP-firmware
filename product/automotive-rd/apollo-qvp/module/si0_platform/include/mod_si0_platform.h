@@ -114,6 +114,7 @@ struct mod_si0_vmcu_api {
 };
 /* Called only by the QVP SCMI policy for the trusted PSCI shutdown channel. */
 int si0_vmcu_accept_shutdown(void);
+int si0_prepare_core_off(unsigned int core_idx);
 
 /*!
  * \brief List of isolated CPU MPIDs.
