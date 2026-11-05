@@ -268,6 +268,13 @@ struct ppu_v1_boot_api {
  */
 struct mod_ppu_v1_recovery_api {
     /*!
+     * Arm graceful core OFF before acknowledging a PSCI request. The caller
+     * must still enqueue the requested state in the power domain module.
+     * The core remains executing until its powerdown WFI.
+     */
+    int (*prepare_core_off)(fwk_id_t pd_id);
+
+    /*!
      * Cancel pending core transitions, request static OFF and report completion.
      * The caller must also update the power domain module's requested policy.
      * This bypasses graceful OFF and must only be used for forced recovery.

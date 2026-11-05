@@ -656,13 +656,18 @@ static void expect_static_off(struct ppu_v1_pd_ctx *pd)
     ppu_v1_off_unlock_Expect(&pd->ppu);
 }
 
-static void request_graceful_off(struct ppu_v1_pd_ctx *pd)
+static void expect_graceful_off(struct ppu_v1_pd_ctx *pd)
 {
     expect_off_mask(pd);
     ppu_v1_get_power_mode_ExpectAndReturn(&pd->ppu, PPU_V1_MODE_ON);
     ppu_v1_lock_off_enable_Expect(&pd->ppu);
     ppu_v1_dynamic_enable_Expect(&pd->ppu, PPU_V1_MODE_OFF);
     ppu_v1_interrupt_unmask_Expect(&pd->ppu, PPU_V1_IMR_DYN_POLICY_MIN_IRQ_MASK);
+}
+
+static void request_graceful_off(struct ppu_v1_pd_ctx *pd)
+{
+    expect_graceful_off(pd);
     TEST_ASSERT_EQUAL(FWK_SUCCESS,
         ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_OFF));
     TEST_ASSERT_TRUE(pd->off_pending);
@@ -714,6 +719,40 @@ void test_graceful_off_waits_for_wfi_and_rejects_stale_min_irq(void)
     TEST_ASSERT_FALSE(pd->off_pending);
     TEST_ASSERT_EQUAL(1, cluster_reports);
     TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_state);
+}
+
+void test_prepare_off_arms_before_ack_and_queued_policy_is_idempotent(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    fwk_module_is_valid_element_id_ExpectAndReturn(pd->id, true);
+    fwk_id_get_module_idx_ExpectAndReturn(pd->id, FWK_MODULE_IDX_PPU_V1);
+    expect_graceful_off(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, recovery_api.prepare_core_off(pd->id));
+    TEST_ASSERT_TRUE(pd->off_pending);
+    TEST_ASSERT_EQUAL(0, cluster_reports);
+
+    /* The PD request is processed after the SCMI response, before WFI. */
+    TEST_ASSERT_EQUAL(FWK_SUCCESS,
+        ppu_v1_core_pd_set_state(pd->id, MOD_PD_STATE_OFF));
+    TEST_ASSERT_TRUE(pd->off_pending);
+    TEST_ASSERT_EQUAL(0, queued_reports);
+    complete_off_irq(pd);
+    TEST_ASSERT_EQUAL(FWK_SUCCESS, ppu_v1_process_event(&queued_report, NULL));
+    TEST_ASSERT_FALSE(pd->off_pending);
+    TEST_ASSERT_EQUAL(1, cluster_reports);
+    TEST_ASSERT_EQUAL(MOD_PD_STATE_OFF, captured_state);
+}
+
+void test_prepare_off_rejects_immediate_power_cut_configuration(void)
+{
+    struct ppu_v1_pd_ctx *pd = graceful_core();
+    struct mod_ppu_v1_pd_config config = *pd->config;
+    config.graceful_core_off = false;
+    pd->config = &config;
+    fwk_module_is_valid_element_id_ExpectAndReturn(pd->id, true);
+    fwk_id_get_module_idx_ExpectAndReturn(pd->id, FWK_MODULE_IDX_PPU_V1);
+    TEST_ASSERT_EQUAL(FWK_E_SUPPORT, recovery_api.prepare_core_off(pd->id));
+    TEST_ASSERT_FALSE(pd->off_pending);
 }
 
 void test_on_during_graceful_off_is_reported_after_off(void)
@@ -890,6 +929,8 @@ int mod_ppu_v1_test_main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_graceful_off_waits_for_wfi_and_rejects_stale_min_irq);
+    RUN_TEST(test_prepare_off_arms_before_ack_and_queued_policy_is_idempotent);
+    RUN_TEST(test_prepare_off_rejects_immediate_power_cut_configuration);
     RUN_TEST(test_on_during_graceful_off_is_reported_after_off);
     RUN_TEST(test_repeated_off_cancels_deferred_on);
     RUN_TEST(test_force_off_cancels_stale_completion_across_new_off);

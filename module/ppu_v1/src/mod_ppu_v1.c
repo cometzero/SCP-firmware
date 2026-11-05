@@ -1027,6 +1027,25 @@ static const struct ppu_v1_boot_api boot_api = {
 };
 
 #ifdef BUILD_HAS_MOD_POWER_DOMAIN
+static int ppu_prepare_core_off(fwk_id_t pd_id)
+{
+    struct ppu_v1_pd_ctx *pd_ctx;
+    unsigned int index;
+
+    if (!fwk_module_is_valid_element_id(pd_id) ||
+        fwk_id_get_module_idx(pd_id) != FWK_MODULE_IDX_PPU_V1)
+        return FWK_E_PARAM;
+    index = fwk_id_get_element_idx(pd_id);
+    if (index >= ppu_v1_ctx.pd_ctx_table_size)
+        return FWK_E_PARAM;
+    pd_ctx = &ppu_v1_ctx.pd_ctx_table[index];
+    if (pd_ctx->config->pd_type != MOD_PD_TYPE_CORE ||
+        !pd_ctx->config->graceful_core_off ||
+        pd_ctx->pd_driver_input_api == NULL)
+        return FWK_E_SUPPORT;
+    return ppu_v1_core_pd_set_state(pd_id, MOD_PD_STATE_OFF);
+}
+
 static int ppu_force_core_off(fwk_id_t pd_id)
 {
     struct ppu_v1_pd_ctx *pd_ctx;
@@ -1046,6 +1065,7 @@ static int ppu_force_core_off(fwk_id_t pd_id)
 }
 
 static const struct mod_ppu_v1_recovery_api recovery_api = {
+    .prepare_core_off = ppu_prepare_core_off,
     .force_core_off = ppu_force_core_off,
 };
 #endif
